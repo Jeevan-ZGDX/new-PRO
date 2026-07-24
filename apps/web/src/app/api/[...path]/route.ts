@@ -4,7 +4,7 @@ import {
   winners, auditLogs, notifications, verificationRequests,
   ensureLoaded, pushRegistration, pushNotification,
   pushVerificationRequest, pushWinner, pushStudent, pushAdvisor,
-  syncRegistration,
+  pushCompetition, syncRegistration, syncVerificationRequests, syncNotifications,
 } from '@/lib/firebase-data'
 import { getAllRoleAccessData, setUserAccess, checkUserAccess } from '@/lib/firestore-service'
 import type { UserRole } from '@/lib/auth'
@@ -25,6 +25,7 @@ const userProfile = {
   language: 'en' as const,
 }
 
+// ─── Types & Helper Functions ───────────────────────────────────────
 type RouteHandler = (req: NextRequest, segments: string[]) => Promise<NextResponse>
 
 function ok(data: unknown) {
@@ -169,6 +170,41 @@ register('PUT', '/auth/language', async (req) => {
 register('POST', '/auth/logout', async () => ok(null))
 
 // --- COMPETITIONS ---
+register('POST', '/competitions', async (req) => {
+  const body = await req.json()
+  const { title, description, shortDescription, category, scope, mode, organizer, websiteUrl, registrationUrl, teamSizeMin, teamSizeMax, prizePool, registrationDeadline, startDate, endDate, eligibility, tags } = body
+  if (!title || !category || !scope || !mode || !organizer) {
+    return NextResponse.json({ success: false, error: { code: 'BAD_REQUEST', message: 'title, category, scope, mode, and organizer are required' } }, { status: 400 })
+  }
+  const now = new Date().toISOString()
+  const newCompetition = {
+    id: 'comp-' + Date.now(),
+    title,
+    description: description || '',
+    shortDescription: shortDescription || '',
+    category,
+    scope,
+    mode,
+    organizer,
+    organizerLogo: null,
+    bannerUrl: null,
+    websiteUrl: websiteUrl || '',
+    registrationUrl: registrationUrl || '',
+    teamSizeMin: teamSizeMin || 1,
+    teamSizeMax: teamSizeMax || 1,
+    prizePool: prizePool || '',
+    registrationDeadline: registrationDeadline || '',
+    startDate: startDate || '',
+    endDate: endDate || '',
+    eligibility: eligibility || { departments: [], yearOfStudy: [], description: '' },
+    tags: tags || [],
+    createdAt: now,
+    updatedAt: now,
+  }
+  await pushCompetition(newCompetition)
+  return ok(newCompetition)
+})
+
 register('GET', '/competitions', async (req) => {
   const qs = new URL(req.url).searchParams
   const filtered = filterComps(competitions, qs)
@@ -199,75 +235,23 @@ register('GET', '/competitions/:id', async (req, seg) => {
   if (!comp) return NextResponse.json({ success: false, error: { code: 'NOT_FOUND', message: 'Competition not found' } }, { status: 404 })
   return ok({
     ...comp,
-    instructions: 'Please read all rules carefully before registering.',
-    contactEmail: 'events@citchennai.net',
-    contactPhone: '+91-44-22345678',
-    venue: comp.mode === 'offline' ? 'CIT Main Campus, Chennai' : undefined,
-    isBookmarked: false,
-    bookmarkCount: Math.floor(Math.random() * 50) + 5,
     registrationCount: registrations.filter(r => r.competitionId === id).length,
+    isBookmarked: false,
+    bookmarkCount: 0,
   })
 })
 
-register('POST', '/competitions', async (req) => {
-  const body = await req.json()
-  const newComp = {
-    id: 'comp-' + (competitions.length + 1),
-    ...body,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  }
-  competitions.push(newComp)
-  return ok(newComp)
-})
-
-register('PUT', '/competitions/:id', async (req, seg) => {
+register('POST', '/competitions/:id/bookmark', async (req, seg) => {
   const id = seg[1]
-  const body = await req.json()
-  const idx = competitions.findIndex(c => c.id === id)
-  if (idx === -1) return NextResponse.json({ success: false, error: { code: 'NOT_FOUND', message: 'Competition not found' } }, { status: 404 })
-  competitions[idx] = { ...competitions[idx], ...body, updatedAt: new Date().toISOString() }
-  return ok(competitions[idx])
+  return ok({ message: 'Competition bookmarked', id })
 })
 
-register('DELETE', '/competitions/:id', async (req, seg) => {
+register('GET', '/competitions/:id/match-feedback', async (req, seg) => {
   const id = seg[1]
-  const idx = competitions.findIndex(c => c.id === id)
-  if (idx === -1) return NextResponse.json({ success: false, error: { code: 'NOT_FOUND', message: 'Competition not found' } }, { status: 404 })
-  competitions.splice(idx, 1)
-  return ok(null)
+  return ok({ feedback: `Your performance in ${competitions.find(c => c.id === id)?.title || 'this competition'}` })
 })
 
-// --- COMPETITION DASHBOARD (for Advisor/HOD/COE) ---
-register('GET', '/competitions/:id/dashboard', async (req, seg) => {
-  const id = seg[1]
-  const comp = competitions.find(c => c.id === id)
-  if (!comp) return NextResponse.json({ success: false, error: { code: 'NOT_FOUND', message: 'Competition not found' } }, { status: 404 })
-
-  const registered = registrations.filter(r => r.competitionId === id)
-  const registeredIds = new Set(registered.map(r => r.userId))
-  const eligibleDepts = comp.eligibility.departments
-  const unregistered = students
-    .filter(s => eligibleDepts.includes(s.department) && !registeredIds.has(s.id))
-    .map(s => ({ id: s.id, name: s.name, email: s.email, department: s.department, section: s.section }))
-
-  const byDept: Record<string, number> = {}
-  registered.forEach(r => {
-    byDept[r.department] = (byDept[r.department] || 0) + 1
-  })
-  const registrationsByDepartment = Object.entries(byDept).map(([department, count]) => ({ department, count }))
-
-  return ok({
-    competition: comp,
-    registeredStudents: registered,
-    unregisteredStudents: unregistered,
-    totalRegistered: registered.length,
-    totalUnregistered: unregistered.length,
-    registrationsByDepartment,
-  })
-})
-
-// --- REGISTRATIONS ---
+// ─── REGISTRATIONS ───────────────────────────────────────────────────
 register('GET', '/registrations', async (req) => {
   const qs = new URL(req.url).searchParams
   const filtered = filterRegs(registrations, qs)
@@ -276,29 +260,28 @@ register('GET', '/registrations', async (req) => {
   return ok(paginated(filtered, page, limit))
 })
 
-register('GET', '/registrations/stats', async () => {
-  const totalRegistered = registrations.length
-  const totalVerified = registrations.filter(r => r.status === 'verified' || r.status === 'completed').length
-  const totalCompleted = registrations.filter(r => r.status === 'completed').length
-  const totalRejected = registrations.filter(r => r.status === 'rejected').length
-  const totalPending = registrations.filter(r => r.status === 'pending_verification').length
-  return ok({ totalRegistered, totalVerified, totalCompleted, totalRejected, totalPending, verificationRate: Math.round((totalVerified / totalRegistered) * 100) })
-})
-
 register('POST', '/registrations', async (req) => {
   const body = await req.json()
-  const comp = competitions.find(c => c.id === body.competitionId)!
-  const newReg: (typeof registrations)[0] = {
-    id: 'reg-' + (registrations.length + 1),
-    competitionId: body.competitionId,
-    competition: comp as (typeof registrations)[0]['competition'],
-    userId: 'user-1',
-    userName: 'Current User',
-    department: '',
+  const { competitionId, userId, verificationMethod, confirmationScreenshot, confirmationEmail } = body
+  if (!competitionId || !userId || !verificationMethod) {
+    return NextResponse.json({ success: false, error: { code: 'BAD_REQUEST', message: 'competitionId, userId, and verificationMethod are required' } }, { status: 400 })
+  }
+  const existing = registrations.find(r => r.competitionId === competitionId && r.userId === userId)
+  if (existing) return ok({ ...existing, alreadyRegistered: true })
+  const comp = competitions.find(c => c.id === competitionId)
+  if (!comp) return NextResponse.json({ success: false, error: { code: 'NOT_FOUND', message: 'Competition not found' } }, { status: 404 })
+  const user = students.find(s => s.id === userId)
+  if (!user) return NextResponse.json({ success: false, error: { code: 'NOT_FOUND', message: 'User not found' } }, { status: 404 })
+  const newRegistration = {
+    id: 'reg-' + Date.now(),
+    competitionId,
+    userId,
+    userName: user.name,
+    department: user.department,
     status: 'pending_verification' as const,
     registeredAt: new Date().toISOString(),
     verifiedAt: null,
-    verificationMethod: body.verificationMethod || null,
+    verificationMethod,
     extractedConfirmationId: null,
     extractedEmail: null,
     rejectionReason: null,
@@ -306,58 +289,53 @@ register('POST', '/registrations', async (req) => {
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   }
-  await pushRegistration(newReg)
-  return ok(newReg)
+  await pushRegistration(newRegistration)
+  await pushNotification({
+    id: 'notif-' + Date.now(),
+    userId,
+    type: 'verification_update',
+    title: 'Registration Submitted',
+    message: `Your registration for ${comp.title} has been submitted and is pending verification.`,
+    data: null,
+    isRead: false,
+    createdAt: new Date().toISOString(),
+  })
+  return ok({ ...newRegistration, alreadyRegistered: false })
 })
 
-register('GET', '/registrations/lookup', async (req) => {
-  const qs = new URL(req.url).searchParams
-  const email = qs.get('email')?.toLowerCase().trim()
-  if (!email) return ok({ found: false, registrations: [] })
-  const student = students.find(s => s.email.toLowerCase() === email)
-  if (!student) return ok({ found: false, registrations: [] })
-  const regs = registrations.filter(r => r.userId === student.id)
-  return ok({ found: true, student, registrations: regs })
+register('GET', '/registrations/user/:userId', async (req, seg) => {
+  const userId = seg[1]
+  const userRegs = registrations.filter(r => r.userId === userId)
+  return ok(userRegs.map(r => ({
+    ...r,
+    competition: competitions.find(c => c.id === r.competitionId) || null,
+  })))
 })
 
 register('GET', '/registrations/:id', async (req, seg) => {
   const id = seg[1]
   const reg = registrations.find(r => r.id === id)
   if (!reg) return NextResponse.json({ success: false, error: { code: 'NOT_FOUND', message: 'Registration not found' } }, { status: 404 })
-  return ok(reg)
-})
-
-register('PATCH', '/registrations/:id/verify', async (req, seg) => {
-  const id = seg[1]
-  const body = await req.json()
-  const reg = registrations.find(r => r.id === id)
-  if (!reg) return NextResponse.json({ success: false, error: { code: 'NOT_FOUND', message: 'Registration not found' } }, { status: 404 })
-  reg.status = body.action === 'approve' ? 'verified' : 'rejected'
-  if (body.action === 'approve') reg.verifiedAt = new Date().toISOString()
-  reg.rejectionReason = body.reason || null
-  return ok(reg)
-})
-
-// --- EMAIL VERIFICATION (keyword search + request) ---
-register('GET', '/registrations/search', async (req) => {
-  const qs = new URL(req.url).searchParams
-  const keyword = qs.get('keyword')?.toLowerCase().trim()
-  const email = qs.get('email')?.toLowerCase().trim()
-  if (!keyword || !email) return ok({ matches: [] })
-  const student = students.find(s => s.email.toLowerCase() === email)
-  if (!student) return ok({ matches: [] })
-  const matchingComps = competitions.filter(c =>
-    c.title.toLowerCase().includes(keyword) ||
-    c.shortDescription.toLowerCase().includes(keyword) ||
-    c.tags.some((t: string) => t.toLowerCase().includes(keyword))
-  )
-  const matches = matchingComps.map(comp => {
-    const reg = registrations.find(r => r.competitionId === comp.id && r.userId === student.id)
-    return { competition: comp, registration: reg || null, isRegistered: !!reg }
+  return ok({
+    ...reg,
+    competition: competitions.find(c => c.id === reg.competitionId) || null,
+    user: students.find(s => s.id === reg.userId) || null,
   })
-  return ok({ student, matches })
 })
 
+register('PUT', '/registrations/:id', async (req, seg) => {
+  const id = seg[1]
+  const updates = await req.json()
+  const item = registrations.find(r => r.id === id)
+  if (!item) return NextResponse.json({ success: false, error: { code: 'NOT_FOUND', message: 'Registration not found' } }, { status: 404 })
+  const updated = { ...item, ...updates, updatedAt: new Date().toISOString() }
+  const idx = registrations.indexOf(item)
+  registrations[idx] = updated
+  await syncRegistration(updated.id)
+  return ok(updated)
+})
+
+// ─── VERIFICATION REQUESTS ───────────────────────────────────────────
 register('POST', '/verification-requests', async (req) => {
   const body = await req.json()
   const { registrationId, studentEmail } = body
@@ -383,7 +361,7 @@ register('POST', '/verification-requests', async (req) => {
   await pushVerificationRequest(newVr as any)
   await pushNotification({
     id: 'notif-' + (notifications.length + 1),
-    userId: 'adv-1',
+    userId: student.id,
     type: 'verification_update' as const,
     title: 'Verification Requested',
     message: `${student.name} has requested verification for ${reg.competition?.title || 'a competition'}.`,
@@ -394,296 +372,93 @@ register('POST', '/verification-requests', async (req) => {
   return ok({ ...newVr, alreadyRequested: false })
 })
 
-// --- NOTIFICATIONS ---
-register('GET', '/notifications', async (req) => {
-  const qs = new URL(req.url).searchParams
-  const page = parseInt(qs.get('page') || '1')
-  const limit = parseInt(qs.get('limit') || '10')
-  return ok({
-    data: notifications.slice((page - 1) * limit, page * limit),
-    total: notifications.length,
-    unreadCount: notifications.filter(n => !n.isRead).length,
-    page,
-    limit,
-  })
-})
-
-register('PATCH', '/notifications/:id/read', async (req, seg) => {
-  const n = notifications.find(x => x.id === seg[1])
-  if (n) n.isRead = true
-  return ok(null)
-})
-
-register('PATCH', '/notifications/read-all', async () => {
-  notifications.forEach(n => { n.isRead = true })
-  return ok(null)
-})
-
-register('GET', '/notifications/unread-count', async () => ok({ count: notifications.filter(n => !n.isRead).length }))
-
-// --- STUDENT DASHBOARD ---
-register('GET', '/student/dashboard/stats', async (req) => {
-  const email = getEmailFromToken(req)
-  const profile = getProfileByEmail(email)
-  const myRegistrations = registrations.filter(r => r.userId === profile.id || r.userName === profile.name)
-  const pending = myRegistrations.filter(r => r.status === 'pending_verification').length
-  const verified = myRegistrations.filter(r => r.status === 'verified' || r.status === 'completed').length
-  const winCount = winners.filter(w => w.email === email).length
-  const upcoming = competitions.filter(c => new Date(c.startDate) > new Date()).slice(0, 5)
-  const recentVerified = myRegistrations.filter(r => r.verifiedAt).sort((a, b) => new Date(b.verifiedAt!).getTime() - new Date(a.verifiedAt!).getTime()).slice(0, 5)
-
-  return ok({
-    totalRegistered: myRegistrations.length,
-    totalVerified: verified,
-    totalPending: pending,
-    totalWins: winCount,
-    registrations: myRegistrations,
-    upcomingCompetitions: upcoming,
-    recentVerifiedRegs: recentVerified,
-  })
-})
-
-// --- STUDENT HISTORY ---
-register('GET', '/student/history', async (req) => {
-  const email = getEmailFromToken(req)
-  const profile = getProfileByEmail(email)
-  const myRegs = registrations.filter(r => r.userId === profile.id || r.userName === profile.name)
-  const history = myRegs.map(r => {
-    const win = winners.find(w => w.competitionId === r.competitionId && (w.email === email))
-    return {
-      registration: r,
-      competition: r.competition,
-      status: r.status,
-      verifiedAt: r.verifiedAt,
-      position: win?.position || null,
-      prize: win?.prize || null,
-    }
-  })
-  return ok(history)
-})
-
-// --- LEADERBOARD ---
-register('GET', '/leaderboard/overall', async () => {
-  const ranked = [...students]
-    .sort((a, b) => b.registeredCompetitions - a.registeredCompetitions)
-    .map((s, i) => ({
-      rank: i + 1,
-      studentName: s.name,
-      email: s.email,
-      department: s.department,
-      points: s.registeredCompetitions * 10,
-      competitionsCount: s.registeredCompetitions,
-      wins: winners.filter(w => w.email === s.email).length,
-    }))
-  return ok(ranked)
-})
-
-register('GET', '/leaderboard/department', async (req) => {
-  const qs = new URL(req.url).searchParams
-  const dept = qs.get('department')
-  let filtered = [...students]
-  if (dept) filtered = filtered.filter(s => s.department === dept)
-  const ranked = filtered
-    .sort((a, b) => b.registeredCompetitions - a.registeredCompetitions)
-    .map((s, i) => ({
-      rank: i + 1,
-      studentName: s.name,
-      email: s.email,
-      department: s.department,
-      points: s.registeredCompetitions * 10,
-      competitionsCount: s.registeredCompetitions,
-      wins: winners.filter(w => w.email === s.email).length,
-    }))
-  return ok(ranked)
-})
-
-register('GET', '/leaderboard/departments', async () => {
-  const deptStats = departments.map(d => {
-    const deptStudents = students.filter(s => s.department === d.name)
-    const totalPoints = deptStudents.reduce((sum, s) => sum + (s as any).points || s.registeredCompetitions * 10, 0)
-    const totalWins = winners.filter(w => w.department === d.name).length
-    return {
-      department: d.name,
-      fullName: d.fullName,
-      totalPoints,
-      totalCompetitions: d.competitionCount,
-      totalWins,
-      studentCount: d.studentCount,
-    }
-  }).sort((a, b) => b.totalPoints - a.totalPoints)
-  return ok(deptStats)
-})
-
-register('GET', '/leaderboard/competition/:id', async (req, seg) => {
-  const id = seg[2]
-  const comp = competitions.find(c => c.id === id)
-  if (!comp) return NextResponse.json({ success: false, error: { code: 'NOT_FOUND', message: 'Competition not found' } }, { status: 404 })
-  const compWinners = winners.filter(w => w.competitionId === id)
-  const ranked = compWinners.map((w, i) => ({
-    rank: i + 1,
-    studentName: w.studentName,
-    email: w.email,
-    department: w.department,
-    score: 100 - i * 10,
-    position: w.position,
-  }))
-  return ok(ranked)
-})
-
-// --- ADVISOR REMINDER ---
-register('POST', '/advisor/remind/:id', async (req, seg) => {
-  const id = seg[2]
-  const comp = competitions.find(c => c.id === id)
-  if (!comp) return NextResponse.json({ success: false, error: { code: 'NOT_FOUND', message: 'Competition not found' } }, { status: 404 })
-  const registeredIds = new Set(registrations.filter(r => r.competitionId === id).map(r => r.userId))
-  const unregistered = students.filter(s => comp.eligibility.departments.includes(s.department) && !registeredIds.has(s.id))
+register('POST', '/verification-requests/with-proof', async (req) => {
+  const body = await req.json()
+  const { registrationId, emailProof, studentId } = body
+  if (!registrationId || !emailProof || !studentId) return NextResponse.json({ success: false, error: { code: 'BAD_REQUEST', message: 'registrationId, emailProof, and studentId required' } }, { status: 400 })
+  const vr = verificationRequests.find(v => v.registrationId === registrationId && v.studentId === studentId)
+  if (!vr) return NextResponse.json({ success: false, error: { code: 'NOT_FOUND', message: 'Verification request not found' } }, { status: 404 })
+  const student = students.find(s => s.id === studentId)
+  if (!student) return NextResponse.json({ success: false, error: { code: 'NOT_FOUND', message: 'Student not found' } }, { status: 404 })
+  vr.emailProof = emailProof
+  vr.status = 'under_review'
+  vr.advisorNotified = true
+  vr.reviewedAt = new Date().toISOString()
+  await syncVerificationRequests()
   await pushNotification({
     id: 'notif-' + (notifications.length + 1),
-    userId: 'adv-1',
-    type: 'deadline_reminder' as const,
-    title: 'Reminder Sent',
-    message: `Reminder sent to ${unregistered.length} students for ${comp.title}.`,
+    userId: student.id,
+    type: 'verification_update' as const,
+    title: 'Verification Under Review',
+    message: `Your verification request for ${vr.competitionTitle} has been received and is under review.`,
     data: null,
     isRead: false,
     createdAt: new Date().toISOString(),
   })
-  return ok({ reminded: unregistered.length, students: unregistered.map(s => s.name) })
+  return ok(vr)
 })
 
-// --- ADVISOR DASHBOARD ---
-register('GET', '/advisor/dashboard/stats', async (req) => {
-  const totalRegistrations = registrations.length
-  const verifiedRegistrations = registrations.filter(r => r.status === 'verified' || r.status === 'completed').length
-  const verificationRate = totalRegistrations > 0 ? Math.round((verifiedRegistrations / totalRegistrations) * 100) : 0
-  const registrationsOverTime = [
-    { date: '2025-04-01', count: 2 }, { date: '2025-04-08', count: 3 }, { date: '2025-04-15', count: 1 },
-    { date: '2025-04-22', count: 4 }, { date: '2025-05-01', count: 5 }, { date: '2025-05-08', count: 3 },
-    { date: '2025-05-15', count: 7 }, { date: '2025-05-22', count: 4 }, { date: '2025-06-01', count: 6 },
-    { date: '2025-06-08', count: 8 }, { date: '2025-06-15', count: 5 }, { date: '2025-06-22', count: 3 },
-  ]
-  const topDepartments = departments.map(d => ({ name: d.name, count: students.filter(s => s.department === d.name).length * 3 })).sort((a, b) => b.count - a.count).slice(0, 5)
-  const recentVerified = registrations.filter(r => r.verifiedAt).sort((a, b) => new Date(b.verifiedAt!).getTime() - new Date(a.verifiedAt!).getTime()).slice(0, 5)
-  const pendingVerifications = registrations.filter(r => r.status === 'pending_verification').slice(0, 5)
-  const selfVerificationRequests = verificationRequests.filter(v => v.status === 'pending').slice(0, 5)
-
-  return ok({ totalCompetitions: competitions.length, totalRegistrations, verifiedRegistrations, verificationRate, registrationsOverTime, topDepartments, recentVerified, pendingVerifications, selfVerificationRequests })
+register('PUT', '/verification-requests/:id', async (req, seg) => {
+  const id = seg[1]
+  const updates = await req.json()
+  const item = verificationRequests.find(v => v.id === id)
+  if (!item) return NextResponse.json({ success: false, error: { code: 'NOT_FOUND', message: 'Verification request not found' } }, { status: 404 })
+  const updated = { ...item, ...updates }
+  const idx = verificationRequests.indexOf(item)
+  verificationRequests[idx] = updated
+  await syncVerificationRequests()
+  return ok(updated)
 })
 
-// --- HOD DASHBOARD ---
-register('GET', '/hod/dashboard/stats', async (req) => {
-  const email = getEmailFromToken(req)
-  const profile = getProfileByEmail(email)
-  const dept = profile.department || 'CSE'
-  const deptStudents = students.filter(s => s.department === dept)
-  const deptRegistrations = registrations.filter(r => deptStudents.some(ds => ds.id === r.userId))
-  const deptCompetitions = competitions.filter(c => c.eligibility.departments.includes(dept))
-  const registered = deptRegistrations.length
-  const unregistered = deptStudents.length - new Set(deptRegistrations.map(r => r.userId)).size
-
-  const years = ['1st Year', '2nd Year', '3rd Year', '4th Year']
-  const yearWise = years.map(year => {
-    const yrStudents = deptStudents.filter(s => s.year === year)
-    const yrRegistrations = deptRegistrations.filter(r => yrStudents.some(s => s.id === r.userId))
-    return {
-      year,
-      studentCount: yrStudents.length,
-      registrationCount: yrRegistrations.length,
-      verifiedCount: yrRegistrations.filter(r => r.status === 'verified' || r.status === 'completed').length,
-      pendingCount: yrRegistrations.filter(r => r.status === 'pending_verification').length,
-    }
-  })
-
-  return ok({
-    department: dept,
-    totalStudents: deptStudents.length,
-    totalCompetitions: deptCompetitions.length,
-    registeredCount: registered,
-    unregisteredCount: Math.max(0, unregistered),
-    registrations: deptRegistrations.slice(0, 10),
-    yearWise,
-    selfVerificationRequests: verificationRequests.filter(v => v.status === 'pending' && v.department === dept).slice(0, 5),
-  })
+register('GET', '/verification-requests/user/:userId', async (req, seg) => {
+  const userId = seg[1]
+  const userVrs = verificationRequests.filter(v => v.studentId === userId)
+  return ok(userVrs)
 })
 
-// --- COE DASHBOARD ---
-register('GET', '/coe/dashboard/stats', async () => {
-  return ok({
-    totalCompetitions: competitions.length,
-    totalStudents: students.length,
-    totalRegistrations: registrations.length,
-    totalAdvisors: advisors.length,
-    totalDepartments: departments.length,
-    totalWinners: winners.length,
-    registrations: registrations.slice(0, 10),
-    selfVerificationRequests: verificationRequests.filter(v => v.status === 'pending').slice(0, 5),
-    registrationsByDepartment: departments.map(d => ({
-      department: d.name,
-      count: registrations.filter(r => {
-        const s = students.find(st => st.id === r.userId)
-        return s && s.department === d.name
-      }).length,
-    })),
-    recentCompetitions: competitions.slice(-3),
-  })
+// ─── NOTIFICATIONS ───────────────────────────────────────────────────
+register('GET', '/notifications', async (req) => {
+  const qs = new URL(req.url).searchParams
+  const userId = qs.get('userId')
+  if (!userId) return NextResponse.json({ success: false, error: { code: 'BAD_REQUEST', message: 'userId required' } }, { status: 400 })
+  const userNotifications = notifications.filter(n => n.userId === userId)
+  return ok(userNotifications)
 })
 
-// --- ROLE ACCESS ---
-register('GET', '/coe/role-access', async () => {
-  const users = await getAllRoleAccessData()
-  return ok({
-    students: users.filter(u => u.role === 'student'),
-    advisors: users.filter(u => u.role === 'advisor'),
-    hods: users.filter(u => u.role === 'hod'),
-  })
+register('PUT', '/notifications/:id/read', async (req, seg) => {
+  const id = seg[1]
+  const item = notifications.find(n => n.id === id)
+  if (!item) return NextResponse.json({ success: false, error: { code: 'NOT_FOUND', message: 'Notification not found' } }, { status: 404 })
+  item.isRead = true
+  const idx = notifications.indexOf(item)
+  notifications[idx] = item
+  await syncNotifications()
+  return ok(item)
 })
 
-register('PATCH', '/coe/role-access/:id', async (req, seg) => {
-  const body = await req.json()
-  const id = seg[2]
-  await setUserAccess(id, body.active !== false)
-  return ok({ updated: true, id, active: body.active !== false })
+// ─── AUDIT LOGS ───────────────────────────────────────────────────────
+register('GET', '/audit-logs', async (req) => {
+  const qs = new URL(req.url).searchParams
+  const page = parseInt(qs.get('page') || '1')
+  const limit = parseInt(qs.get('limit') || '10')
+  return ok(paginated(auditLogs, page, limit))
 })
 
-// --- FILE UPLOAD (Firebase Storage) ---
-register('POST', '/upload', async (req) => {
-  try {
-    const formData = await req.formData()
-    const file = formData.get('file') as File | null
-    const folder = (formData.get('folder') as string) || 'uploads'
-
-    if (!file) {
-      return NextResponse.json({ success: false, error: { code: 'BAD_REQUEST', message: 'No file provided' } }, { status: 400 })
-    }
-
-    const { uploadFile } = await import('@/lib/storage-service')
-    const buffer = Buffer.from(await file.arrayBuffer())
-    const result = await uploadFile(buffer, file.name, file.type || 'application/octet-stream', folder)
-
-    return ok(result)
-  } catch (err: any) {
-    return NextResponse.json({ success: false, error: { code: 'UPLOAD_FAILED', message: err.message } }, { status: 500 })
-  }
+register('GET', '/audit-logs/:id', async (req, seg) => {
+  const id = seg[1]
+  const log = auditLogs.find(l => l.id === id)
+  if (!log) return NextResponse.json({ success: false, error: { code: 'NOT_FOUND', message: 'Audit log not found' } }, { status: 404 })
+  return ok(log)
 })
 
-register('DELETE', '/upload/:path(*)', async (req, seg) => {
-  try {
-    const path = seg[2]
-    const { deleteFile } = await import('@/lib/storage-service')
-    await deleteFile(decodeURIComponent(path))
-    return ok({ deleted: true })
-  } catch (err: any) {
-    return NextResponse.json({ success: false, error: { code: 'DELETE_FAILED', message: err.message } }, { status: 500 })
-  }
-})
-
-// --- ADMIN ROUTES (legacy - mapped to COE) ---
+// ─── ADMIN ROUTES (legacy - mapped to COE) ───────────────────────────────────
 register('GET', '/admin/dashboard/stats', async () => {
   const totalCompetitions = competitions.length
   const totalRegistrations = registrations.length
   const verifiedRegistrations = registrations.filter(r => r.status === 'verified' || r.status === 'completed').length
   const verificationRate = totalRegistrations > 0 ? Math.round((verifiedRegistrations / totalRegistrations) * 100) : 0
   const registrationsOverTime = [
-    { date: '2025-04-01', count: 2 }, { date: '2025-04-08', count: 3 }, { date: '2025-04-15', count: 1 },
+    { date: '2025-04-01', count: 2 }, { date: '2025-04-08', count: 4 }, { date: '2025-04-15', count: 1 },
     { date: '2025-04-22', count: 4 }, { date: '2025-05-01', count: 5 }, { date: '2025-05-08', count: 3 },
     { date: '2025-05-15', count: 7 }, { date: '2025-05-22', count: 4 }, { date: '2025-06-01', count: 6 },
     { date: '2025-06-08', count: 8 }, { date: '2025-06-15', count: 5 }, { date: '2025-06-22', count: 3 },
@@ -702,15 +477,12 @@ register('GET', '/admin/registrations/stats', async () => {
   const totalPending = registrations.filter(r => r.status === 'pending_verification').length
   const totalRejected = registrations.filter(r => r.status === 'rejected').length
   const totalCompleted = registrations.filter(r => r.status === 'completed').length
-  return ok({
-    totalRegistered, totalVerified, totalCompleted, totalRejected, totalPending,
-    verificationRate: totalRegistered > 0 ? Math.round((totalVerified / totalRegistered) * 100) : 0,
-    totalCompetitions: competitions.length,
-    totalRegistrations: registrations.length,
-    registrationGrowth: 15,
-    verifiedGrowth: 10,
-    verificationRateChange: 5,
-  })
+  const verificationRate = totalRegistered > 0 ? Math.round((totalVerified / totalRegistered) * 100) : 0
+  const registrationGrowth = 15.5
+  const verifiedGrowth = 12.3
+  const verificationRateChange = 2.1
+
+  return ok({ totalRegistered, totalVerified, totalCompleted, totalRejected, totalPending, verificationRate, registrationGrowth, verifiedGrowth, verificationRateChange })
 })
 
 register('GET', '/admin/students', async (req) => {
@@ -797,23 +569,20 @@ register('POST', '/admin/winners', async (req) => {
     position: position || '',
     prize: prize || '',
     date: new Date().toISOString().split('T')[0],
+    verificationDate: new Date().toISOString(),
+    registrationId: null,
   }
   await pushWinner(newWinner)
-
-  const allUserIds = ['user-1', 'user-coe', 'user-hod', 'user-adv', 'user-stu']
-  for (const uid of allUserIds) {
-    await pushNotification({
-      id: 'notif-' + (notifications.length + 1),
-      userId: uid,
-      type: 'winner_announced' as const,
-      title: 'Winner Announced',
-      message: `${studentName} from ${department} has won ${position} in ${competition}!`,
-      data: null,
-      isRead: false,
-      createdAt: new Date().toISOString(),
-    })
-  }
-
+  await pushNotification({
+    id: 'notif-' + (notifications.length + 1),
+    userId: 'user-1',
+    type: 'winner_announced' as const,
+    title: 'Winner Announced',
+    message: `${studentName} from ${department} has won ${position} in ${competition}!`,
+    data: null,
+    isRead: false,
+    createdAt: new Date().toISOString(),
+  })
   return ok(newWinner)
 })
 
@@ -838,25 +607,13 @@ register('GET', '/admin/analytics/stats', async () => {
   return ok({ totalCompetitions, totalParticipants, winRate, verificationRate, competitionTrends, departmentPerformance, verificationRateOverTime })
 })
 
-register('GET', '/admin/audit-logs', async (req) => {
-  const qs = new URL(req.url).searchParams
-  const page = parseInt(qs.get('page') || '1')
-  const limit = parseInt(qs.get('limit') || '10')
-  return ok(paginated(auditLogs, page, limit))
-})
-
-// --- GMAIL OAUTH ---
-const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || ''
-const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET || ''
-const GOOGLE_REDIRECT_URI = process.env.GOOGLE_REDIRECT_URI || 'http://localhost:3000/api/auth/gmail/callback'
-const SCOPES = 'https://www.googleapis.com/auth/gmail.readonly openid email'
-
+// ─── GMAIL OAUTH ---
 register('GET', '/auth/gmail', async (req) => {
   const url = new URL('https://accounts.google.com/o/oauth2/v2/auth')
-  url.searchParams.set('client_id', GOOGLE_CLIENT_ID)
-  url.searchParams.set('redirect_uri', GOOGLE_REDIRECT_URI)
+  url.searchParams.set('client_id', process.env.GOOGLE_CLIENT_ID || '')
+  url.searchParams.set('redirect_uri', process.env.GOOGLE_REDIRECT_URI || 'http://localhost:3000/api/auth/gmail/callback')
   url.searchParams.set('response_type', 'code')
-  url.searchParams.set('scope', SCOPES)
+  url.searchParams.set('scope', 'https://www.googleapis.com/auth/gmail.readonly openid email')
   url.searchParams.set('access_type', 'offline')
   url.searchParams.set('prompt', 'consent')
   return NextResponse.redirect(url.toString())
@@ -867,126 +624,92 @@ register('GET', '/auth/gmail/callback', async (req) => {
   const code = qs.get('code')
   if (!code) return NextResponse.redirect(new URL('/email-verification?error=no_code', req.url))
 
-  const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
+  const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams({
+      client_id: process.env.GOOGLE_CLIENT_ID || '',
+      client_secret: process.env.GOOGLE_CLIENT_SECRET || '',
       code,
-      client_id: GOOGLE_CLIENT_ID,
-      client_secret: GOOGLE_CLIENT_SECRET,
-      redirect_uri: GOOGLE_REDIRECT_URI,
+      redirect_uri: process.env.GOOGLE_REDIRECT_URI || 'http://localhost:3000/api/auth/gmail/callback',
       grant_type: 'authorization_code',
-    }),
+    }).toString(),
   })
-  const tokens = await tokenRes.json()
-  if (!tokens.access_token) return NextResponse.redirect(new URL('/email-verification?error=token_failed', req.url))
 
-  const res = NextResponse.redirect(new URL('/email-verification?auth=success', req.url))
-  res.cookies.set('gmail_token', tokens.access_token, { httpOnly: true, secure: false, path: '/', maxAge: 3600 })
-  if (tokens.refresh_token) res.cookies.set('gmail_refresh_token', tokens.refresh_token, { httpOnly: true, secure: false, path: '/', maxAge: 86400 })
-  return res
+  if (!tokenResponse.ok) return NextResponse.redirect(new URL('/login?error=auth_failed', req.url))
+
+  const { access_token, refresh_token, expires_in } = await tokenResponse.json()
+  const userResponse = await fetch('https://www.googleapis.com/oauth2/v1/userinfo', {
+    headers: { Authorization: `Bearer ${access_token}` },
+  })
+
+  if (!userResponse.ok) return NextResponse.redirect(new URL('/login?error=user_info_failed', req.url))
+
+  const user = await userResponse.json()
+  const token = 'mock-jwt-' + user.email + '-' + Date.now()
+  return ok({ user, token, refreshToken: refresh_token })
 })
 
-register('GET', '/gmail/search', async (req) => {
+register('GET', '/auth/gmail/callback', async (req) => {
   const qs = new URL(req.url).searchParams
-  const keyword = qs.get('keyword')?.trim()
-  if (!keyword) return ok({ emails: [] })
+  const code = qs.get('code')
+  if (!code) return NextResponse.redirect(new URL('/email-verification?error=no_code', req.url))
 
-  const token = req.cookies.get('gmail_token')?.value
-  if (!token) return NextResponse.json({ success: false, error: { code: 'UNAUTHORIZED', message: 'Not authenticated with Gmail' } }, { status: 401 })
-
-  const query = keyword ? `subject:(${keyword}) OR ${keyword}` : ''
-  const searchRes = await fetch(`https://gmail.googleapis.com/gmail/v1/users/me/messages?q=${encodeURIComponent(query)}&maxResults=10`, {
-    headers: { Authorization: `Bearer ${token}` },
+  const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      client_id: process.env.GOOGLE_CLIENT_ID || '',
+      client_secret: process.env.GOOGLE_CLIENT_SECRET || '',
+      code,
+      redirect_uri: process.env.GOOGLE_REDIRECT_URI || 'http://localhost:3000/api/auth/gmail/callback',
+      grant_type: 'authorization_code',
+    }).toString(),
   })
-  if (!searchRes.ok) return ok({ emails: [] })
 
-  const searchData = await searchRes.json()
-  const messages = searchData.messages || []
-  const emails = await Promise.all(
-    messages.map(async (msg: any) => {
-      const detailRes = await fetch(`https://gmail.googleapis.com/gmail/v1/users/me/messages/${msg.id}?format=metadata&metadataHeaders=From&metadataHeaders=Subject&metadataHeaders=Date`, {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-      if (!detailRes.ok) return null
-      const detail = await detailRes.json()
-      const headers = detail.payload?.headers || []
-      const from = headers.find((h: any) => h.name === 'From')?.value || ''
-      const subject = headers.find((h: any) => h.name === 'Subject')?.value || ''
-      const date = headers.find((h: any) => h.name === 'Date')?.value || ''
-      const snippet = detail.snippet || ''
-      return { id: msg.id, from, subject, snippet, date, matchKeyword: keyword }
-    })
-  )
+  if (!tokenResponse.ok) return NextResponse.redirect(new URL('/login?error=auth_failed', req.url))
 
-  return ok({ emails: emails.filter(Boolean) })
+  const { access_token, refresh_token, expires_in } = await tokenResponse.json()
+  const userResponse = await fetch('https://www.googleapis.com/oauth2/v1/userinfo', {
+    headers: { Authorization: `Bearer ${access_token}` },
+  })
+
+  if (!userResponse.ok) return NextResponse.redirect(new URL('/login?error=user_info_failed', req.url))
+
+  const user = await userResponse.json()
+  const token = 'mock-jwt-' + user.email + '-' + Date.now()
+  return ok({ user, token, refreshToken: refresh_token })
 })
 
-register('GET', '/gmail/email-detail', async (req) => {
-  const qs = new URL(req.url).searchParams
-  const id = qs.get('id')
-  if (!id) return ok({ email: null })
-
-  const token = req.cookies.get('gmail_token')?.value
-  if (!token) return NextResponse.json({ success: false, error: { code: 'UNAUTHORIZED', message: 'Not authenticated' } }, { status: 401 })
-
-  const detailRes = await fetch(`https://gmail.googleapis.com/gmail/v1/users/me/messages/${id}?format=metadata&metadataHeaders=From&metadataHeaders=To&metadataHeaders=Subject&metadataHeaders=Date`, {
-    headers: { Authorization: `Bearer ${token}` },
-  })
-  if (!detailRes.ok) return ok({ email: null })
-
-  const detail = await detailRes.json()
-  const headers = detail.payload?.headers || []
-  const from = headers.find((h: any) => h.name === 'From')?.value || ''
-  const to = headers.find((h: any) => h.name === 'To')?.value || ''
-  const subject = headers.find((h: any) => h.name === 'Subject')?.value || ''
-  const date = headers.find((h: any) => h.name === 'Date')?.value || ''
-  const snippet = detail.snippet || ''
-
-  return ok({ email: { id, from, to, subject, snippet, date } })
-})
-
-register('POST', '/verification-requests/with-proof', async (req) => {
+register('POST', '/verification-requests', async (req) => {
   const body = await req.json()
-  const { registrationId, studentEmail, emailProof } = body
-  if (!studentEmail) {
-    return NextResponse.json({ success: false, error: { code: 'BAD_REQUEST', message: 'studentEmail is required' } }, { status: 400 })
-  }
+  const { registrationId, studentEmail } = body
+  if (!registrationId || !studentEmail) return NextResponse.json({ success: false, error: { code: 'BAD_REQUEST', message: 'registrationId and studentEmail required' } }, { status: 400 })
   const student = students.find(s => s.email.toLowerCase() === studentEmail.toLowerCase())
   if (!student) return NextResponse.json({ success: false, error: { code: 'NOT_FOUND', message: 'Student not found' } }, { status: 404 })
-
-  let competitionTitle = 'Unknown'
-  let reg: any = null
-
-  if (registrationId) {
-    reg = registrations.find(r => r.id === registrationId)
-    if (!reg) return NextResponse.json({ success: false, error: { code: 'NOT_FOUND', message: 'Registration not found' } }, { status: 404 })
-    competitionTitle = reg.competition?.title || 'Unknown'
-    const existingVr = verificationRequests.find(v => v.registrationId === registrationId && v.studentId === student.id)
-    if (existingVr) return ok({ ...existingVr, alreadyRequested: true })
-  } else if (emailProof?.subject) {
-    competitionTitle = emailProof.subject
-  }
-
+  const reg = registrations.find(r => r.id === registrationId)
+  if (!reg) return NextResponse.json({ success: false, error: { code: 'NOT_FOUND', message: 'Registration not found' } }, { status: 404 })
+  const existingVr = verificationRequests.find(v => v.registrationId === registrationId && v.studentId === student.id)
+  if (existingVr) return ok({ ...existingVr, alreadyRequested: true })
   const newVr = {
     id: 'vr-' + (verificationRequests.length + 1),
-    registrationId: registrationId || null,
+    registrationId,
     studentId: student.id,
     studentName: student.name,
     department: student.department,
-    competitionTitle,
+    competitionTitle: reg.competition?.title || 'Unknown',
     advisorNotified: false,
-    emailProof: emailProof || null,
+    emailProof: null,
     status: 'pending' as const,
     requestedAt: new Date().toISOString(),
   }
   await pushVerificationRequest(newVr as any)
   await pushNotification({
     id: 'notif-' + (notifications.length + 1),
-    userId: 'adv-1',
+    userId: student.id,
     type: 'verification_update' as const,
-    title: 'Email Proof Submitted',
-    message: `${student.name} has submitted email proof${competitionTitle && competitionTitle !== 'Unknown' ? ` for "${competitionTitle}"` : ''}.`,
+    title: 'Verification Requested',
+    message: `${student.name} has requested verification for ${reg.competition?.title || 'a competition'}.`,
     data: null,
     isRead: false,
     createdAt: new Date().toISOString(),
@@ -994,46 +717,107 @@ register('POST', '/verification-requests/with-proof', async (req) => {
   return ok({ ...newVr, alreadyRequested: false })
 })
 
-register('PATCH', '/verification-requests/:id/verify', async (req, seg) => {
-  const vrId = seg[1]
-  const vr = verificationRequests.find(v => v.id === vrId)
-  if (!vr) return NextResponse.json({ success: false, error: { code: 'NOT_FOUND', message: 'Verification request not found' } }, { status: 404 })
-
-  ;(vr as any).status = 'verified'
-  vr.advisorNotified = true
-
-  if (vr.registrationId) {
-    const reg = registrations.find(r => r.id === vr.registrationId)
-    if (reg) {
-      reg.status = 'verified'
-      reg.verifiedAt = new Date().toISOString()
-      await syncRegistration(reg.id)
-    }
-  }
-
-  await pushNotification({
-    id: 'notif-' + (notifications.length + 1),
-    userId: vr.studentId,
-    type: 'verification_update' as const,
-    title: 'Email Verified',
-    message: `Your email proof has been verified by your class advisor.`,
-    data: null,
-    isRead: false,
-    createdAt: new Date().toISOString(),
-  })
-
-  return ok({ verified: true, vr })
-})
-
-// --- GET all verification requests (for advisor page) ---
-register('GET', '/verification-requests', async (req) => {
+register('GET', '/notifications', async (req) => {
   const qs = new URL(req.url).searchParams
-  const dept = qs.get('department')
-  let result = [...verificationRequests]
-  if (dept) result = result.filter(v => v.department === dept)
-  result.sort((a, b) => new Date(b.requestedAt).getTime() - new Date(a.requestedAt).getTime())
-  return ok(result)
+  const userId = qs.get('userId')
+  if (!userId) return NextResponse.json({ success: false, error: { code: 'BAD_REQUEST', message: 'userId required' } }, { status: 400 })
+  const userNotifications = notifications.filter(n => n.userId === userId)
+  return ok(userNotifications)
 })
+
+register('PUT', '/notifications/:id/read', async (req, seg) => {
+  const id = seg[1]
+  const item = notifications.find(n => n.id === id)
+  if (!item) return NextResponse.json({ success: false, error: { code: 'NOT_FOUND', message: 'Notification not found' } }, { status: 404 })
+  item.isRead = true
+  const idx = notifications.indexOf(item)
+  notifications[idx] = item
+  await syncNotifications()
+  return ok(item)
+})
+
+register('GET', '/audit-logs', async (req) => {
+  const qs = new URL(req.url).searchParams
+  const page = parseInt(qs.get('page') || '1')
+  const limit = parseInt(qs.get('limit') || '10')
+  return ok(paginated(auditLogs, page, limit))
+})
+
+register('GET', '/audit-logs/:id', async (req, seg) => {
+  const id = seg[1]
+  const log = auditLogs.find(l => l.id === id)
+  if (!log) return NextResponse.json({ success: false, error: { code: 'NOT_FOUND', message: 'Audit log not found' } }, { status: 404 })
+  return ok(log)
+})
+
+// ─── IMPORT ENDPOINT ---
+register('POST', '/admin/import', async (req) => {
+  try {
+    const body = await req.json()
+    const { type, items } = body
+    
+    if (!type || !items) {
+      return NextResponse.json(
+        { success: false, error: { code: 'INVALID_REQUEST', message: 'Missing type or items' } },
+        { status: 400 }
+      )
+    }
+    
+    const processedItems = items.map((item: Record<string, unknown>) => {
+      const base = { ...item }
+      if (type === 'advisors' && item.assignedSections && typeof item.assignedSections === 'string') {
+        base.assignedSections = item.assignedSections.split(',').map((s: string) => s.trim()).filter(Boolean)
+      }
+      if (type === 'students' && item.createdAt && typeof item.createdAt === 'string') {
+        base.createdAt = new Date(item.createdAt).toISOString()
+      }
+      if (type === 'competitions' && item.eligibility && typeof item.eligibility === 'string') {
+        base.eligibility = JSON.parse(item.eligibility)
+      }
+      if (type === 'competitions' && item.tags && typeof item.tags === 'string') {
+        base.tags = JSON.parse(item.tags)
+      }
+      return base
+    })
+    
+    // Import to local data stores
+    for (const item of processedItems) {
+      switch (type) {
+        case 'advisors':
+          await pushAdvisor(item)
+          break
+        case 'students':
+          await pushStudent(item)
+          break
+        case 'competitions':
+          await pushCompetition(item)
+          break
+        case 'winners':
+          await pushWinner(item)
+          break
+        case 'registrations':
+          await pushRegistration(item)
+          break
+      }
+    }
+    
+    const remainingItems = items.length > 100 ? items.slice(0, 100) : items
+    return ok({
+      success: true,
+      message: `Successfully imported ${items.length} records for ${type}`,
+      count: items.length,
+      preview: remainingItems.slice(0, 5),
+    })
+  } catch (error) {
+    console.error('Import error:', error)
+    return NextResponse.json(
+      { success: false, error: { code: 'IMPORT_ERROR', message: 'Failed to import data' } },
+      { status: 500 }
+    )
+  }
+})
+
+// ─── END OF IMPORT ENDPOINT ---
 
 export async function GET(request: NextRequest, { params }: { params: { path: string[] } }) {
   return handle(request, params.path)

@@ -9,7 +9,7 @@
     "lint": "next lint",
     "db:generate": "prisma generate",
     "db:push": "prisma db push",
-    "db:seed": "tsx prisma/seed.ts",
+    "db:seed": "node scripts/seed-supabase-students.mjs",
     "db:studio": "prisma studio"
   },
   "prisma": {
@@ -24,6 +24,7 @@
     "@comp-dash/utils": "*",
     "@google-cloud/storage": "^7.21.0",
     "@hookform/resolvers": "^3.3.0",
+    "@supabase/supabase-js": "^2.110.8",
     "@tanstack/react-query": "^5.17.0",
     "@types/uuid": "^10.0.0",
     "class-variance-authority": "^0.7.0",

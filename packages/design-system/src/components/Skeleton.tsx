@@ -18,11 +18,13 @@ const skeletonVariants = cva('animate-pulse bg-gray-200 rounded-xl', {
       threequarters: 'w-3/4',
       half: 'w-1/2',
       third: 'w-1/3',
+      twothirds: 'w-2/3',
       quarter: 'w-1/4',
       xs: 'w-16',
       sm: 'w-24',
       md: 'w-32',
       lg: 'w-48',
+      '3xl': 'w-96',
     },
   },
   defaultVariants: {

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { Suspense, useState, useEffect } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { Card, CardHeader, CardTitle, Badge } from '@comp-dash/design-system'
 import { getCurrentUser } from '@/lib/auth'
@@ -8,7 +8,7 @@ import { Mail, Search, Send, CheckCircle, Inbox, Clock, Shield } from 'lucide-re
 
 type Step = 'signin' | 'permissions' | 'inbox'
 
-export default function EmailVerificationPage() {
+function EmailVerificationContent() {
   const searchParams = useSearchParams()
   const [step, setStep] = useState<Step>('signin')
   const [user, setUser] = useState<any>(null)
@@ -263,7 +263,7 @@ export default function EmailVerificationPage() {
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                     <input type="text" placeholder={useGmail ? 'Search your Gmail inbox...' : 'Search...'}
                       value={keyword} onChange={e => setKeyword(e.target.value)}
-                      onKeyDown={e => { if (e.key === 'Enter') useGmail ? handleSearchGmail() : handleSearchInternal() }}
+                      onKeyDown={e => { if (e.key === 'Enter') { if (useGmail) handleSearchGmail(); else handleSearchInternal() } }}
                       className="w-full pl-10 pr-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm text-gray-700 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent"
                     />
                   </div>
@@ -404,5 +404,17 @@ export default function EmailVerificationPage() {
         </>
       )}
     </div>
+  )
+}
+
+export default function EmailVerificationPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="w-8 h-8 border-2 border-accent border-t-transparent rounded-full animate-spin" />
+      </div>
+    }>
+      <EmailVerificationContent />
+    </Suspense>
   )
 }

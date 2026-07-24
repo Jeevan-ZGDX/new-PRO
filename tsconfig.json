@@ -1,0 +1,18 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "baseUrl": ".",
+    "noEmit": true
+  },
+  "include": [],
+  "references": [
+    { "path": "apps/web" },
+    { "path": "apps/mobile" },
+    { "path": "packages/api" },
+    { "path": "packages/design-system" },
+    { "path": "packages/hooks" },
+    { "path": "packages/i18n" },
+    { "path": "packages/types" },
+    { "path": "packages/utils" }
+  ]
+}

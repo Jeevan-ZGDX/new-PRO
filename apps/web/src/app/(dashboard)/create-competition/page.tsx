@@ -106,7 +106,7 @@ export default function CreateCompetitionPage() {
     try {
       await createMutation.mutateAsync(payload)
       router.push('/competitions')
-    } catch {}
+    } catch { /* ignore */ }
   }
 
   const isValid = form.title && form.category && form.scope && form.mode && form.organizer

@@ -11,20 +11,6 @@ export interface StoredUser {
 const USERS_KEY = 'comp_dash_users'
 const CURRENT_USER_KEY = 'comp_dash_current_user'
 
-const SEED_USERS: StoredUser[] = [
-  { email: 'hod@cit.in', password: 'hod123', role: 'hod', name: 'Dr. HOD Kumar', department: 'CSE' },
-  { email: 'advisor@cit.in', password: 'advisor123', role: 'advisor', name: 'Dr. Priya Sharma', department: 'CSE' },
-  { email: 'student@cit.in', password: 'student123', role: 'student', name: 'Jeevan R', department: 'CSE' },
-  { email: 'admin@cit.in', password: 'admin123', role: 'super_admin', name: 'Super Admin', department: 'Administration' },
-]
-
-export function seedUsers(): void {
-  if (typeof window === 'undefined') return
-  const existing = localStorage.getItem(USERS_KEY)
-  if (existing) return
-  localStorage.setItem(USERS_KEY, JSON.stringify(SEED_USERS))
-}
-
 export function getStoredUsers(): StoredUser[] {
   if (typeof window === 'undefined') return []
   try {
