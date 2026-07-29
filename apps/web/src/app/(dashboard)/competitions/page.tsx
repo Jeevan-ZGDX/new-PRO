@@ -4,26 +4,30 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useTranslation } from 'react-i18next'
 import { Card, Badge } from '@comp-dash/design-system'
-import { useCompetitions } from '@comp-dash/api'
+import { useCompetitions, isSupabaseEnabled } from '@comp-dash/api'
 import { Calendar, MapPin, Users, Clock, ArrowRight, Search } from 'lucide-react'
 import type { CompetitionCategory } from '@comp-dash/types'
 
 const categoryOptions = [
   { label: 'All', value: 'all' },
-  { label: 'Hackathon', value: 'hackathon' },
-  { label: 'Internship', value: 'internship' },
-  { label: 'Workshop', value: 'workshop' },
-  { label: 'Paper Presentation', value: 'paper_presentation' },
+  { label: 'Competition', value: 'competition' },
+  { label: 'C + P', value: 'c + p' },
+  { label: 'C + I', value: 'c + i' },
+  { label: 'Start-up', value: 'start-up' },
 ]
 
 const categoryGradients: Record<string, string> = {
-  hackathon: 'from-violet-500 to-purple-600',
-  internship: 'from-blue-500 to-cyan-600',
-  workshop: 'from-amber-500 to-orange-600',
-  paper_presentation: 'from-emerald-500 to-teal-600',
-  project: 'from-rose-500 to-pink-600',
-  sports: 'from-green-500 to-emerald-600',
-  cultural: 'from-pink-500 to-rose-600',
+  competition: 'from-violet-500 to-purple-600',
+  'c + p': 'from-emerald-500 to-teal-600',
+  'c + i': 'from-blue-500 to-cyan-600',
+  'start-up': 'from-amber-500 to-orange-600',
+}
+
+function formatDate(dateStr: string | null | undefined) {
+  if (!dateStr) return null
+  const d = new Date(dateStr)
+  if (isNaN(d.getTime())) return null
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
 export default function CompetitionsPage() {
@@ -31,6 +35,8 @@ export default function CompetitionsPage() {
   const router = useRouter()
   const [search, setSearch] = useState('')
   const [selectedCategory, setSelectedCategory] = useState('all')
+
+  const realtime = isSupabaseEnabled()
 
   const { data, isLoading } = useCompetitions({
     category: selectedCategory === 'all' ? undefined : (selectedCategory as CompetitionCategory),
@@ -41,9 +47,17 @@ export default function CompetitionsPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">{t('sidebar.competitions')}</h1>
-        <p className="text-gray-500 mt-1">Browse and register for competitions</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">{t('sidebar.competitions')}</h1>
+          <p className="text-gray-500 mt-1">Browse competitions from across India</p>
+        </div>
+        {realtime && (
+          <div className="flex items-center gap-1.5 px-3 py-1.5 bg-green-50 border border-green-200 rounded-full text-xs text-green-700">
+            <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+            Live from Supabase
+          </div>
+        )}
       </div>
 
       <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
@@ -84,40 +98,45 @@ export default function CompetitionsPage() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
           {competitions.map((comp: any) => {
-            const deadline = new Date(comp.registrationDeadline)
-            const isOpen = deadline > new Date()
-            const daysLeft = Math.ceil((deadline.getTime() - Date.now()) / (1000 * 60 * 60 * 24))
+            const deadline = comp.registrationDeadline ? new Date(comp.registrationDeadline) : null
+            const isOpen = deadline ? deadline > new Date() : true
+            const daysLeft = deadline ? Math.ceil((deadline.getTime() - Date.now()) / (1000 * 60 * 60 * 24)) : null
 
             return (
               <div key={comp.id}
                 className="bg-white border border-gray-200 rounded-2xl overflow-hidden hover:shadow-lg hover:border-accent/20 transition-all cursor-pointer group"
                 onClick={() => router.push(`/competitions/${comp.id}`)}
               >
-                <div className={`h-2 bg-gradient-to-r ${categoryGradients[comp.category] || 'from-gray-400 to-gray-500'}`} />
+                <div className={`h-2 bg-gradient-to-r ${categoryGradients[comp.category?.toLowerCase()] || 'from-gray-400 to-gray-500'}`} />
                 <div className="p-5">
                   <div className="flex items-start justify-between mb-3">
-                    <Badge variant="primary" size="sm">{comp.category.replace('_', ' ')}</Badge>
-                    <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
-                      isOpen ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-600'
-                    }`}>
-                      {isOpen ? `${daysLeft > 0 ? `${daysLeft}d left` : 'Closing soon'}` : 'Closed'}
-                    </span>
+                    <Badge variant="primary" size="sm">{comp.category || 'Competition'}</Badge>
+                    {daysLeft !== null && (
+                      <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
+                        isOpen ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-600'
+                      }`}>
+                        {isOpen ? `${daysLeft > 0 ? `${daysLeft}d left` : 'Closing soon'}` : 'Closed'}
+                      </span>
+                    )}
                   </div>
 
                   <h3 className="text-base font-semibold text-gray-900 mb-2 line-clamp-2 group-hover:text-accent transition-colors">
                     {comp.title}
                   </h3>
 
-                  <p className="text-xs text-gray-500 mb-4 line-clamp-2">{comp.shortDescription}</p>
+                  {comp.eligibility?.yearOfStudy?.filter(Boolean).length > 0 && (
+                    <p className="text-xs text-gray-500 mb-4">
+                      Eligible: {comp.eligibility.yearOfStudy.filter(Boolean).join(', ')}
+                    </p>
+                  )}
 
                   <div className="space-y-2 mb-4">
                     <div className="flex items-center gap-2 text-xs text-gray-500">
                       <Calendar className="w-3.5 h-3.5 text-gray-400" />
-                      <span>{new Date(comp.startDate).toLocaleDateString()} - {new Date(comp.endDate).toLocaleDateString()}</span>
-                    </div>
-                    <div className="flex items-center gap-2 text-xs text-gray-500">
-                      <MapPin className="w-3.5 h-3.5 text-gray-400" />
-                      <span className="capitalize">{comp.mode}</span>
+                      <span>
+                        {formatDate(comp.startDate) || 'TBA'}
+                        {comp.endDate ? ` - ${formatDate(comp.endDate)}` : ''}
+                      </span>
                     </div>
                     <div className="flex items-center gap-2 text-xs text-gray-500">
                       <Users className="w-3.5 h-3.5 text-gray-400" />

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import {
   departments, students, advisors, competitions, registrations,
   winners, auditLogs, notifications, verificationRequests,
-  ensureLoaded, pushRegistration, pushNotification,
+  ensureLoaded, pushRegistration, pushNotification, pushNotifications,
   pushVerificationRequest, pushWinner, pushStudent, pushAdvisor,
   pushCompetition, syncRegistration, syncVerificationRequests, syncNotifications,
 } from '@/lib/firebase-data'
@@ -30,6 +30,10 @@ type RouteHandler = (req: NextRequest, segments: string[]) => Promise<NextRespon
 
 function ok(data: unknown) {
   return NextResponse.json({ success: true, data })
+}
+
+function error(code: string, message: string, status = 400) {
+  return NextResponse.json({ success: false, error: { code, message } }, { status })
 }
 
 function paginated<T>(items: T[], page: number, limit: number) {
@@ -202,6 +206,19 @@ register('POST', '/competitions', async (req) => {
     updatedAt: now,
   }
   await pushCompetition(newCompetition)
+
+  const notifItems = students.slice(0, 50).map(s => ({
+    id: 'notif-' + Date.now() + '-' + s.id,
+    userId: s.id,
+    type: 'new_competition',
+    title: 'New Competition Added',
+    message: `${title} has been added. Check it out now!`,
+    data: { competitionId: newCompetition.id, competitionTitle: title },
+    isRead: false,
+    createdAt: new Date().toISOString(),
+  }))
+  await pushNotifications(notifItems)
+
   return ok(newCompetition)
 })
 
@@ -416,6 +433,20 @@ register('GET', '/verification-requests/user/:userId', async (req, seg) => {
   return ok(userVrs)
 })
 
+register('GET', '/verification-requests', async () => {
+  return ok(verificationRequests)
+})
+
+register('PATCH', '/verification-requests/:id/verify', async (req, seg) => {
+  const id = seg[1]
+  const item = verificationRequests.find(v => v.id === id)
+  if (!item) return NextResponse.json({ success: false, error: { code: 'NOT_FOUND', message: 'Verification request not found' } }, { status: 404 })
+  const idx = verificationRequests.indexOf(item)
+  verificationRequests[idx] = { ...item, status: 'verified', advisorNotified: true }
+  await syncVerificationRequests()
+  return ok(verificationRequests[idx])
+})
+
 // ─── NOTIFICATIONS ───────────────────────────────────────────────────
 register('GET', '/notifications', async (req) => {
   const qs = new URL(req.url).searchParams
@@ -622,6 +653,7 @@ register('GET', '/auth/gmail', async (req) => {
 register('GET', '/auth/gmail/callback', async (req) => {
   const qs = new URL(req.url).searchParams
   const code = qs.get('code')
+  const state = qs.get('state') // optional: userId to associate tokens
   if (!code) return NextResponse.redirect(new URL('/email-verification?error=no_code', req.url))
 
   const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
@@ -636,118 +668,161 @@ register('GET', '/auth/gmail/callback', async (req) => {
     }).toString(),
   })
 
-  if (!tokenResponse.ok) return NextResponse.redirect(new URL('/login?error=auth_failed', req.url))
+  if (!tokenResponse.ok) return NextResponse.redirect(new URL('/email-verification?error=auth_failed', req.url))
 
   const { access_token, refresh_token, expires_in } = await tokenResponse.json()
   const userResponse = await fetch('https://www.googleapis.com/oauth2/v1/userinfo', {
     headers: { Authorization: `Bearer ${access_token}` },
   })
 
-  if (!userResponse.ok) return NextResponse.redirect(new URL('/login?error=user_info_failed', req.url))
+  if (!userResponse.ok) return NextResponse.redirect(new URL('/email-verification?error=user_info_failed', req.url))
 
   const user = await userResponse.json()
-  const token = 'mock-jwt-' + user.email + '-' + Date.now()
-  return ok({ user, token, refreshToken: refresh_token })
+  const userId = state || user.email
+
+  // Fetch initial historyId from Gmail profile
+  let historyId = ''
+  try {
+    const profileRes = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/profile', {
+      headers: { Authorization: `Bearer ${access_token}` },
+    })
+    if (profileRes.ok) {
+      const profile = await profileRes.json()
+      historyId = profile.historyId || ''
+    }
+  } catch { /* ignore */ }
+
+  // Redirect back with tokens and historyId in hash (client stores them)
+  const params = new URLSearchParams({
+    auth: 'success',
+    access_token,
+    refresh_token: refresh_token || '',
+    expires_in: String(expires_in || 3600),
+    history_id: historyId,
+    email: user.email || '',
+  })
+  return NextResponse.redirect(new URL(`/email-verification?${params.toString()}`, req.url))
 })
 
-register('GET', '/auth/gmail/callback', async (req) => {
-  const qs = new URL(req.url).searchParams
-  const code = qs.get('code')
-  if (!code) return NextResponse.redirect(new URL('/email-verification?error=no_code', req.url))
-
-  const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({
-      client_id: process.env.GOOGLE_CLIENT_ID || '',
-      client_secret: process.env.GOOGLE_CLIENT_SECRET || '',
-      code,
-      redirect_uri: process.env.GOOGLE_REDIRECT_URI || 'http://localhost:3000/api/auth/gmail/callback',
-      grant_type: 'authorization_code',
-    }).toString(),
-  })
-
-  if (!tokenResponse.ok) return NextResponse.redirect(new URL('/login?error=auth_failed', req.url))
-
-  const { access_token, refresh_token, expires_in } = await tokenResponse.json()
-  const userResponse = await fetch('https://www.googleapis.com/oauth2/v1/userinfo', {
-    headers: { Authorization: `Bearer ${access_token}` },
-  })
-
-  if (!userResponse.ok) return NextResponse.redirect(new URL('/login?error=user_info_failed', req.url))
-
-  const user = await userResponse.json()
-  const token = 'mock-jwt-' + user.email + '-' + Date.now()
-  return ok({ user, token, refreshToken: refresh_token })
-})
-
-register('POST', '/verification-requests', async (req) => {
-  const body = await req.json()
-  const { registrationId, studentEmail } = body
-  if (!registrationId || !studentEmail) return NextResponse.json({ success: false, error: { code: 'BAD_REQUEST', message: 'registrationId and studentEmail required' } }, { status: 400 })
-  const student = students.find(s => s.email.toLowerCase() === studentEmail.toLowerCase())
-  if (!student) return NextResponse.json({ success: false, error: { code: 'NOT_FOUND', message: 'Student not found' } }, { status: 404 })
-  const reg = registrations.find(r => r.id === registrationId)
-  if (!reg) return NextResponse.json({ success: false, error: { code: 'NOT_FOUND', message: 'Registration not found' } }, { status: 404 })
-  const existingVr = verificationRequests.find(v => v.registrationId === registrationId && v.studentId === student.id)
-  if (existingVr) return ok({ ...existingVr, alreadyRequested: true })
-  const newVr = {
-    id: 'vr-' + (verificationRequests.length + 1),
-    registrationId,
-    studentId: student.id,
-    studentName: student.name,
-    department: student.department,
-    competitionTitle: reg.competition?.title || 'Unknown',
-    advisorNotified: false,
-    emailProof: null,
-    status: 'pending' as const,
-    requestedAt: new Date().toISOString(),
-  }
-  await pushVerificationRequest(newVr as any)
-  await pushNotification({
-    id: 'notif-' + (notifications.length + 1),
-    userId: student.id,
-    type: 'verification_update' as const,
-    title: 'Verification Requested',
-    message: `${student.name} has requested verification for ${reg.competition?.title || 'a competition'}.`,
-    data: null,
-    isRead: false,
-    createdAt: new Date().toISOString(),
-  })
-  return ok({ ...newVr, alreadyRequested: false })
-})
-
-register('GET', '/notifications', async (req) => {
+// ─── GMAIL SYNC & SEARCH ────────────────────────────────────────────
+register('GET', '/gmail/tokens', async (req) => {
   const qs = new URL(req.url).searchParams
   const userId = qs.get('userId')
-  if (!userId) return NextResponse.json({ success: false, error: { code: 'BAD_REQUEST', message: 'userId required' } }, { status: 400 })
-  const userNotifications = notifications.filter(n => n.userId === userId)
-  return ok(userNotifications)
+  if (!userId) return error('BAD_REQUEST', 'userId required')
+  try {
+    const { getGmailTokens } = await import('@/lib/gmail-sync')
+    const tokens = getGmailTokens(userId)
+    return ok({ hasTokens: !!tokens, hasRefreshToken: !!tokens?.refresh_token })
+  } catch { return ok({ hasTokens: false }) }
 })
 
-register('PUT', '/notifications/:id/read', async (req, seg) => {
-  const id = seg[1]
-  const item = notifications.find(n => n.id === id)
-  if (!item) return NextResponse.json({ success: false, error: { code: 'NOT_FOUND', message: 'Notification not found' } }, { status: 404 })
-  item.isRead = true
-  const idx = notifications.indexOf(item)
-  notifications[idx] = item
-  await syncNotifications()
-  return ok(item)
+register('POST', '/gmail/tokens', async (req) => {
+  const body = await req.json()
+  const { userId, accessToken, refreshToken, expiresIn, historyId } = body
+  if (!userId || !accessToken) return error('BAD_REQUEST', 'userId and accessToken required')
+  try {
+    const { setGmailTokens, setHistoryId } = await import('@/lib/gmail-sync')
+    setGmailTokens(userId, { access_token: accessToken, refresh_token: refreshToken || '', expiry_date: Date.now() + (expiresIn || 3600) * 1000 })
+    if (historyId) setHistoryId(userId, historyId)
+    return ok({ stored: true })
+  } catch { return error('INTERNAL', 'Failed to store tokens') }
 })
 
-register('GET', '/audit-logs', async (req) => {
+register('GET', '/gmail/sync', async (req) => {
   const qs = new URL(req.url).searchParams
-  const page = parseInt(qs.get('page') || '1')
-  const limit = parseInt(qs.get('limit') || '10')
-  return ok(paginated(auditLogs, page, limit))
+  const userId = qs.get('userId')
+  if (!userId) return error('BAD_REQUEST', 'userId required')
+  try {
+    const { fetchValidAccessToken, getHistoryId, setHistoryId, fetchHistorySync, appendSyncedEmails, extractCompetitionHint } = await import('@/lib/gmail-sync')
+    const accessToken = await fetchValidAccessToken(userId)
+    if (!accessToken) return error('UNAUTHORIZED', 'Gmail not connected')
+    const startHistoryId = getHistoryId(userId)
+    if (!startHistoryId) return error('BAD_REQUEST', 'No historyId — perform initial sync first')
+    const result = await fetchHistorySync(accessToken, startHistoryId)
+    setHistoryId(userId, result.historyId)
+    const tagged = result.emails.map(e => ({ ...e, competitionHint: extractCompetitionHint(e) }))
+    appendSyncedEmails(userId, tagged)
+    return ok({ historyId: result.historyId, newEmails: result.emails.length, emails: tagged })
+  } catch { return error('INTERNAL', 'Sync failed') }
 })
 
-register('GET', '/audit-logs/:id', async (req, seg) => {
-  const id = seg[1]
-  const log = auditLogs.find(l => l.id === id)
-  if (!log) return NextResponse.json({ success: false, error: { code: 'NOT_FOUND', message: 'Audit log not found' } }, { status: 404 })
-  return ok(log)
+register('GET', '/gmail/sync/initial', async (req) => {
+  const qs = new URL(req.url).searchParams
+  const userId = qs.get('userId')
+  if (!userId) return error('BAD_REQUEST', 'userId required')
+  try {
+    const { fetchValidAccessToken, setHistoryId, fetchInitialHistoryId } = await import('@/lib/gmail-sync')
+    const accessToken = await fetchValidAccessToken(userId)
+    if (!accessToken) return error('UNAUTHORIZED', 'Gmail not connected')
+    const historyId = await fetchInitialHistoryId(accessToken)
+    if (historyId) setHistoryId(userId, historyId)
+    return ok({ historyId: historyId || '' })
+  } catch { return error('INTERNAL', 'Initial sync failed') }
+})
+
+register('GET', '/gmail/search', async (req) => {
+  const qs = new URL(req.url).searchParams
+  const userId = qs.get('userId')
+  const keyword = qs.get('keyword')
+  if (!userId || !keyword) return error('BAD_REQUEST', 'userId and keyword required')
+  try {
+    const { fetchValidAccessToken, searchGmailEmails, extractCompetitionHint } = await import('@/lib/gmail-sync')
+    const accessToken = await fetchValidAccessToken(userId)
+    if (!accessToken) return error('UNAUTHORIZED', 'Gmail not connected')
+    const emails = await searchGmailEmails(accessToken, keyword)
+    const tagged = emails.map(e => ({ ...e, competitionHint: extractCompetitionHint(e) }))
+    return ok({ emails: tagged })
+  } catch { return error('INTERNAL', 'Search failed') }
+})
+
+register('GET', '/gmail/email-detail', async (req) => {
+  const qs = new URL(req.url).searchParams
+  const userId = qs.get('userId')
+  const id = qs.get('id')
+  if (!userId || !id) return error('BAD_REQUEST', 'userId and id required')
+  try {
+    const { fetchValidAccessToken, fetchEmailDetail } = await import('@/lib/gmail-sync')
+    const accessToken = await fetchValidAccessToken(userId)
+    if (!accessToken) return error('UNAUTHORIZED', 'Gmail not connected')
+    const email = await fetchEmailDetail(accessToken, id)
+    if (!email) return error('NOT_FOUND', 'Email not found')
+    return ok({ email })
+  } catch { return error('INTERNAL', 'Failed to fetch email detail') }
+})
+
+register('GET', '/gmail/emails/stored', async (req) => {
+  const qs = new URL(req.url).searchParams
+  const userId = qs.get('userId')
+  if (!userId) return error('BAD_REQUEST', 'userId required')
+  try {
+    const { getSyncedEmails } = await import('@/lib/gmail-sync')
+    const emails = getSyncedEmails(userId)
+    return ok({ emails })
+  } catch { return error('INTERNAL', 'Failed to fetch stored emails') }
+})
+
+// ─── AI COMPETITION EXTRACTION (placeholder) ────────────────────────
+register('POST', '/gmail/extract-competitions', async (req) => {
+  const body = await req.json()
+  const { userId, emailIds } = body
+  if (!userId || !emailIds?.length) return error('BAD_REQUEST', 'userId and emailIds required')
+  try {
+    const { getSyncedEmails } = await import('@/lib/gmail-sync')
+    const allEmails = getSyncedEmails(userId)
+    const selected = allEmails.filter(e => emailIds.includes(e.id))
+    const extracted = selected.map(e => ({
+      emailId: e.id,
+      subject: e.subject,
+      from: e.from,
+      date: e.date,
+      competitionHint: e.competitionHint || null,
+      // Future: AI-extracted fields
+      suggestedTitle: null as string | null,
+      suggestedOrganizer: null as string | null,
+      suggestedDeadline: null as string | null,
+    }))
+    return ok({ extracted })
+  } catch { return error('INTERNAL', 'Extraction failed') }
 })
 
 // ─── IMPORT ENDPOINT ---

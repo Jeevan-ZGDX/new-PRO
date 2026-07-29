@@ -1,9 +1,10 @@
 'use client'
 
-import { useState } from 'react'
-import { Card, CardHeader, CardTitle, Badge, Button } from '@comp-dash/design-system'
+import { useState, useEffect } from 'react'
+import { Card } from '@comp-dash/design-system'
 import { useRoleAccess } from '@comp-dash/api'
-import { Shield, Users, UserCog, GraduationCap, ToggleLeft, ToggleRight, Mail, Building2 } from 'lucide-react'
+import { Shield, Users, UserCog, GraduationCap, Mail, Building2 } from 'lucide-react'
+import { getCurrentUser } from '@/lib/auth'
 
 type RoleGroup = 'student' | 'advisor' | 'hod'
 
@@ -16,18 +17,25 @@ interface RoleUser {
   active: boolean
 }
 
-const roleTabs: { key: RoleGroup | 'all'; label: string; icon: typeof Users }[] = [
-  { key: 'all', label: 'All', icon: Users },
-  { key: 'student', label: 'Students', icon: GraduationCap },
-  { key: 'advisor', label: 'Advisors', icon: UserCog },
-  { key: 'hod', label: 'HODs', icon: Shield },
-]
-
 export default function RoleAccessPage() {
+  const [currentUser, setCurrentUser] = useState<{ role: string } | null>(null)
   const [activeRole, setActiveRole] = useState<RoleGroup | 'all'>('all')
   const { data, isLoading, refetch } = useRoleAccess()
 
-  const allUsers: RoleUser[] = data ? [...((data as Record<string, unknown>)?.students as RoleUser[] || []), ...((data as Record<string, unknown>)?.advisors as RoleUser[] || []), ...((data as Record<string, unknown>)?.hods as RoleUser[] || [])] : []
+  useEffect(() => {
+    setCurrentUser(getCurrentUser())
+  }, [])
+
+  const isAdmin = currentUser?.role === 'super_admin'
+
+  const roleTabs: { key: RoleGroup | 'all'; label: string; icon: typeof Users }[] = [
+    { key: 'all', label: 'All', icon: Users },
+    { key: 'student', label: 'Students', icon: GraduationCap },
+    { key: 'advisor', label: 'Advisors', icon: UserCog },
+    ...(!isAdmin ? [{ key: 'hod' as const, label: 'HODs', icon: Shield }] : []),
+  ]
+
+  const allUsers: RoleUser[] = data ? [...((data as Record<string, unknown>)?.students as RoleUser[] || []), ...((data as Record<string, unknown>)?.advisors as RoleUser[] || [])] : []
 
   const filtered = activeRole === 'all' ? allUsers : allUsers.filter((u) => u.role === activeRole)
 
@@ -83,7 +91,7 @@ export default function RoleAccessPage() {
         <div className="p-6 space-y-8">
           {activeRole === 'all' ? (
             <>
-              {(['student', 'advisor', 'hod'] as const).map((role) => {
+              {(['student', 'advisor', ...(isAdmin ? [] : ['hod'])] as const).map((role) => {
                 const roleUsers = grouped[role]
                 if (roleUsers.length === 0) return null
                 return (
@@ -95,7 +103,7 @@ export default function RoleAccessPage() {
                     </h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                       {roleUsers.map((user) => (
-                        <UserCard key={user.id} user={user} onToggle={refetch} />
+                        <UserCard key={user.id} user={user} />
                       ))}
                     </div>
                   </div>
@@ -105,7 +113,7 @@ export default function RoleAccessPage() {
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {filtered.map((user) => (
-                <UserCard key={user.id} user={user} onToggle={refetch} />
+                <UserCard key={user.id} user={user} />
               ))}
               {filtered.length === 0 && (
                 <div className="col-span-full text-center py-12 text-gray-500">No users found</div>
@@ -118,66 +126,30 @@ export default function RoleAccessPage() {
   )
 }
 
-function UserCard({ user, onToggle }: { user: RoleUser; onToggle: () => void }) {
-  const [active, setActive] = useState(user.active)
-  const [toggling, setToggling] = useState(false)
-
-  const handleToggle = async () => {
-    setToggling(true)
-    const newActive = !active
-    setActive(newActive)
-    try {
-      await fetch(`/api/coe/role-access/${user.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ active: newActive }),
-      })
-      onToggle()
-    } catch {
-      setActive(active)
-    } finally {
-      setToggling(false)
-    }
-  }
-
+function UserCard({ user }: { user: RoleUser }) {
   return (
     <div className="p-4 bg-white border border-gray-100 rounded-xl hover:shadow-sm transition-shadow">
-      <div className="flex items-start justify-between mb-3">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-accent/10 flex items-center justify-center">
-            {user.role === 'student' ? (
-              <GraduationCap className="w-5 h-5 text-accent" />
-            ) : user.role === 'advisor' ? (
-              <UserCog className="w-5 h-5 text-accent" />
-            ) : (
-              <Shield className="w-5 h-5 text-accent" />
-            )}
+      <div className="flex items-start gap-3">
+        <div className="w-10 h-10 rounded-full bg-accent/10 flex items-center justify-center shrink-0">
+          {user.role === 'student' ? (
+            <GraduationCap className="w-5 h-5 text-accent" />
+          ) : user.role === 'advisor' ? (
+            <UserCog className="w-5 h-5 text-accent" />
+          ) : (
+            <Shield className="w-5 h-5 text-accent" />
+          )}
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-medium text-gray-900 truncate">{user.name}</p>
+          <div className="flex items-center gap-1 mt-0.5 text-xs text-gray-500 truncate">
+            <Mail className="w-3 h-3 shrink-0" />
+            {user.email}
           </div>
-          <div>
-            <p className="text-sm font-medium text-gray-900">{user.name}</p>
-            <div className="flex items-center gap-1 mt-0.5 text-xs text-gray-500">
-              <Mail className="w-3 h-3" />
-              {user.email}
-            </div>
+          <div className="flex items-center gap-1 mt-1 text-xs text-gray-500">
+            <Building2 className="w-3 h-3 shrink-0" />
+            {user.department}
           </div>
         </div>
-      </div>
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Building2 className="w-3.5 h-3.5 text-gray-400" />
-          <span className="text-xs text-gray-600">{user.department}</span>
-        </div>
-        <button
-          onClick={handleToggle}
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-            active
-              ? 'bg-green-50 text-green-700 hover:bg-green-100'
-              : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
-          }`}
-        >
-          {active ? <ToggleRight className="w-3.5 h-3.5" /> : <ToggleLeft className="w-3.5 h-3.5" />}
-          {active ? 'Active' : 'Inactive'}
-        </button>
       </div>
     </div>
   )

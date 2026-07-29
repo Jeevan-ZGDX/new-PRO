@@ -42,7 +42,7 @@ const navItems: NavItem[] = [
   { label: 'Registrations', icon: ClipboardList, href: '/registrations', roles: ['hod', 'super_admin'] },
   { label: 'Students', icon: Users, href: '/students', roles: ['hod', 'super_admin'] },
   { label: 'Advisors', icon: GraduationCap, href: '/advisors', roles: ['hod', 'super_admin'] },
-  { label: 'Departments', icon: Building2, href: '/departments', roles: ['hod'] },
+  { label: 'Departments', icon: Building2, href: '/departments', roles: ['super_admin'] },
   { label: 'Analytics', icon: BarChart3, href: '/analytics', roles: ['hod'] },
   { label: 'Winners', icon: Medal, href: '/winners', roles: ['hod', 'advisor', 'student', 'super_admin'] },
 ]

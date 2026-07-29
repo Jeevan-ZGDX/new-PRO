@@ -1,8 +1,11 @@
 'use client'
 
-import { type ReactNode, useState } from 'react'
+import { type ReactNode, useState, useEffect } from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { ToastProvider } from '@/contexts/ToastContext'
+import { ThemeProvider } from '@/contexts/ThemeContext'
+import { setSupabaseClient } from '@comp-dash/api'
+import { supabase } from '@/lib/supabase-client'
 import '@comp-dash/i18n'
 
 export function Providers({ children }: { children: ReactNode }) {
@@ -19,9 +22,17 @@ export function Providers({ children }: { children: ReactNode }) {
       })
   )
 
+  useEffect(() => {
+    if (supabase) {
+      setSupabaseClient(supabase)
+    }
+  }, [])
+
   return (
     <QueryClientProvider client={queryClient}>
-      <ToastProvider>{children}</ToastProvider>
+      <ThemeProvider>
+        <ToastProvider>{children}</ToastProvider>
+      </ThemeProvider>
     </QueryClientProvider>
   )
 }

@@ -4,16 +4,9 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Card, Badge } from '@comp-dash/design-system'
 import { getCurrentUser } from '@/lib/auth'
-import { Mail, Search, CheckCircle, User, Building2, ChevronDown, ChevronUp, GraduationCap } from 'lucide-react'
+import { Mail, Search, CheckCircle, User, Building2, ChevronDown, ChevronUp, GraduationCap, AtSign } from 'lucide-react'
 
 const YEAR_ORDER = ['1st Year', '2nd Year', '3rd Year', '4th Year']
-
-const STUDENT_YEARS: Record<string, { year: string; section: string }> = {
-  'stu-1': { year: '3rd Year', section: 'A' },
-  'stu-4': { year: '4th Year', section: 'A' },
-  'stu-5': { year: '3rd Year', section: 'C' },
-  'stu-11': { year: '2nd Year', section: 'B' },
-}
 
 interface EmailProof {
   from: string
@@ -27,6 +20,7 @@ interface VerificationRequest {
   registrationId: string | null
   studentId: string
   studentName: string
+  studentEmail?: string
   department: string
   competitionTitle: string
   advisorNotified: boolean
@@ -130,6 +124,12 @@ function YearSection({ year, requests, onVerify, verifyingId, expandedId, onTogg
                       <div className="space-y-2">
                         <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Email Metadata</p>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          {(vr as any).studentEmail && (
+                            <div className="p-3 bg-white border border-gray-200 rounded-xl md:col-span-2">
+                              <p className="text-xs text-gray-400 uppercase tracking-wider mb-1">Student Email</p>
+                              <p className="text-sm font-medium text-accent break-all">{(vr as any).studentEmail}</p>
+                            </div>
+                          )}
                           <div className="p-3 bg-white border border-gray-200 rounded-xl">
                             <p className="text-xs text-gray-400 uppercase tracking-wider mb-1">From</p>
                             <p className="text-sm font-medium text-gray-900 break-all">{vr.emailProof.from}</p>
@@ -211,9 +211,21 @@ export default function VerificationRequestsPage() {
   const fetchRequests = async () => {
     setLoading(true)
     try {
-      const res = await fetch('/api/verification-requests')
-      const json = await res.json()
-      setAllRequests(json.data || [])
+      const [vrRes, studentsRes] = await Promise.all([
+        fetch('/api/verification-requests'),
+        fetch('/api/admin/students?limit=5000'),
+      ])
+      const vrJson = await vrRes.json()
+      const studentsJson = await studentsRes.json()
+      const studentMap = new Map<string, { year: string; section: string; email: string }>()
+      for (const s of studentsJson.data?.data || []) {
+        studentMap.set(s.id, { year: s.year || 'Unknown', section: s.section || '-', email: s.email || '' })
+      }
+      const enriched = (vrJson.data || []).map((vr: VerificationRequest) => {
+        const info = studentMap.get(vr.studentId) || { year: 'Unknown', section: '-', email: '' }
+        return { ...vr, year: info.year, section: info.section, studentEmail: info.email }
+      })
+      setAllRequests(enriched)
     } catch {
       setAllRequests([])
     } finally {
@@ -232,16 +244,14 @@ export default function VerificationRequestsPage() {
   }
 
   const requestsWithYear = allRequests
-    .map(r => {
-      const info = STUDENT_YEARS[r.studentId]
-      return { ...r, year: info?.year || 'Unknown', section: info?.section || '-' }
-    })
     .filter(r => r.department === 'CSE')
+    .map(r => ({ ...r, year: (r as any).year || 'Unknown', section: (r as any).section || '-' }))
 
   const filtered = requestsWithYear.filter(r => {
     const matchesSearch = !search || 
       r.studentName.toLowerCase().includes(search.toLowerCase()) ||
       r.studentId.toLowerCase().includes(search.toLowerCase()) ||
+      (r.studentEmail && r.studentEmail.toLowerCase().includes(search.toLowerCase())) ||
       r.competitionTitle.toLowerCase().includes(search.toLowerCase())
     const matchesFilter = statusFilter === 'all' || r.status === statusFilter
     return matchesSearch && matchesFilter
@@ -288,7 +298,7 @@ export default function VerificationRequestsPage() {
       <div className="flex items-center gap-3 flex-wrap">
         <div className="relative flex-1 min-w-[200px]">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-          <input type="text" placeholder="Search by name, ID, competition..."
+          <input type="text" placeholder="Search by name, email, ID, competition..."
             value={search} onChange={e => setSearch(e.target.value)}
             className="w-full pl-10 pr-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm text-gray-700 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent"
           />

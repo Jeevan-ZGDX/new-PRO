@@ -1,15 +1,17 @@
 'use client'
 
-import { Suspense, useState, useEffect } from 'react'
-import { useSearchParams } from 'next/navigation'
+import { Suspense, useState, useEffect, useCallback } from 'react'
+import { useSearchParams, useRouter } from 'next/navigation'
 import { Card, CardHeader, CardTitle, Badge } from '@comp-dash/design-system'
 import { getCurrentUser } from '@/lib/auth'
-import { Mail, Search, Send, CheckCircle, Inbox, Clock, Shield } from 'lucide-react'
+import { setGmailTokens, setHistoryId, getSyncedEmails, setSyncedEmails, appendSyncedEmails, clearGmailTokens, getHistoryId } from '@/lib/gmail-sync'
+import { Mail, Search, Send, CheckCircle, Inbox, Clock, Shield, RefreshCw } from 'lucide-react'
 
 type Step = 'signin' | 'permissions' | 'inbox'
 
 function EmailVerificationContent() {
   const searchParams = useSearchParams()
+  const router = useRouter()
   const [step, setStep] = useState<Step>('signin')
   const [user, setUser] = useState<any>(null)
   const [emails, setEmails] = useState<any[]>([])
@@ -23,19 +25,60 @@ function EmailVerificationContent() {
   const [submitted, setSubmitted] = useState(false)
   const [gmailSearching, setGmailSearching] = useState(false)
   const [useGmail, setUseGmail] = useState(false)
+  const [syncing, setSyncing] = useState(false)
+  const [lastSync, setLastSync] = useState<string | null>(null)
+
+  const userId = user?.email || ''
+
+  // Handle OAuth redirect back from server
+  useEffect(() => {
+    const auth = searchParams.get('auth')
+    const accessToken = searchParams.get('access_token')
+    const refreshToken = searchParams.get('refresh_token')
+    const expiresIn = searchParams.get('expires_in')
+    const historyId = searchParams.get('history_id')
+    const email = searchParams.get('email')
+
+    if (auth === 'success' && userId && accessToken) {
+      setGmailTokens(userId, {
+        access_token: accessToken,
+        refresh_token: refreshToken || '',
+        expiry_date: Date.now() + (Number(expiresIn) || 3600) * 1000,
+      })
+      if (historyId) setHistoryId(userId, historyId)
+      setUseGmail(true)
+      setStep('inbox')
+      // Clean URL params
+      router.replace('/email-verification')
+      // Load stored emails
+      const stored = getSyncedEmails(userId)
+      if (stored.length > 0) {
+        setEmails(stored)
+        setLastSync(new Date().toISOString())
+      }
+    }
+  }, [searchParams, userId, router])
 
   useEffect(() => {
     const u = getCurrentUser()
     setUser(u)
     if (searchParams.get('auth') === 'success') {
-      setStep('inbox')
-      setUseGmail(true)
+      // handled above by userId check
     }
   }, [searchParams])
 
   useEffect(() => {
     if (step === 'inbox' && !useGmail && user?.email) fetchInternalEmails(user.email)
   }, [step, useGmail, user])
+
+  // Auto incremental sync every 30 seconds when Gmail is connected
+  useEffect(() => {
+    if (!useGmail || !userId) return
+    const interval = setInterval(() => {
+      handleSync()
+    }, 30000)
+    return () => clearInterval(interval)
+  }, [useGmail, userId])
 
   const fetchInternalEmails = async (email: string) => {
     setLoading(true)
@@ -81,10 +124,11 @@ function EmailVerificationContent() {
     if (!keyword.trim()) return
     setGmailSearching(true)
     try {
-      const res = await fetch(`/api/gmail/search?keyword=${encodeURIComponent(keyword.trim())}`)
+      const res = await fetch(`/api/gmail/search?userId=${encodeURIComponent(userId)}&keyword=${encodeURIComponent(keyword.trim())}`)
       if (res.status === 401) { setStep('signin'); return }
       const json = await res.json()
-      setEmails(json.data?.emails || [])
+      const fetched = json.data?.emails || []
+      setEmails(fetched)
       setFilteredEmails(null)
       setSelectedEmail(null)
       setEmailMeta(null)
@@ -95,6 +139,23 @@ function EmailVerificationContent() {
       setGmailSearching(false)
     }
   }
+
+  const handleSync = useCallback(async () => {
+    if (!userId || syncing) return
+    setSyncing(true)
+    try {
+      const res = await fetch(`/api/gmail/sync?userId=${encodeURIComponent(userId)}`)
+      if (res.status === 401) { clearGmailTokens(userId); setStep('signin'); return }
+      const json = await res.json()
+      if (json.success && json.data?.emails?.length > 0) {
+        setEmails(prev => {
+          const ids = new Set(prev.map(e => e.id))
+          return [...json.data.emails.filter((e: any) => !ids.has(e.id)), ...prev]
+        })
+      }
+      setLastSync(new Date().toISOString())
+    } catch { /* ignore */ } finally { setSyncing(false) }
+  }, [userId, syncing])
 
   const handleSearchInternal = () => {
     if (!keyword.trim()) { setFilteredEmails(null); return }
@@ -115,7 +176,7 @@ function EmailVerificationContent() {
     if (useGmail && email.id) {
       setMetaLoading(true)
       try {
-        const res = await fetch(`/api/gmail/email-detail?id=${encodeURIComponent(email.id)}`)
+        const res = await fetch(`/api/gmail/email-detail?userId=${encodeURIComponent(userId)}&id=${encodeURIComponent(email.id)}`)
         const json = await res.json()
         setEmailMeta(json.data?.email || null)
       } catch { /* */ } finally { setMetaLoading(false) }
@@ -252,7 +313,20 @@ function EmailVerificationContent() {
             <Badge variant={useGmail ? 'success' : 'info'} size="sm">{useGmail ? 'Gmail' : 'In-App'}</Badge>
           </div>
 
-          <div className="grid grid-cols-1 gap-6">
+           <div className="grid grid-cols-1 gap-6">
+            {useGmail && (
+              <div className="flex items-center justify-between px-4 py-2 bg-gray-50 rounded-xl border border-gray-200">
+                <div className="flex items-center gap-2 text-xs text-gray-500">
+                  <RefreshCw className={`w-3.5 h-3.5 ${syncing ? 'animate-spin text-accent' : ''}`} />
+                  {syncing ? 'Syncing...' : lastSync ? `Last sync: ${new Date(lastSync).toLocaleTimeString()}` : 'Auto-sync every 30s'}
+                </div>
+                <button onClick={handleSync} disabled={syncing}
+                  className="text-xs font-medium text-accent hover:text-accent/80 disabled:opacity-50"
+                >
+                  Sync Now
+                </button>
+              </div>
+            )}
             <Card>
               <CardHeader>
                 <CardTitle>{useGmail ? 'Gmail Inbox' : 'Inbox'}</CardTitle>

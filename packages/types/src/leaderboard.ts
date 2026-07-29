@@ -3,9 +3,11 @@ export interface LeaderboardEntry {
   studentName: string
   email: string
   department: string
+  section?: string
   points: number
   competitionsCount: number
   wins: number
+  recentCompetition?: string
 }
 
 export interface DepartmentLeaderboardEntry {

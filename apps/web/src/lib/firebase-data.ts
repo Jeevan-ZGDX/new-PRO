@@ -15,6 +15,7 @@ import {
   upsertRegistration,
   upsertWinner,
   upsertNotification,
+  upsertNotifications,
   upsertVerificationRequest,
   insertAuditLog,
 } from './supabase-client'
@@ -206,6 +207,14 @@ export async function pushRegistration(item: any) {
 export async function pushNotification(item: any) {
   notifications.push(item)
   await upsertNotification(item)
+  persistToStorage()
+}
+
+export async function pushNotifications(items: any[]) {
+  for (const item of items) {
+    notifications.push(item)
+  }
+  await upsertNotifications(items)
   persistToStorage()
 }
 

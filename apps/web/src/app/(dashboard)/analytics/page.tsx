@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next'
 import {
   Card, CardHeader, CardTitle, StatCard, StatCardSkeleton, Button,
 } from '@comp-dash/design-system'
-import { useAdminAnalytics } from '@comp-dash/api'
+import { useAdminAnalytics, useLeaderboardOverall } from '@comp-dash/api'
 import { BarChart3, Users, TrendingUp, CheckCircle, Download } from 'lucide-react'
 import { exportToCSV } from '@/lib/export-csv'
 import {
@@ -14,6 +14,22 @@ import {
 export default function AnalyticsPage() {
   const { t } = useTranslation()
   const { data: stats, isLoading } = useAdminAnalytics()
+  const { data: leaderboard } = useLeaderboardOverall()
+
+  const classData = (leaderboard || []).reduce<Record<string, { section: string; points: number; wins: number; students: Set<string> }>>((acc, e) => {
+    const section = e.section || 'Unknown'
+    if (!acc[section]) acc[section] = { section, points: 0, wins: 0, students: new Set() }
+    acc[section].points += e.points
+    acc[section].wins += e.wins
+    acc[section].students.add(e.email)
+    return acc
+  }, {})
+
+  const classChartData = Object.values(classData)
+    .map(c => ({ name: c.section, points: c.points, wins: c.wins, students: c.students.size }))
+    .sort((a, b) => b.points - a.points)
+
+  const totalStudents = classChartData.reduce((s, c) => s + c.students, 0)
 
   const handleExport = () => {
     if (!stats) return
@@ -26,7 +42,7 @@ export default function AnalyticsPage() {
         ['Win Rate', `${stats.winRate}%`],
         ['Verification Rate', `${stats.verificationRate}%`],
         ['Trend Data Points', String(stats.competitionTrends.length)],
-        ['Departments Tracked', String(stats.departmentPerformance.length)],
+        ['Classes Tracked', String(classChartData.length)],
       ]
     )
   }
@@ -116,12 +132,12 @@ export default function AnalyticsPage() {
 
         <Card padding="lg">
           <CardHeader>
-            <CardTitle>Department Performance</CardTitle>
+            <CardTitle>Class-wise Performance</CardTitle>
           </CardHeader>
           <div className="mt-4 h-64">
-            {stats?.departmentPerformance && stats.departmentPerformance.length > 0 ? (
+            {classChartData.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={stats.departmentPerformance}>
+                <BarChart data={classChartData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
                   <XAxis dataKey="name" stroke="#9CA3AF" fontSize={12} tickLine={false} axisLine={false} />
                   <YAxis stroke="#9CA3AF" fontSize={12} tickLine={false} axisLine={false} />
@@ -133,7 +149,7 @@ export default function AnalyticsPage() {
                       boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
                     }}
                   />
-                  <Bar dataKey="count" fill="#6C4CF1" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="points" name="Total Points" fill="#6C4CF1" radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             ) : (

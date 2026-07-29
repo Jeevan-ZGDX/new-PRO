@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { Card, CardHeader, CardTitle, Badge, Button } from '@comp-dash/design-system'
-import { useLeaderboardOverall, useLeaderboardDepartments, useLeaderboardDepartment, useCompetitionDashboard, useCompetitions } from '@comp-dash/api'
+import { useLeaderboardOverall, useCompetitionDashboard, useCompetitions } from '@comp-dash/api'
 import { Trophy, Users, Award, ChevronDown, Search, Medal, Star } from 'lucide-react'
 import { getCurrentUser } from '@/lib/auth'
 
@@ -10,7 +10,7 @@ type Tab = 'overall' | 'department' | 'competition'
 
 const tabs: { key: Tab; label: string; icon: typeof Trophy }[] = [
   { key: 'overall', label: 'Overall', icon: Trophy },
-  { key: 'department', label: 'Department-wise', icon: Users },
+  { key: 'department', label: 'Section-wise', icon: Users },
   { key: 'competition', label: 'Competition-wise', icon: Award },
 ]
 
@@ -33,15 +33,11 @@ export default function LeaderboardPage() {
   }, [])
 
   const { data: overallData, isLoading: overallLoading } = useLeaderboardOverall()
-  const { data: deptsData, isLoading: deptsLoading } = useLeaderboardDepartments()
-  const { data: deptDetailData, isLoading: deptDetailLoading } = useLeaderboardDepartment(
-    selectedDept ? { department: selectedDept } : undefined
-  )
   const { data: compsData } = useCompetitions()
 
-  const handleDepartmentSelect = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    setSelectedDept(e.target.value)
-  }
+  const filteredSectionData = selectedDept && overallData
+    ? overallData.filter(e => e.section === selectedDept)
+    : []
 
   const handleCompetitionSelect = (e: React.ChangeEvent<HTMLSelectElement>) => {
     setSelectedComp(e.target.value)
@@ -84,9 +80,9 @@ export default function LeaderboardPage() {
                   <tr className="border-b border-gray-100">
                     <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider px-4 py-3">Rank</th>
                     <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider px-4 py-3">Student</th>
-                    <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider px-4 py-3">Department</th>
+                    <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider px-4 py-3">Section</th>
                     <th className="text-right text-xs font-medium text-gray-500 uppercase tracking-wider px-4 py-3">Points</th>
-                    <th className="text-right text-xs font-medium text-gray-500 uppercase tracking-wider px-4 py-3">Competitions</th>
+                    <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider px-4 py-3">Competitions</th>
                     <th className="text-right text-xs font-medium text-gray-500 uppercase tracking-wider px-4 py-3">Wins</th>
                   </tr>
                 </thead>
@@ -117,12 +113,16 @@ export default function LeaderboardPage() {
                           </div>
                         </td>
                         <td className="px-4 py-4">
-                          <Badge variant="primary" size="sm">{entry.department}</Badge>
+                          <Badge variant="primary" size="sm">
+                            {entry.section || entry.department}
+                          </Badge>
                         </td>
                         <td className="px-4 py-4 text-right">
                           <span className="text-sm font-semibold text-accent">{entry.points}</span>
                         </td>
-                        <td className="px-4 py-4 text-right text-sm text-gray-600">{entry.competitionsCount}</td>
+                        <td className="px-4 py-4 text-sm text-gray-600 max-w-[200px] truncate">
+                          {entry.recentCompetition || '-'}
+                        </td>
                         <td className="px-4 py-4 text-right text-sm text-gray-600">{entry.wins}</td>
                       </tr>
                     ))
@@ -138,100 +138,49 @@ export default function LeaderboardPage() {
 
           {activeTab === 'department' && (
             <div className="space-y-6">
-              <div className="flex items-center gap-3">
-                <select
-                  value={selectedDept}
-                  onChange={handleDepartmentSelect}
-                  className="px-4 py-2 bg-white border border-gray-200 rounded-xl text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent"
-                >
-                  <option value="">All Departments</option>
-                  {deptsData?.map((d) => (
-                    <option key={d.department} value={d.department}>{d.department}</option>
-                  ))}
-                </select>
-                {selectedDept && (
-                  <Button variant="ghost" size="sm" onClick={() => setSelectedDept('')}>Clear</Button>
-                )}
-              </div>
-
               {selectedDept ? (
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead>
-                      <tr className="border-b border-gray-100">
-                        <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider px-4 py-3">Rank</th>
-                        <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider px-4 py-3">Student</th>
-                        <th className="text-right text-xs font-medium text-gray-500 uppercase tracking-wider px-4 py-3">Points</th>
-                        <th className="text-right text-xs font-medium text-gray-500 uppercase tracking-wider px-4 py-3">Wins</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {deptDetailLoading ? (
-                        Array.from({ length: 3 }).map((_, i) => (
-                          <tr key={i} className="border-b border-gray-50">
-                            <td colSpan={4} className="px-4 py-4">
-                              <div className="h-10 bg-gray-100 rounded animate-pulse" />
-                            </td>
-                          </tr>
-                        ))
-                      ) : deptDetailData && deptDetailData.length > 0 ? (
-                        deptDetailData.map((entry) => (
-                          <tr key={entry.rank} className="border-b border-gray-50 hover:bg-gray-50/50 transition-colors even:bg-gray-50/30">
-                            <td className="px-4 py-4">
-                              <RankBadge rank={entry.rank} />
-                            </td>
-                            <td className="px-4 py-4">
-                              <div className="flex items-center gap-3">
-                                <p className="text-sm font-medium text-gray-900">{entry.studentName}</p>
-                                <span className="text-xs text-gray-500">{entry.email}</span>
-                              </div>
-                            </td>
-                            <td className="px-4 py-4 text-right text-sm font-semibold text-accent">{entry.points}</td>
-                            <td className="px-4 py-4 text-right text-sm text-gray-600">{entry.wins} wins</td>
-                          </tr>
-                        ))
-                      ) : (
-                        <tr>
-                          <td colSpan={4} className="text-center py-12 text-gray-500">No data for this department</td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
+                <>
+                  <div className="flex items-center gap-2">
+                    <Button variant="ghost" size="sm" onClick={() => setSelectedDept('')}>
+                      ← Back to Sections
+                    </Button>
+                    <span className="text-sm font-semibold text-gray-700">Section {selectedDept}</span>
+                  </div>
+                  <SectionDetailTable sectionId={selectedDept} />
+                </>
               ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {deptsLoading ? (
-                    Array.from({ length: 6 }).map((_, i) => (
-                      <div key={i} className="h-24 bg-gray-100 rounded-xl animate-pulse" />
-                    ))
-                  ) : deptsData && deptsData.length > 0 ? (
-                    deptsData.map((dept, idx) => (
-                      <div
-                        key={dept.department}
-                        className="p-4 bg-white border border-gray-100 rounded-xl hover:shadow-sm transition-shadow cursor-pointer"
-                        onClick={() => setSelectedDept(dept.department)}
-                      >
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="text-sm font-medium text-gray-900">{dept.department}</span>
-                          <span className="text-xs text-gray-400">#{idx + 1}</span>
-                        </div>
-                        <div className="flex items-center gap-4 text-xs text-gray-500">
-                          <span>{dept.totalPoints} pts</span>
-                          <span>{dept.totalCompetitions} comps</span>
-                          <span>{dept.totalWins} wins</span>
-                        </div>
-                        <div className="mt-2 h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                          <div
-                            className="h-full bg-accent rounded-full transition-all"
-                            style={{ width: `${deptsData ? (dept.totalPoints / Math.max(...deptsData.map(d => d.totalPoints))) * 100 : 0}%` }}
-                          />
-                        </div>
-                      </div>
-                    ))
-                  ) : (
-                    <div className="col-span-full text-center py-12 text-gray-500">No department data available</div>
-                  )}
-                </div>
+                <>
+                  <p className="text-sm text-gray-500">Click a section to view its students</p>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
+                    {overallLoading ? (
+                      Array.from({ length: 12 }).map((_, i) => (
+                        <div key={i} className="h-20 bg-gray-100 rounded-xl animate-pulse" />
+                      ))
+                    ) : overallData && overallData.length > 0 ? (
+                      (() => {
+                        const sections = [...new Set(overallData.map(e => e.section).filter(Boolean))].sort() as string[]
+                        return sections.map((sec) => {
+                          const students = overallData.filter(e => e.section === sec)
+                          const totalPts = students.reduce((sum, s) => sum + s.points, 0)
+                          const totalWins = students.reduce((sum, s) => sum + s.wins, 0)
+                          return (
+                            <div
+                              key={sec}
+                              className="p-4 bg-white border border-gray-100 rounded-xl hover:shadow-md hover:border-accent/20 transition-all cursor-pointer"
+                              onClick={() => setSelectedDept(sec)}
+                            >
+                              <p className="text-base font-bold text-gray-900">{sec}</p>
+                              <p className="text-xs text-gray-500 mt-1">{students.length} students</p>
+                              <p className="text-xs text-accent font-medium mt-1">{totalPts} pts · {totalWins} wins</p>
+                            </div>
+                          )
+                        })
+                      })()
+                    ) : (
+                      <div className="col-span-full text-center py-12 text-gray-500">No section data available</div>
+                    )}
+                  </div>
+                </>
               )}
             </div>
           )}
@@ -263,6 +212,62 @@ export default function LeaderboardPage() {
           )}
         </div>
       </Card>
+    </div>
+  )
+}
+
+function SectionDetailTable({ sectionId }: { sectionId: string }) {
+  const { data: overallData, isLoading } = useLeaderboardOverall()
+
+  if (isLoading) {
+    return (
+      <div className="space-y-3">
+        {Array.from({ length: 5 }).map((_, i) => (
+          <div key={i} className="h-12 bg-gray-100 rounded-xl animate-pulse" />
+        ))}
+      </div>
+    )
+  }
+
+  const students = overallData?.filter(e => e.section === sectionId) || []
+  if (students.length === 0) {
+    return <div className="text-center py-12 text-gray-500">No students in this section</div>
+  }
+
+  const ranked = [...students].sort((a, b) => b.points - a.points || b.wins - a.wins)
+    .map((s, i) => ({ ...s, rank: i + 1 }))
+
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full">
+        <thead>
+          <tr className="border-b border-gray-100">
+            <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider px-4 py-3">Rank</th>
+            <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider px-4 py-3">Student</th>
+            <th className="text-right text-xs font-medium text-gray-500 uppercase tracking-wider px-4 py-3">Points</th>
+            <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider px-4 py-3">Competitions</th>
+            <th className="text-right text-xs font-medium text-gray-500 uppercase tracking-wider px-4 py-3">Wins</th>
+          </tr>
+        </thead>
+        <tbody>
+          {ranked.map((entry) => (
+            <tr key={entry.rank} className="border-b border-gray-50 hover:bg-gray-50/50 transition-colors even:bg-gray-50/30">
+              <td className="px-4 py-4">
+                <RankBadge rank={entry.rank} />
+              </td>
+              <td className="px-4 py-4">
+                <p className="text-sm font-medium text-gray-900">{entry.studentName}</p>
+                <p className="text-xs text-gray-500">{entry.email}</p>
+              </td>
+              <td className="px-4 py-4 text-right text-sm font-semibold text-accent">{entry.points}</td>
+              <td className="px-4 py-4 text-sm text-gray-600 max-w-[200px] truncate">
+                {entry.recentCompetition || '-'}
+              </td>
+              <td className="px-4 py-4 text-right text-sm text-gray-600 font-medium">{entry.wins}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   )
 }

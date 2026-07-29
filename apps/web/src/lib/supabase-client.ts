@@ -354,6 +354,24 @@ export async function upsertNotification(notif: Record<string, unknown>) {
   return { success: true }
 }
 
+export async function upsertNotifications(notifs: Record<string, unknown>[]) {
+  if (!supabase || notifs.length === 0) return { success: false, reason: 'missing-config' }
+
+  const rows = notifs.map(notif => ({
+    id: notif.id,
+    user_id: notif.userId,
+    type: notif.type,
+    title: notif.title,
+    message: notif.message,
+    data: notif.data || null,
+    is_read: notif.isRead || false,
+  }))
+
+  const { error } = await supabase.from('notifications').upsert(rows, { onConflict: 'id' })
+  if (error) return { success: false, reason: error.message }
+  return { success: true }
+}
+
 // ─── Audit Logs ────────────────────────────────────────────────────
 export async function fetchAuditLogsFromSupabase() {
   if (!supabase) return []
@@ -441,6 +459,67 @@ export async function upsertVerificationRequest(vr: Record<string, unknown>) {
   }
 
   const { error } = await supabase.from('verification_requests').upsert(row, { onConflict: 'id' })
+  if (error) return { success: false, reason: error.message }
+  return { success: true }
+}
+
+// ─── Competition Dashboard (External) ──────────────────────────────
+export async function fetchCompetitionDashboardFromSupabase() {
+  if (!supabase) return []
+
+  const { data, error } = await supabase
+    .from('competition_dashboard')
+    .select('*')
+    .order('serial_no', { ascending: true })
+
+  if (error) {
+    console.error('Supabase fetch competition_dashboard error:', error.message)
+    return []
+  }
+
+  return (data || []).map((row: any) => ({
+    id: row.id,
+    serialNo: row.serial_no,
+    competitionName: row.competition_name,
+    competitionStatus: row.competition_status,
+    eligibleYear: row.eligible_year,
+    regDeadline: row.reg_deadline,
+    r1Date: row.r1_date,
+    r2Date: row.r2_date,
+    remainingDaysForReg: row.remaining_days_for_reg,
+    rDaysForR1: row.r_days_for_r1,
+    rDaysForR2: row.r_days_for_r2,
+    regTeam: row.reg_team,
+    totalPrizeAmount: row.total_prize_amount,
+    category: row.category,
+    organizer: row.organizer,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  }))
+}
+
+export async function upsertCompetitionDashboardItem(item: Record<string, unknown>) {
+  if (!supabase) return { success: false, reason: 'missing-config' }
+
+  const row = {
+    id: item.id,
+    serial_no: item.serialNo || item.serial_no,
+    competition_name: item.competitionName || item.competition_name,
+    competition_status: item.competitionStatus || item.competition_status || 'On Going',
+    eligible_year: item.eligibleYear || item.eligible_year || '',
+    reg_deadline: item.regDeadline || item.reg_deadline || null,
+    r1_date: item.r1Date || item.r1_date || null,
+    r2_date: item.r2Date || item.r2_date || null,
+    remaining_days_for_reg: item.remainingDaysForReg ?? item.remaining_days_for_reg ?? 0,
+    r_days_for_r1: item.rDaysForR1 ?? item.r_days_for_r1 ?? 0,
+    r_days_for_r2: item.rDaysForR2 ?? item.r_days_for_r2 ?? 0,
+    reg_team: item.regTeam ?? item.reg_team ?? 0,
+    total_prize_amount: item.totalPrizeAmount || item.total_prize_amount || '',
+    category: item.category || 'Competition',
+    organizer: item.organizer || '',
+  }
+
+  const { error } = await supabase.from('competition_dashboard').upsert(row, { onConflict: 'id' })
   if (error) return { success: false, reason: error.message }
   return { success: true }
 }

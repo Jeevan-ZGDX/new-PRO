@@ -1,6 +1,8 @@
 export { apiClient } from './client'
+export { setSupabaseClient, getSupabaseClient, isSupabaseEnabled } from './supabase-manager'
 export { useLogin, useProfile, useUpdateProfile, useUpdateNotificationPreferences, useUpdateLanguage, useLogout } from './hooks/useAuth'
 export { useCompetitions, useCompetition, useUpcomingDeadlines, useTrendingCompetitions, useSearchCompetitions } from './hooks/useCompetitions'
+export { useLeaderboardOverall, useLeaderboardDepartment, useLeaderboardDepartments } from './hooks/useLeaderboard'
 export {
   useRegistrations,
   useRegistration,
@@ -11,9 +13,6 @@ export {
   useAdminRegistrationStats,
   useStudentDashboardStats,
   useStudentHistory,
-  useLeaderboardOverall,
-  useLeaderboardDepartment,
-  useLeaderboardDepartments,
   useCompetitionDashboard,
   useAdvisorDashboardStats,
   useHodDashboardStats,

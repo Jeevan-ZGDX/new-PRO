@@ -6,17 +6,18 @@ import { Card, CardHeader, CardTitle, SettingsRow } from '@comp-dash/design-syst
 import { useProfile, useUpdateNotificationPreferences } from '@comp-dash/api'
 import { Building2, Calendar, Bell, BellOff, Moon, Sun, Palette, Loader2 } from 'lucide-react'
 import { useToast } from '@/contexts/ToastContext'
+import { useTheme } from '@/contexts/ThemeContext'
 
 export default function SettingsPage() {
   const { t } = useTranslation()
   const { data: profile, isLoading } = useProfile()
   const { toast } = useToast()
   const { mutate: updateNotificationPrefs, isPending: isSaving } = useUpdateNotificationPreferences()
+  const { theme, setTheme } = useTheme()
 
   const [emailNotifications, setEmailNotifications] = useState(true)
   const [pushNotifications, setPushNotifications] = useState(true)
   const [deadlineReminders, setDeadlineReminders] = useState(true)
-  const [theme, setTheme] = useState<'light' | 'dark'>('light')
 
   useEffect(() => {
     if (profile?.notificationPreferences) {
