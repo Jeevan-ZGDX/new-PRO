@@ -22,6 +22,35 @@ interface StoredEmail {
   competitionHint?: string
 }
 
+interface GmailSyncResult {
+  historyId: string
+  emails: StoredEmail[]
+}
+
+interface GmailSearchResult {
+  emails: StoredEmail[]
+}
+
+function getApiBase(): string {
+  if (typeof window === 'undefined') return ''
+  return ''
+}
+
+async function fetchApi(endpoint: string, params: Record<string, string> = {}, options: { method?: string; body?: any } = {}): Promise<any> {
+  const url = new URL(`/api${endpoint}`, window.location.origin)
+  Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v))
+  const res = await fetch(url.toString(), {
+    method: options.method || 'GET',
+    headers: options.body ? { 'Content-Type': 'application/json' } : {},
+    body: options.body ? JSON.stringify(options.body) : undefined,
+  })
+  const json = await res.json()
+  if (!res.ok || !json.success) {
+    throw new Error(json.error?.message || 'API request failed')
+  }
+  return json.data
+}
+
 export function getGmailTokens(userId: string): GmailTokens | null {
   if (typeof window === 'undefined') return null
   try {
@@ -110,85 +139,56 @@ export async function fetchValidAccessToken(userId: string): Promise<string | nu
   return tokens.access_token
 }
 
-export async function fetchInitialHistoryId(accessToken: string): Promise<string | null> {
+export async function storeTokensOnServer(userId: string, tokens: GmailTokens, historyId?: string): Promise<void> {
+  await fetchApi('/gmail/tokens', { userId }, {
+    method: 'POST',
+    body: {
+      userId,
+      accessToken: tokens.access_token,
+      refreshToken: tokens.refresh_token || '',
+      expiresIn: String(Math.floor((tokens.expiry_date - Date.now()) / 1000)),
+      historyId: historyId || '',
+    },
+  })
+}
+
+// --- Server-proxied Gmail API calls ---
+
+export async function fetchInitialHistoryId(userId: string): Promise<string | null> {
+  const accessToken = await fetchValidAccessToken(userId)
+  if (!accessToken) return null
   try {
-    const res = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/profile', {
-      headers: { Authorization: `Bearer ${accessToken}` },
-    })
-    if (!res.ok) return null
-    const data = await res.json()
+    const data = await fetchApi('/gmail/sync/initial', { userId, accessToken })
     return data.historyId || null
   } catch { return null }
 }
 
-export async function fetchEmailDetail(accessToken: string, emailId: string): Promise<StoredEmail | null> {
+export async function fetchHistorySync(userId: string): Promise<GmailSyncResult | null> {
+  const accessToken = await fetchValidAccessToken(userId)
+  const startHistoryId = getHistoryId(userId)
+  if (!accessToken || !startHistoryId) return null
   try {
-    const res = await fetch(
-      `https://gmail.googleapis.com/gmail/v1/users/me/messages/${emailId}?format=metadata&metadataHeaders=From&metadataHeaders=To&metadataHeaders=Subject&metadataHeaders=Date`,
-      { headers: { Authorization: `Bearer ${accessToken}` } }
-    )
-    if (!res.ok) return null
-    const data = await res.json()
-    const headers = (data.payload?.headers || []).reduce((acc: Record<string, string>, h: any) => {
-      acc[h.name.toLowerCase()] = h.value
-      return acc
-    }, {})
-    return {
-      id: data.id,
-      threadId: data.threadId,
-      from: headers.from || '',
-      to: headers.to || '',
-      subject: headers.subject || '',
-      snippet: data.snippet || '',
-      date: headers.date || data.internalDate || '',
-      labels: data.labelIds || [],
-    }
+    const data = await fetchApi('/gmail/sync', { userId, accessToken, startHistoryId })
+    return { historyId: data.historyId, emails: data.emails }
   } catch { return null }
 }
 
-export async function fetchHistorySync(accessToken: string, startHistoryId: string): Promise<{
-  historyId: string
-  emails: StoredEmail[]
-}> {
+export async function searchGmailEmails(userId: string, keyword: string): Promise<StoredEmail[]> {
+  const accessToken = await fetchValidAccessToken(userId)
+  if (!accessToken) return []
   try {
-    const res = await fetch(
-      `https://gmail.googleapis.com/gmail/v1/users/me/history?startHistoryId=${startHistoryId}&historyTypes=messageAdded`,
-      { headers: { Authorization: `Bearer ${accessToken}` } }
-    )
-    if (!res.ok) return { historyId: startHistoryId, emails: [] }
-    const data = await res.json()
-    const newHistoryId = data.historyId || startHistoryId
-    const messageIds: string[] = []
-    for (const record of data.history || []) {
-      for (const msg of record.messagesAdded || []) {
-        if (msg.message?.id) messageIds.push(msg.message.id)
-      }
-    }
-    const emails: StoredEmail[] = []
-    for (const id of messageIds.slice(0, 50)) {
-      const detail = await fetchEmailDetail(accessToken, id)
-      if (detail) emails.push(detail)
-    }
-    return { historyId: newHistoryId, emails }
-  } catch { return { historyId: startHistoryId, emails: [] } }
+    const data = await fetchApi('/gmail/search', { userId, accessToken, keyword })
+    return data.emails || []
+  } catch { return [] }
 }
 
-export async function searchGmailEmails(accessToken: string, query: string): Promise<StoredEmail[]> {
+export async function fetchEmailDetail(userId: string, emailId: string): Promise<StoredEmail | null> {
+  const accessToken = await fetchValidAccessToken(userId)
+  if (!accessToken) return null
   try {
-    const res = await fetch(
-      `https://gmail.googleapis.com/gmail/v1/users/me/messages?q=${encodeURIComponent(query)}&maxResults=20`,
-      { headers: { Authorization: `Bearer ${accessToken}` } }
-    )
-    if (!res.ok) return []
-    const data = await res.json()
-    const messages = data.messages || []
-    const emails: StoredEmail[] = []
-    for (const msg of messages.slice(0, 20)) {
-      const detail = await fetchEmailDetail(accessToken, msg.id)
-      if (detail) emails.push(detail)
-    }
-    return emails
-  } catch { return [] }
+    const data = await fetchApi('/gmail/email-detail', { userId, accessToken, id: emailId })
+    return data.email || null
+  } catch { return null }
 }
 
 export function extractCompetitionHint(email: StoredEmail): string | null {

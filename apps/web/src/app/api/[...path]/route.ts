@@ -36,6 +36,73 @@ function error(code: string, message: string, status = 400) {
   return NextResponse.json({ success: false, error: { code, message } }, { status })
 }
 
+// ─── Server-side Gmail API Helpers ─────────────────────────────────────
+const GMAIL_API_BASE = 'https://gmail.googleapis.com/gmail/v1/users/me'
+
+async function gmailApiRequest(accessToken: string, endpoint: string, options: RequestInit = {}) {
+  const res = await fetch(`${GMAIL_API_BASE}${endpoint}`, {
+    ...options,
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+      ...options.headers,
+    },
+  })
+  if (!res.ok) {
+    const err = await res.text()
+    throw new Error(`Gmail API error: ${res.status} ${err}`)
+  }
+  return res.json()
+}
+
+async function gmailSearchMessages(accessToken: string, query: string, maxResults = 20) {
+  const data = await gmailApiRequest(accessToken, `/messages?q=${encodeURIComponent(query)}&maxResults=${maxResults}`)
+  return data.messages || []
+}
+
+async function gmailGetMessage(accessToken: string, messageId: string) {
+  return gmailApiRequest(accessToken, `/messages/${messageId}?format=metadata&metadataHeaders=From&metadataHeaders=To&metadataHeaders=Subject&metadataHeaders=Date`)
+}
+
+async function gmailGetProfile(accessToken: string) {
+  return gmailApiRequest(accessToken, '/profile')
+}
+
+async function gmailGetHistory(accessToken: string, startHistoryId: string) {
+  return gmailApiRequest(accessToken, `/history?startHistoryId=${startHistoryId}&historyTypes=messageAdded`)
+}
+
+function extractHeaders(payload: any): Record<string, string> {
+  return (payload?.headers || []).reduce((acc: Record<string, string>, h: any) => {
+    acc[h.name.toLowerCase()] = h.value
+    return acc
+  }, {})
+}
+
+function mapGmailMessage(message: any): any {
+  const headers = extractHeaders(message.payload)
+  return {
+    id: message.id,
+    threadId: message.threadId,
+    from: headers.from || '',
+    to: headers.to || '',
+    subject: headers.subject || '',
+    snippet: message.snippet || '',
+    date: headers.date || message.internalDate || '',
+    labels: message.labelIds || [],
+  }
+}
+
+function extractCompetitionHint(email: any): string | null {
+  const subject = (email.subject || '').toLowerCase()
+  const from = (email.from || '').toLowerCase()
+  const keywords = ['competition', 'hackathon', 'contest', 'challenge', 'registration', 'workshop', 'conference', 'seminar', 'symposium']
+  for (const kw of keywords) {
+    if (subject.includes(kw) || from.includes(kw)) return kw
+  }
+  return null
+}
+
 function paginated<T>(items: T[], page: number, limit: number) {
   const total = items.length
   const totalPages = Math.ceil(total / limit)
@@ -705,100 +772,128 @@ register('GET', '/auth/gmail/callback', async (req) => {
 })
 
 // ─── GMAIL SYNC & SEARCH ────────────────────────────────────────────
+// Tokens are managed client-side in localStorage. Server endpoints accept accessToken.
 register('GET', '/gmail/tokens', async (req) => {
   const qs = new URL(req.url).searchParams
   const userId = qs.get('userId')
   if (!userId) return error('BAD_REQUEST', 'userId required')
-  try {
-    const { getGmailTokens } = await import('@/lib/gmail-sync')
-    const tokens = getGmailTokens(userId)
-    return ok({ hasTokens: !!tokens, hasRefreshToken: !!tokens?.refresh_token })
-  } catch { return ok({ hasTokens: false }) }
+  // Client manages tokens in localStorage. Return success if userId provided.
+  return ok({ hasTokens: true, note: 'Tokens stored client-side' })
 })
 
 register('POST', '/gmail/tokens', async (req) => {
   const body = await req.json()
   const { userId, accessToken, refreshToken, expiresIn, historyId } = body
   if (!userId || !accessToken) return error('BAD_REQUEST', 'userId and accessToken required')
-  try {
-    const { setGmailTokens, setHistoryId } = await import('@/lib/gmail-sync')
-    setGmailTokens(userId, { access_token: accessToken, refresh_token: refreshToken || '', expiry_date: Date.now() + (expiresIn || 3600) * 1000 })
-    if (historyId) setHistoryId(userId, historyId)
-    return ok({ stored: true })
-  } catch { return error('INTERNAL', 'Failed to store tokens') }
+  // Client stores tokens in localStorage. Server acknowledges.
+  return ok({ stored: true, historyId: historyId || '' })
 })
 
 register('GET', '/gmail/sync', async (req) => {
   const qs = new URL(req.url).searchParams
   const userId = qs.get('userId')
-  if (!userId) return error('BAD_REQUEST', 'userId required')
+  const accessToken = qs.get('accessToken')
+  const startHistoryId = qs.get('startHistoryId')
+  if (!userId || !accessToken || !startHistoryId) {
+    return error('BAD_REQUEST', 'userId, accessToken, and startHistoryId required')
+  }
   try {
-    const { fetchValidAccessToken, getHistoryId, setHistoryId, fetchHistorySync, appendSyncedEmails, extractCompetitionHint } = await import('@/lib/gmail-sync')
-    const accessToken = await fetchValidAccessToken(userId)
-    if (!accessToken) return error('UNAUTHORIZED', 'Gmail not connected')
-    const startHistoryId = getHistoryId(userId)
-    if (!startHistoryId) return error('BAD_REQUEST', 'No historyId — perform initial sync first')
-    const result = await fetchHistorySync(accessToken, startHistoryId)
-    setHistoryId(userId, result.historyId)
-    const tagged = result.emails.map(e => ({ ...e, competitionHint: extractCompetitionHint(e) }))
-    appendSyncedEmails(userId, tagged)
-    return ok({ historyId: result.historyId, newEmails: result.emails.length, emails: tagged })
-  } catch { return error('INTERNAL', 'Sync failed') }
+    console.log('[Gmail Sync] Starting incremental sync for user:', userId)
+    const history = await gmailGetHistory(accessToken, startHistoryId)
+    const messageIds: string[] = []
+    for (const record of history.history || []) {
+      for (const msg of record.messagesAdded || []) {
+        if (msg.message?.id) messageIds.push(msg.message.id)
+      }
+    }
+    console.log('[Gmail Sync] Found', messageIds.length, 'new message(s)')
+    const emails = []
+    for (const id of messageIds.slice(0, 50)) {
+      try {
+        const message = await gmailGetMessage(accessToken, id)
+        emails.push(mapGmailMessage(message))
+      } catch (e) {
+        console.warn('[Gmail Sync] Failed to fetch message', id, e)
+      }
+    }
+    const newHistoryId = history.historyId || startHistoryId
+    const tagged = emails.map(e => ({ ...e, competitionHint: extractCompetitionHint(e) }))
+    return ok({ historyId: newHistoryId, newEmails: emails.length, emails: tagged })
+  } catch (e) {
+    console.error('[Gmail Sync] Error:', e)
+    return error('INTERNAL', 'Sync failed: ' + (e instanceof Error ? e.message : String(e)))
+  }
 })
 
 register('GET', '/gmail/sync/initial', async (req) => {
   const qs = new URL(req.url).searchParams
   const userId = qs.get('userId')
-  if (!userId) return error('BAD_REQUEST', 'userId required')
+  const accessToken = qs.get('accessToken')
+  if (!userId || !accessToken) return error('BAD_REQUEST', 'userId and accessToken required')
   try {
-    const { fetchValidAccessToken, setHistoryId, fetchInitialHistoryId } = await import('@/lib/gmail-sync')
-    const accessToken = await fetchValidAccessToken(userId)
-    if (!accessToken) return error('UNAUTHORIZED', 'Gmail not connected')
-    const historyId = await fetchInitialHistoryId(accessToken)
-    if (historyId) setHistoryId(userId, historyId)
-    return ok({ historyId: historyId || '' })
-  } catch { return error('INTERNAL', 'Initial sync failed') }
+    console.log('[Gmail Initial Sync] Fetching profile for user:', userId)
+    const profile = await gmailGetProfile(accessToken)
+    const historyId = profile.historyId || ''
+    console.log('[Gmail Initial Sync] Got historyId:', historyId)
+    return ok({ historyId })
+  } catch (e) {
+    console.error('[Gmail Initial Sync] Error:', e)
+    return error('INTERNAL', 'Initial sync failed: ' + (e instanceof Error ? e.message : String(e)))
+  }
 })
 
 register('GET', '/gmail/search', async (req) => {
   const qs = new URL(req.url).searchParams
   const userId = qs.get('userId')
+  const accessToken = qs.get('accessToken')
   const keyword = qs.get('keyword')
-  if (!userId || !keyword) return error('BAD_REQUEST', 'userId and keyword required')
+  const maxResults = parseInt(qs.get('maxResults') || '20')
+  if (!userId || !accessToken || !keyword) {
+    return error('BAD_REQUEST', 'userId, accessToken, and keyword required')
+  }
   try {
-    const { fetchValidAccessToken, searchGmailEmails, extractCompetitionHint } = await import('@/lib/gmail-sync')
-    const accessToken = await fetchValidAccessToken(userId)
-    if (!accessToken) return error('UNAUTHORIZED', 'Gmail not connected')
-    const emails = await searchGmailEmails(accessToken, keyword)
+    console.log('[Gmail Search] Searching for:', keyword)
+    const messages = await gmailSearchMessages(accessToken, keyword, maxResults)
+    console.log('[Gmail Search] Found', messages.length, 'message(s)')
+    const emails = []
+    for (const msg of messages.slice(0, maxResults)) {
+      try {
+        const message = await gmailGetMessage(accessToken, msg.id)
+        emails.push(mapGmailMessage(message))
+      } catch (e) {
+        console.warn('[Gmail Search] Failed to fetch message', msg.id, e)
+      }
+    }
     const tagged = emails.map(e => ({ ...e, competitionHint: extractCompetitionHint(e) }))
     return ok({ emails: tagged })
-  } catch { return error('INTERNAL', 'Search failed') }
+  } catch (e) {
+    console.error('[Gmail Search] Error:', e)
+    return error('INTERNAL', 'Search failed: ' + (e instanceof Error ? e.message : String(e)))
+  }
 })
 
 register('GET', '/gmail/email-detail', async (req) => {
   const qs = new URL(req.url).searchParams
   const userId = qs.get('userId')
+  const accessToken = qs.get('accessToken')
   const id = qs.get('id')
-  if (!userId || !id) return error('BAD_REQUEST', 'userId and id required')
+  if (!userId || !accessToken || !id) return error('BAD_REQUEST', 'userId, accessToken, and id required')
   try {
-    const { fetchValidAccessToken, fetchEmailDetail } = await import('@/lib/gmail-sync')
-    const accessToken = await fetchValidAccessToken(userId)
-    if (!accessToken) return error('UNAUTHORIZED', 'Gmail not connected')
-    const email = await fetchEmailDetail(accessToken, id)
-    if (!email) return error('NOT_FOUND', 'Email not found')
-    return ok({ email })
-  } catch { return error('INTERNAL', 'Failed to fetch email detail') }
+    console.log('[Gmail Detail] Fetching message:', id)
+    const message = await gmailGetMessage(accessToken, id)
+    return ok({ email: mapGmailMessage(message) })
+  } catch (e) {
+    console.error('[Gmail Detail] Error:', e)
+    return error('INTERNAL', 'Failed to fetch email detail: ' + (e instanceof Error ? e.message : String(e)))
+  }
 })
 
 register('GET', '/gmail/emails/stored', async (req) => {
   const qs = new URL(req.url).searchParams
   const userId = qs.get('userId')
   if (!userId) return error('BAD_REQUEST', 'userId required')
-  try {
-    const { getSyncedEmails } = await import('@/lib/gmail-sync')
-    const emails = getSyncedEmails(userId)
-    return ok({ emails })
-  } catch { return error('INTERNAL', 'Failed to fetch stored emails') }
+  // Client manages stored emails in localStorage
+  return ok({ emails: [], note: 'Emails stored client-side in localStorage' })
 })
 
 // ─── AI COMPETITION EXTRACTION (placeholder) ────────────────────────
