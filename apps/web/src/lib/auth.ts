@@ -27,7 +27,7 @@ export function getStoredUsers(): StoredUser[] {
       localStorage.setItem(USERS_KEY, JSON.stringify(DEFAULT_USERS))
       return DEFAULT_USERS
     }
-    let users: StoredUser[] = JSON.parse(raw)
+    const users: StoredUser[] = JSON.parse(raw)
     if (!Array.isArray(users) || users.length === 0) {
       localStorage.setItem(USERS_KEY, JSON.stringify(DEFAULT_USERS))
       return DEFAULT_USERS

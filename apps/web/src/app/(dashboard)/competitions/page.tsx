@@ -1,11 +1,12 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useTranslation } from 'react-i18next'
 import { Card, Badge } from '@comp-dash/design-system'
 import { useCompetitions, isSupabaseEnabled } from '@comp-dash/api'
-import { Calendar, MapPin, Users, Clock, ArrowRight, Search } from 'lucide-react'
+import { getCurrentUser } from '@/lib/auth'
+import { Calendar, MapPin, Users, Clock, ArrowRight, Search, Pencil } from 'lucide-react'
 import type { CompetitionCategory } from '@comp-dash/types'
 
 const categoryOptions = [
@@ -33,6 +34,8 @@ function formatDate(dateStr: string | null | undefined) {
 export default function CompetitionsPage() {
   const { t } = useTranslation()
   const router = useRouter()
+  const [user, setUser] = useState<any>(null)
+  useEffect(() => { setUser(getCurrentUser()) }, [])
   const [search, setSearch] = useState('')
   const [selectedCategory, setSelectedCategory] = useState('all')
 
@@ -149,8 +152,18 @@ export default function CompetitionsPage() {
                       <p className="text-xs text-gray-400 dark:text-[#8B949E]">Prize Pool</p>
                       <p className="text-sm font-bold text-accent dark:text-[#38BDF8]">{comp.prizePool || 'N/A'}</p>
                     </div>
-                    <div className="flex items-center gap-1 text-sm font-medium text-accent dark:text-[#38BDF8] group-hover:gap-2 transition-all">
-                      View Details <ArrowRight className="w-4 h-4" />
+                    <div className="flex items-center gap-2">
+                      {user?.role === 'super_admin' && (
+                        <button onClick={(e) => { e.stopPropagation(); router.push(`/create-competition?edit=${comp.id}`) }}
+                          className="flex items-center gap-1 px-2.5 py-1.5 bg-gray-50 dark:bg-[#0D1117] border border-gray-200 dark:border-[#30363D] rounded-lg text-xs font-medium text-gray-500 dark:text-[#8B949E] hover:text-accent dark:hover:text-[#38BDF8] transition-colors"
+                        >
+                          <Pencil className="w-3 h-3" />
+                          Edit
+                        </button>
+                      )}
+                      <div className="flex items-center gap-1 text-sm font-medium text-accent dark:text-[#38BDF8] group-hover:gap-2 transition-all">
+                        View Details <ArrowRight className="w-4 h-4" />
+                      </div>
                     </div>
                   </div>
                 </div>

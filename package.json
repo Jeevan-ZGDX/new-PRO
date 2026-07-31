@@ -8,8 +8,10 @@
   "scripts": {
     "dev:mobile": "expo start --dev-client",
     "dev:web": "npm run dev -w apps/web",
+    "build": "npm run db:generate -w apps/web && npm run build -w apps/web",
+    "start": "npm run start -w apps/web",
     "build:mobile": "expo build:android && expo build:ios",
-    "build:web": "next build apps/web && next export -o out",
+    "build:web": "next build apps/web",
     "lint": "eslint . --ext .tsx,.ts",
     "format": "prettier --write .",
     "typecheck": "tsc --noEmit",
@@ -21,7 +23,7 @@
     "eslint": "^8.56.0",
     "husky": "^9.0.0",
     "prettier": "^3.2.0",
-    "prisma": "^7.9.0",
+    "prisma": "^5.22.0",
     "turbo": "^1.12.0",
     "typescript": "^5.3.0"
   },
@@ -30,5 +32,9 @@
   },
   "dependencies": {
     "xlsx": "^0.18.5"
+  },
+  "overrides": {
+    "react": "$react",
+    "react-dom": "$react-dom"
   }
 }

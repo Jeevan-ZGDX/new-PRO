@@ -1,31 +1,32 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Card, CardHeader, CardTitle, Badge, Button } from '@comp-dash/design-system'
-import { useLeaderboardOverall, useCompetitionDashboard, useCompetitions } from '@comp-dash/api'
-import { Trophy, Users, Award, ChevronDown, Search, Medal, Star } from 'lucide-react'
+import { Card, Badge } from '@comp-dash/design-system'
+import { useLeaderboardOverall, useCompetitions, useCompetitionDashboard } from '@comp-dash/api'
+import type { LeaderboardEntry } from '@comp-dash/types'
+import { Trophy, Star, Search, Award, Users, ChevronDown } from 'lucide-react'
 import { getCurrentUser } from '@/lib/auth'
 
-type Tab = 'overall' | 'department' | 'competition'
-
-const tabs: { key: Tab; label: string; icon: typeof Trophy }[] = [
-  { key: 'overall', label: 'Overall', icon: Trophy },
-  { key: 'department', label: 'Section-wise', icon: Users },
-  { key: 'competition', label: 'Competition-wise', icon: Award },
-]
-
 function RankBadge({ rank }: { rank: number }) {
-  if (rank === 1) return <Medal className="w-5 h-5 text-yellow-500" />
-  if (rank === 2) return <Medal className="w-5 h-5 text-gray-400 dark:text-[#8B949E]" />
-  if (rank === 3) return <Medal className="w-5 h-5 text-amber-600 dark:text-amber-400" />
-  return <span className="text-sm font-medium text-gray-500 dark:text-[#8B949E] w-5 text-center">{rank}</span>
+  if (rank === 1) return <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-amber-400 text-white font-bold text-xs shadow-sm">1</span>
+  if (rank === 2) return <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-slate-300 text-slate-700 font-bold text-xs shadow-sm">2</span>
+  if (rank === 3) return <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-amber-600 text-white font-bold text-xs shadow-sm">3</span>
+  return <span className="text-sm font-semibold text-gray-500 dark:text-[#8B949E] pl-2">#{rank}</span>
 }
 
+type LeaderboardTab = 'overall' | 'section' | 'competition'
+
+const tabs: { key: LeaderboardTab; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
+  { key: 'overall', label: 'Overall', icon: Trophy },
+  { key: 'section', label: 'Section-wise', icon: Users },
+  { key: 'competition', label: 'By Competition', icon: Award },
+]
+
 export default function LeaderboardPage() {
+  const [activeTab, setActiveTab] = useState<LeaderboardTab>('overall')
+  const [selectedDept, setSelectedDept] = useState<string | null>(null)
+  const [selectedComp, setSelectedComp] = useState<string>('')
   const [isStudent, setIsStudent] = useState(false)
-  const [activeTab, setActiveTab] = useState<Tab>('overall')
-  const [selectedDept, setSelectedDept] = useState('')
-  const [selectedComp, setSelectedComp] = useState('')
 
   useEffect(() => {
     const user = getCurrentUser()
@@ -45,7 +46,7 @@ export default function LeaderboardPage() {
         <h1 className="text-2xl font-bold text-gray-900 dark:text-[#F0F6FC]">Leaderboard</h1>
       </div>
 
-      <Card padding="none" className="overflow-hidden">
+      <Card padding="none" className="overflow-hidden bg-white dark:bg-[#161B22] border border-gray-200 dark:border-[#30363D]">
         {!isStudent && (
           <div className="flex border-b border-gray-100 dark:border-[#30363D]">
             {tabs.map((tab) => {
@@ -124,7 +125,7 @@ export default function LeaderboardPage() {
                     ))
                   ) : (
                     <tr>
-                      <td colSpan={6} className="text-center py-12 text-gray-500 dark:text-[#8B949E]">No leaderboard data available</td>
+                      <td colSpan={6} className="text-center py-12 text-gray-500 dark:text-[#8B949E]">No data available</td>
                     </tr>
                   )}
                 </tbody>
@@ -132,30 +133,27 @@ export default function LeaderboardPage() {
             </div>
           )}
 
-          {activeTab === 'department' && (
+          {activeTab === 'section' && !isStudent && (
             <div className="space-y-6">
               {selectedDept ? (
-                <>
-                  <div className="flex items-center gap-2">
-                    <Button variant="ghost" size="sm" onClick={() => setSelectedDept('')}>
-                      ← Back to Sections
-                    </Button>
-                    <span className="text-sm font-semibold text-gray-700 dark:text-[#F0F6FC]">Section {selectedDept}</span>
-                  </div>
+                <div>
+                  <button
+                    onClick={() => setSelectedDept(null)}
+                    className="text-sm text-accent dark:text-[#38BDF8] hover:underline mb-4 flex items-center gap-1"
+                  >
+                    &larr; Back to all sections
+                  </button>
+                  <h3 className="text-lg font-bold text-gray-900 dark:text-[#F0F6FC] mb-4">Section {selectedDept} Rankings</h3>
                   <SectionDetailTable sectionId={selectedDept} />
-                </>
+                </div>
               ) : (
                 <>
-                  <p className="text-sm text-gray-500 dark:text-[#8B949E]">Click a section to view its students</p>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
-                    {overallLoading ? (
-                      Array.from({ length: 12 }).map((_, i) => (
-                        <div key={i} className="h-20 bg-gray-100 dark:bg-[#161B22] rounded-xl animate-pulse" />
-                      ))
-                    ) : overallData && overallData.length > 0 ? (
+                  <p className="text-sm text-gray-500 dark:text-[#8B949E]">Click a section to view student rankings</p>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {overallData && overallData.length > 0 ? (
                       (() => {
                         const sections = [...new Set(overallData.map(e => e.section).filter(Boolean))].sort() as string[]
-                        return sections.map((sec) => {
+                        return sections.map(sec => {
                           const students = overallData.filter(e => e.section === sec)
                           const totalPts = students.reduce((sum, s) => sum + s.points, 0)
                           const totalWins = students.reduce((sum, s) => sum + s.wins, 0)
@@ -167,7 +165,7 @@ export default function LeaderboardPage() {
                             >
                               <p className="text-base font-bold text-gray-900 dark:text-[#F0F6FC]">{sec}</p>
                               <p className="text-xs text-gray-500 dark:text-[#8B949E] mt-1">{students.length} students</p>
-                              <p className="text-xs text-accent dark:text-[#38BDF8] font-medium mt-1">{totalPts} pts · {totalWins} wins</p>
+                              <p className="text-xs text-accent dark:text-[#38BDF8] font-medium mt-1">{totalPts} pts &middot; {totalWins} wins</p>
                             </div>
                           )
                         })

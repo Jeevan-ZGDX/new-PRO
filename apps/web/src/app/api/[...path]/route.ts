@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic'
+
 import { NextRequest, NextResponse } from 'next/server'
 import {
   departments, students, advisors, competitions, registrations,
@@ -245,7 +247,7 @@ register('POST', '/auth/logout', async () => ok(null))
 // --- COMPETITIONS ---
 register('POST', '/competitions', async (req) => {
   const body = await req.json()
-  const { title, description, shortDescription, category, scope, mode, organizer, websiteUrl, registrationUrl, teamSizeMin, teamSizeMax, prizePool, registrationDeadline, startDate, endDate, eligibility, tags } = body
+  const { title, description, shortDescription, category, scope, mode, organizer, organizerEmail, websiteUrl, registrationUrl, teamSizeMin, teamSizeMax, prizePool, registrationDeadline, startDate, endDate, eligibility, tags } = body
   if (!title || !category || !scope || !mode || !organizer) {
     return NextResponse.json({ success: false, error: { code: 'BAD_REQUEST', message: 'title, category, scope, mode, and organizer are required' } }, { status: 400 })
   }
@@ -259,6 +261,7 @@ register('POST', '/competitions', async (req) => {
     scope,
     mode,
     organizer,
+    organizerEmail: organizerEmail || '',
     organizerLogo: null,
     bannerUrl: null,
     websiteUrl: websiteUrl || '',
@@ -276,7 +279,7 @@ register('POST', '/competitions', async (req) => {
   }
   await pushCompetition(newCompetition)
 
-  const notifItems = students.slice(0, 50).map(s => ({
+  const notifItems = students.map(s => ({
     id: 'notif-' + Date.now() + '-' + s.id,
     userId: s.id,
     type: 'new_competition',
@@ -325,6 +328,39 @@ register('GET', '/competitions/:id', async (req, seg) => {
     isBookmarked: false,
     bookmarkCount: 0,
   })
+})
+
+register('PUT', '/competitions/:id', async (req, seg) => {
+  const id = seg[1]
+  const comp = competitions.find(c => c.id === id)
+  if (!comp) return NextResponse.json({ success: false, error: { code: 'NOT_FOUND', message: 'Competition not found' } }, { status: 404 })
+  const body = await req.json()
+  const idx = competitions.indexOf(comp)
+  const updated = {
+    ...comp,
+    title: body.title ?? comp.title,
+    description: body.description ?? comp.description,
+    shortDescription: body.shortDescription ?? comp.shortDescription,
+    category: body.category ?? comp.category,
+    scope: body.scope ?? comp.scope,
+    mode: body.mode ?? comp.mode,
+    organizer: body.organizer ?? comp.organizer,
+    organizerEmail: body.organizerEmail ?? comp.organizerEmail,
+    websiteUrl: body.websiteUrl ?? comp.websiteUrl,
+    registrationUrl: body.registrationUrl ?? comp.registrationUrl,
+    teamSizeMin: body.teamSizeMin ?? comp.teamSizeMin,
+    teamSizeMax: body.teamSizeMax ?? comp.teamSizeMax,
+    prizePool: body.prizePool ?? comp.prizePool,
+    registrationDeadline: body.registrationDeadline ?? comp.registrationDeadline,
+    startDate: body.startDate ?? comp.startDate,
+    endDate: body.endDate ?? comp.endDate,
+    eligibility: body.eligibility ?? comp.eligibility,
+    tags: body.tags ?? comp.tags,
+    updatedAt: new Date().toISOString(),
+  }
+  competitions[idx] = updated
+  await pushCompetition(updated)
+  return ok(updated)
 })
 
 register('POST', '/competitions/:id/bookmark', async (req, seg) => {
@@ -604,7 +640,7 @@ register('POST', '/admin/students', async (req) => {
     name,
     email,
     department: 'CSE',
-    year: year || '1st Year',
+    year: year || '2nd Year',
     section: section || 'A',
     registeredCompetitions: 0,
     verifiedCompetitions: 0,
@@ -887,6 +923,36 @@ register('GET', '/gmail/email-detail', async (req) => {
   } catch (e) {
     console.error('[Gmail Detail] Error:', e)
     return error('INTERNAL', 'Failed to fetch email detail: ' + (e instanceof Error ? e.message : String(e)))
+  }
+})
+
+register('GET', '/gmail/recent', async (req) => {
+  const qs = new URL(req.url).searchParams
+  const userId = qs.get('userId')
+  const accessToken = qs.get('accessToken')
+  const maxResults = parseInt(qs.get('maxResults') || '30')
+  if (!userId || !accessToken) {
+    return error('BAD_REQUEST', 'userId and accessToken required')
+  }
+  try {
+    console.log('[Gmail Recent] Fetching recent messages for user:', userId)
+    const data = await gmailApiRequest(accessToken, `/messages?maxResults=${maxResults}`)
+    const messageIds: string[] = (data.messages || []).map((m: any) => m.id)
+    console.log('[Gmail Recent] Found', messageIds.length, 'recent message(s)')
+    const emails = []
+    for (const id of messageIds.slice(0, maxResults)) {
+      try {
+        const message = await gmailGetMessage(accessToken, id)
+        emails.push(mapGmailMessage(message))
+      } catch (e) {
+        console.warn('[Gmail Recent] Failed to fetch message', id, e)
+      }
+    }
+    const tagged = emails.map(e => ({ ...e, competitionHint: extractCompetitionHint(e) }))
+    return ok({ emails: tagged })
+  } catch (e) {
+    console.error('[Gmail Recent] Error:', e)
+    return error('INTERNAL', 'Failed to fetch recent emails: ' + (e instanceof Error ? e.message : String(e)))
   }
 })
 

@@ -34,14 +34,14 @@ export const departments: any[] = [
     website: ''
   }
 ]
-export let students: any[] = [...studentsData.students]
-export let advisors: any[] = []
-export let competitions: any[] = []
-export let registrations: any[] = []
-export let winners: any[] = []
-export let auditLogs: any[] = []
-export let notifications: any[] = []
-export let verificationRequests: any[] = []
+export const students: any[] = [...studentsData.students]
+export const advisors: any[] = []
+export const competitions: any[] = []
+export const registrations: any[] = []
+export const winners: any[] = []
+export const auditLogs: any[] = []
+export const notifications: any[] = []
+export const verificationRequests: any[] = []
 
 let loaded = false
 

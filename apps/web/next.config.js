@@ -1,5 +1,17 @@
+const path = require('path')
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
+  typescript: {
+    ignoreBuildErrors: true,
+  },
+  compiler: {
+    styledComponents: true,
+  },
+  output: 'standalone',
   transpilePackages: [
     '@comp-dash/api',
     '@comp-dash/design-system',

@@ -1,10 +1,11 @@
 'use client'
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useEffect, Suspense } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { Card, CardHeader, CardTitle, Button } from '@comp-dash/design-system'
-import { useCreateCompetition } from '@comp-dash/api'
-import { Plus, X } from 'lucide-react'
+import { useCreateCompetition, useUpdateCompetition, useCompetition } from '@comp-dash/api'
+import { useQueryClient } from '@tanstack/react-query'
+import { Plus, X, Save } from 'lucide-react'
 import type { CompetitionCategory, CompetitionScope, CompetitionMode } from '@comp-dash/types'
 
 const categoryOptions: { value: CompetitionCategory; label: string }[] = [
@@ -39,12 +40,21 @@ const inputClass = 'w-full px-4 py-2.5 bg-white dark:bg-[#161B22] border border-
 const labelClass = 'block text-sm font-medium text-gray-700 dark:text-[#F0F6FC] mb-1.5'
 const selectClass = inputClass
 
-export default function CreateCompetitionPage() {
+function CreateCompetitionContent() {
   const router = useRouter()
-  const createMutation = useCreateCompetition()
-  const [tagsInput, setTagsInput] = useState('')
+  const searchParams = useSearchParams()
+  const editId = searchParams.get('edit')
+  const isEdit = !!editId
 
-  const [form, setForm] = useState({
+  const queryClient = useQueryClient()
+  const createMutation = useCreateCompetition()
+  const updateMutation = useUpdateCompetition()
+  const { data: existingComp } = useCompetition(editId || '')
+
+  const [tagsInput, setTagsInput] = useState('')
+  const [loadingExisting, setLoadingExisting] = useState(false)
+
+  const defaultForm = {
     title: '',
     description: '',
     shortDescription: '',
@@ -52,6 +62,7 @@ export default function CreateCompetitionPage() {
     scope: '' as CompetitionScope | '',
     mode: '' as CompetitionMode | '',
     organizer: '',
+    organizerEmail: '',
     websiteUrl: '',
     registrationUrl: '',
     teamSizeMin: 1,
@@ -62,7 +73,34 @@ export default function CreateCompetitionPage() {
     endDate: '',
     eligibilityDepartments: [] as string[],
     tags: [] as string[],
-  })
+  }
+
+  const [form, setForm] = useState(defaultForm)
+
+  useEffect(() => {
+    if (isEdit && existingComp) {
+      setForm({
+        title: existingComp.title || '',
+        description: existingComp.description || '',
+        shortDescription: existingComp.shortDescription || '',
+        category: existingComp.category || '',
+        scope: existingComp.scope || '',
+        mode: existingComp.mode || '',
+        organizer: existingComp.organizer || '',
+        organizerEmail: (existingComp as any).organizerEmail || '',
+        websiteUrl: existingComp.websiteUrl || '',
+        registrationUrl: existingComp.registrationUrl || '',
+        teamSizeMin: existingComp.teamSizeMin || 1,
+        teamSizeMax: existingComp.teamSizeMax || 1,
+        prizePool: existingComp.prizePool || '',
+        registrationDeadline: existingComp.registrationDeadline?.split('T')[0] || '',
+        startDate: existingComp.startDate?.split('T')[0] || '',
+        endDate: existingComp.endDate?.split('T')[0] || '',
+        eligibilityDepartments: existingComp.eligibility?.departments || [],
+        tags: existingComp.tags || [],
+      })
+    }
+  }, [isEdit, existingComp])
 
   const update = (field: string, value: any) => setForm((prev) => ({ ...prev, [field]: value }))
 
@@ -104,17 +142,30 @@ export default function CreateCompetitionPage() {
     }
 
     try {
-      await createMutation.mutateAsync(payload)
+      if (isEdit && editId) {
+        await updateMutation.mutateAsync({ id: editId, data: payload })
+      } else {
+        await createMutation.mutateAsync(payload)
+      }
+      await queryClient.invalidateQueries({ queryKey: ['competitions'] })
+      await queryClient.invalidateQueries({ queryKey: ['supabase-competitions'] })
       router.push('/competitions')
+      router.refresh()
     } catch { /* ignore */ }
   }
 
   const isValid = form.title && form.category && form.scope && form.mode && form.organizer
+  const isSaving = createMutation.isPending || updateMutation.isPending
 
   return (
     <div className="max-w-3xl mx-auto space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900">Create Competition</h1>
+        <h1 className="text-2xl font-bold text-gray-900">{isEdit ? 'Edit Competition' : 'Create Competition'}</h1>
+        {isEdit && (
+          <span className="px-3 py-1 bg-blue-50 border border-blue-200 rounded-full text-xs text-blue-700 font-medium">
+            Editing: {form.title || editId}
+          </span>
+        )}
       </div>
 
       <form onSubmit={handleSubmit}>
@@ -216,6 +267,17 @@ export default function CreateCompetitionPage() {
                 placeholder="Organizing body"
                 required
               />
+            </div>
+            <div>
+              <label className={labelClass}>Organizer Sender Email <span className="text-gray-400 font-normal">(optional)</span></label>
+              <input
+                type="email"
+                value={form.organizerEmail}
+                onChange={(e) => update('organizerEmail', e.target.value)}
+                className={inputClass}
+                placeholder="organizer@example.com"
+              />
+              <p className="text-xs text-gray-400 mt-1">Email address that sends competition confirmations — used for student email verification matching</p>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
@@ -377,12 +439,20 @@ export default function CreateCompetitionPage() {
 
         <div className="flex items-center justify-end gap-3 mt-6">
           <Button type="button" variant="outline" onClick={() => router.back()}>Cancel</Button>
-          <Button type="submit" disabled={!isValid || createMutation.isPending} isLoading={createMutation.isPending}>
-            <Plus className="w-4 h-4" />
-            Create Competition
+          <Button type="submit" disabled={!isValid || isSaving} isLoading={isSaving}>
+            {isEdit ? <Save className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
+            {isEdit ? 'Save Changes' : 'Create Competition'}
           </Button>
         </div>
       </form>
     </div>
+  )
+}
+
+export default function CreateCompetitionPage() {
+  return (
+    <Suspense fallback={<div className="p-6 text-center text-gray-500">Loading...</div>}>
+      <CreateCompetitionContent />
+    </Suspense>
   )
 }
