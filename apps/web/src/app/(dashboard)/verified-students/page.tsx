@@ -157,8 +157,8 @@ export default function VerifiedStudentsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Verified Students</h1>
-          <p className="text-gray-500 mt-1">
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-[#F0F6FC]">Verified Students</h1>
+          <p className="text-gray-500 dark:text-[#8B949E] mt-1">
             {user?.role === 'student'
               ? 'Your verified submissions with email proof metadata'
               : 'Students who have been verified with their submitted email proof metadata'}
@@ -177,24 +177,24 @@ export default function VerifiedStudentsPage() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card>
           <div className="p-4 text-center">
-            <p className="text-2xl font-bold text-green-600">{verified.length}</p>
-            <p className="text-xs text-gray-500 mt-1">Total Verified</p>
+            <p className="text-2xl font-bold text-green-600 dark:text-green-400">{verified.length}</p>
+            <p className="text-xs text-gray-500 dark:text-[#8B949E] mt-1">Total Verified</p>
           </div>
         </Card>
         <Card>
           <div className="p-4 text-center">
-            <p className="text-2xl font-bold text-gray-900">
+            <p className="text-2xl font-bold text-gray-900 dark:text-[#F0F6FC]">
               {new Set(verified.map(v => v.studentId)).size}
             </p>
-            <p className="text-xs text-gray-500 mt-1">Unique Students</p>
+            <p className="text-xs text-gray-500 dark:text-[#8B949E] mt-1">Unique Students</p>
           </div>
         </Card>
         <Card>
           <div className="p-4 text-center">
-            <p className="text-2xl font-bold text-accent">
+            <p className="text-2xl font-bold text-accent dark:text-[#38BDF8]">
               {new Set(verified.map(v => v.competitionTitle)).size}
             </p>
-            <p className="text-xs text-gray-500 mt-1">Competitions Verified</p>
+            <p className="text-xs text-gray-500 dark:text-[#8B949E] mt-1">Competitions Verified</p>
           </div>
         </Card>
       </div>
