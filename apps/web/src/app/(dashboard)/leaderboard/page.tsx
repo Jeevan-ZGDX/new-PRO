@@ -16,9 +16,9 @@ const tabs: { key: Tab; label: string; icon: typeof Trophy }[] = [
 
 function RankBadge({ rank }: { rank: number }) {
   if (rank === 1) return <Medal className="w-5 h-5 text-yellow-500" />
-  if (rank === 2) return <Medal className="w-5 h-5 text-gray-400" />
-  if (rank === 3) return <Medal className="w-5 h-5 text-amber-600" />
-  return <span className="text-sm font-medium text-gray-500 w-5 text-center">{rank}</span>
+  if (rank === 2) return <Medal className="w-5 h-5 text-gray-400 dark:text-[#8B949E]" />
+  if (rank === 3) return <Medal className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+  return <span className="text-sm font-medium text-gray-500 dark:text-[#8B949E] w-5 text-center">{rank}</span>
 }
 
 export default function LeaderboardPage() {
@@ -35,10 +35,6 @@ export default function LeaderboardPage() {
   const { data: overallData, isLoading: overallLoading } = useLeaderboardOverall()
   const { data: compsData } = useCompetitions()
 
-  const filteredSectionData = selectedDept && overallData
-    ? overallData.filter(e => e.section === selectedDept)
-    : []
-
   const handleCompetitionSelect = (e: React.ChangeEvent<HTMLSelectElement>) => {
     setSelectedComp(e.target.value)
   }
@@ -46,12 +42,12 @@ export default function LeaderboardPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900">Leaderboard</h1>
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-[#F0F6FC]">Leaderboard</h1>
       </div>
 
       <Card padding="none" className="overflow-hidden">
         {!isStudent && (
-          <div className="flex border-b border-gray-100">
+          <div className="flex border-b border-gray-100 dark:border-[#30363D]">
             {tabs.map((tab) => {
               const Icon = tab.icon
               return (
@@ -60,8 +56,8 @@ export default function LeaderboardPage() {
                   onClick={() => setActiveTab(tab.key)}
                   className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 text-sm font-medium transition-colors ${
                     activeTab === tab.key
-                      ? 'text-accent border-b-2 border-accent bg-accent/5'
-                      : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+                      ? 'text-accent dark:text-[#38BDF8] border-b-2 border-accent dark:border-[#38BDF8] bg-accent/5 dark:bg-[#161B22]'
+                      : 'text-gray-500 dark:text-[#8B949E] hover:text-gray-700 dark:hover:text-[#F0F6FC] hover:bg-gray-50 dark:hover:bg-[#21262D]'
                   }`}
                 >
                   <Icon className="w-4 h-4" />
@@ -77,38 +73,38 @@ export default function LeaderboardPage() {
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
-                  <tr className="border-b border-gray-100">
-                    <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider px-4 py-3">Rank</th>
-                    <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider px-4 py-3">Student</th>
-                    <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider px-4 py-3">Section</th>
-                    <th className="text-right text-xs font-medium text-gray-500 uppercase tracking-wider px-4 py-3">Points</th>
-                    <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider px-4 py-3">Competitions</th>
-                    <th className="text-right text-xs font-medium text-gray-500 uppercase tracking-wider px-4 py-3">Wins</th>
+                  <tr className="border-b border-gray-100 dark:border-[#30363D]">
+                    <th className="text-left text-xs font-medium text-gray-500 dark:text-[#8B949E] uppercase tracking-wider px-4 py-3">Rank</th>
+                    <th className="text-left text-xs font-medium text-gray-500 dark:text-[#8B949E] uppercase tracking-wider px-4 py-3">Student</th>
+                    <th className="text-left text-xs font-medium text-gray-500 dark:text-[#8B949E] uppercase tracking-wider px-4 py-3">Section</th>
+                    <th className="text-right text-xs font-medium text-gray-500 dark:text-[#8B949E] uppercase tracking-wider px-4 py-3">Points</th>
+                    <th className="text-left text-xs font-medium text-gray-500 dark:text-[#8B949E] uppercase tracking-wider px-4 py-3">Competitions</th>
+                    <th className="text-right text-xs font-medium text-gray-500 dark:text-[#8B949E] uppercase tracking-wider px-4 py-3">Wins</th>
                   </tr>
                 </thead>
                 <tbody>
                   {overallLoading ? (
                     Array.from({ length: 5 }).map((_, i) => (
-                      <tr key={i} className="border-b border-gray-50">
+                      <tr key={i} className="border-b border-gray-50 dark:border-[#30363D]">
                         <td colSpan={6} className="px-4 py-4">
-                          <div className="h-10 bg-gray-100 rounded animate-pulse" />
+                          <div className="h-10 bg-gray-100 dark:bg-[#161B22] rounded animate-pulse" />
                         </td>
                       </tr>
                     ))
                   ) : overallData && overallData.length > 0 ? (
                     overallData.map((entry) => (
-                      <tr key={entry.rank} className="border-b border-gray-50 hover:bg-gray-50/50 transition-colors even:bg-gray-50/30">
+                      <tr key={entry.rank} className="border-b border-gray-50 dark:border-[#30363D] hover:bg-gray-50/50 hover:dark:bg-[#161B22]/50 transition-colors">
                         <td className="px-4 py-4">
                           <RankBadge rank={entry.rank} />
                         </td>
                         <td className="px-4 py-4">
                           <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 rounded-full bg-accent/10 flex items-center justify-center">
-                              <Star className="w-4 h-4 text-accent" />
+                            <div className="w-8 h-8 rounded-full bg-accent/10 dark:bg-[#38BDF8]/10 flex items-center justify-center">
+                              <Star className="w-4 h-4 text-accent dark:text-[#38BDF8]" />
                             </div>
                             <div>
-                              <p className="text-sm font-medium text-gray-900">{entry.studentName}</p>
-                              <p className="text-xs text-gray-500">{entry.email}</p>
+                              <p className="text-sm font-medium text-gray-900 dark:text-[#F0F6FC]">{entry.studentName}</p>
+                              <p className="text-xs text-gray-500 dark:text-[#8B949E]">{entry.email}</p>
                             </div>
                           </div>
                         </td>
@@ -118,17 +114,17 @@ export default function LeaderboardPage() {
                           </Badge>
                         </td>
                         <td className="px-4 py-4 text-right">
-                          <span className="text-sm font-semibold text-accent">{entry.points}</span>
+                          <span className="text-sm font-semibold text-accent dark:text-[#38BDF8]">{entry.points}</span>
                         </td>
-                        <td className="px-4 py-4 text-sm text-gray-600 max-w-[200px] truncate">
+                        <td className="px-4 py-4 text-sm text-gray-600 dark:text-[#8B949E] max-w-[200px] truncate">
                           {entry.recentCompetition || '-'}
                         </td>
-                        <td className="px-4 py-4 text-right text-sm text-gray-600">{entry.wins}</td>
+                        <td className="px-4 py-4 text-right text-sm text-gray-600 dark:text-[#8B949E] font-medium">{entry.wins}</td>
                       </tr>
                     ))
                   ) : (
                     <tr>
-                      <td colSpan={6} className="text-center py-12 text-gray-500">No leaderboard data available</td>
+                      <td colSpan={6} className="text-center py-12 text-gray-500 dark:text-[#8B949E]">No leaderboard data available</td>
                     </tr>
                   )}
                 </tbody>
@@ -144,17 +140,17 @@ export default function LeaderboardPage() {
                     <Button variant="ghost" size="sm" onClick={() => setSelectedDept('')}>
                       ← Back to Sections
                     </Button>
-                    <span className="text-sm font-semibold text-gray-700">Section {selectedDept}</span>
+                    <span className="text-sm font-semibold text-gray-700 dark:text-[#F0F6FC]">Section {selectedDept}</span>
                   </div>
                   <SectionDetailTable sectionId={selectedDept} />
                 </>
               ) : (
                 <>
-                  <p className="text-sm text-gray-500">Click a section to view its students</p>
+                  <p className="text-sm text-gray-500 dark:text-[#8B949E]">Click a section to view its students</p>
                   <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
                     {overallLoading ? (
                       Array.from({ length: 12 }).map((_, i) => (
-                        <div key={i} className="h-20 bg-gray-100 rounded-xl animate-pulse" />
+                        <div key={i} className="h-20 bg-gray-100 dark:bg-[#161B22] rounded-xl animate-pulse" />
                       ))
                     ) : overallData && overallData.length > 0 ? (
                       (() => {
@@ -166,18 +162,18 @@ export default function LeaderboardPage() {
                           return (
                             <div
                               key={sec}
-                              className="p-4 bg-white border border-gray-100 rounded-xl hover:shadow-md hover:border-accent/20 transition-all cursor-pointer"
+                              className="p-4 bg-white dark:bg-[#161B22] border border-gray-100 dark:border-[#30363D] rounded-xl hover:shadow-md hover:border-accent/20 dark:hover:border-[#38BDF8]/40 transition-all cursor-pointer"
                               onClick={() => setSelectedDept(sec)}
                             >
-                              <p className="text-base font-bold text-gray-900">{sec}</p>
-                              <p className="text-xs text-gray-500 mt-1">{students.length} students</p>
-                              <p className="text-xs text-accent font-medium mt-1">{totalPts} pts · {totalWins} wins</p>
+                              <p className="text-base font-bold text-gray-900 dark:text-[#F0F6FC]">{sec}</p>
+                              <p className="text-xs text-gray-500 dark:text-[#8B949E] mt-1">{students.length} students</p>
+                              <p className="text-xs text-accent dark:text-[#38BDF8] font-medium mt-1">{totalPts} pts · {totalWins} wins</p>
                             </div>
                           )
                         })
                       })()
                     ) : (
-                      <div className="col-span-full text-center py-12 text-gray-500">No section data available</div>
+                      <div className="col-span-full text-center py-12 text-gray-500 dark:text-[#8B949E]">No section data available</div>
                     )}
                   </div>
                 </>
@@ -191,7 +187,7 @@ export default function LeaderboardPage() {
                 <select
                   value={selectedComp}
                   onChange={handleCompetitionSelect}
-                  className="flex-1 px-4 py-2 bg-white border border-gray-200 rounded-xl text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent"
+                  className="flex-1 px-4 py-2 bg-white dark:bg-[#161B22] border border-gray-200 dark:border-[#30363D] rounded-xl text-sm text-gray-700 dark:text-[#F0F6FC] focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent"
                 >
                   <option value="">Select a competition...</option>
                   {compsData?.data?.map((c) => (
@@ -203,8 +199,8 @@ export default function LeaderboardPage() {
               {selectedComp ? (
                 <CompetitionLeaderboardTable competitionId={selectedComp} />
               ) : (
-                <div className="text-center py-12 text-gray-500">
-                  <Search className="w-12 h-12 mx-auto mb-3 text-gray-300" />
+                <div className="text-center py-12 text-gray-500 dark:text-[#8B949E]">
+                  <Search className="w-12 h-12 mx-auto mb-3 text-gray-300 dark:text-[#30363D]" />
                   <p>Select a competition to view rankings</p>
                 </div>
               )}
@@ -223,7 +219,7 @@ function SectionDetailTable({ sectionId }: { sectionId: string }) {
     return (
       <div className="space-y-3">
         {Array.from({ length: 5 }).map((_, i) => (
-          <div key={i} className="h-12 bg-gray-100 rounded-xl animate-pulse" />
+          <div key={i} className="h-12 bg-gray-100 dark:bg-[#161B22] rounded-xl animate-pulse" />
         ))}
       </div>
     )
@@ -231,7 +227,7 @@ function SectionDetailTable({ sectionId }: { sectionId: string }) {
 
   const students = overallData?.filter(e => e.section === sectionId) || []
   if (students.length === 0) {
-    return <div className="text-center py-12 text-gray-500">No students in this section</div>
+    return <div className="text-center py-12 text-gray-500 dark:text-[#8B949E]">No students in this section</div>
   }
 
   const ranked = [...students].sort((a, b) => b.points - a.points || b.wins - a.wins)
@@ -241,29 +237,29 @@ function SectionDetailTable({ sectionId }: { sectionId: string }) {
     <div className="overflow-x-auto">
       <table className="w-full">
         <thead>
-          <tr className="border-b border-gray-100">
-            <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider px-4 py-3">Rank</th>
-            <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider px-4 py-3">Student</th>
-            <th className="text-right text-xs font-medium text-gray-500 uppercase tracking-wider px-4 py-3">Points</th>
-            <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider px-4 py-3">Competitions</th>
-            <th className="text-right text-xs font-medium text-gray-500 uppercase tracking-wider px-4 py-3">Wins</th>
+          <tr className="border-b border-gray-100 dark:border-[#30363D]">
+            <th className="text-left text-xs font-medium text-gray-500 dark:text-[#8B949E] uppercase tracking-wider px-4 py-3">Rank</th>
+            <th className="text-left text-xs font-medium text-gray-500 dark:text-[#8B949E] uppercase tracking-wider px-4 py-3">Student</th>
+            <th className="text-right text-xs font-medium text-gray-500 dark:text-[#8B949E] uppercase tracking-wider px-4 py-3">Points</th>
+            <th className="text-left text-xs font-medium text-gray-500 dark:text-[#8B949E] uppercase tracking-wider px-4 py-3">Competitions</th>
+            <th className="text-right text-xs font-medium text-gray-500 dark:text-[#8B949E] uppercase tracking-wider px-4 py-3">Wins</th>
           </tr>
         </thead>
         <tbody>
           {ranked.map((entry) => (
-            <tr key={entry.rank} className="border-b border-gray-50 hover:bg-gray-50/50 transition-colors even:bg-gray-50/30">
+            <tr key={entry.rank} className="border-b border-gray-50 dark:border-[#30363D] hover:bg-gray-50/50 hover:dark:bg-[#161B22]/50 transition-colors">
               <td className="px-4 py-4">
                 <RankBadge rank={entry.rank} />
               </td>
               <td className="px-4 py-4">
-                <p className="text-sm font-medium text-gray-900">{entry.studentName}</p>
-                <p className="text-xs text-gray-500">{entry.email}</p>
+                <p className="text-sm font-medium text-gray-900 dark:text-[#F0F6FC]">{entry.studentName}</p>
+                <p className="text-xs text-gray-500 dark:text-[#8B949E]">{entry.email}</p>
               </td>
-              <td className="px-4 py-4 text-right text-sm font-semibold text-accent">{entry.points}</td>
-              <td className="px-4 py-4 text-sm text-gray-600 max-w-[200px] truncate">
+              <td className="px-4 py-4 text-right text-sm font-semibold text-accent dark:text-[#38BDF8]">{entry.points}</td>
+              <td className="px-4 py-4 text-sm text-gray-600 dark:text-[#8B949E] max-w-[200px] truncate">
                 {entry.recentCompetition || '-'}
               </td>
-              <td className="px-4 py-4 text-right text-sm text-gray-600 font-medium">{entry.wins}</td>
+              <td className="px-4 py-4 text-right text-sm text-gray-600 dark:text-[#8B949E] font-medium">{entry.wins}</td>
             </tr>
           ))}
         </tbody>
@@ -278,7 +274,7 @@ function CompetitionLeaderboardTable({ competitionId }: { competitionId: string 
   if (!compData) {
     return (
       <div className="flex items-center justify-center py-12">
-        <div className="w-6 h-6 border-2 border-accent border-t-transparent rounded-full animate-spin" />
+        <div className="w-6 h-6 border-2 border-accent dark:border-[#38BDF8] border-t-transparent rounded-full animate-spin" />
       </div>
     )
   }
@@ -291,23 +287,23 @@ function CompetitionLeaderboardTable({ competitionId }: { competitionId: string 
     <div className="overflow-x-auto">
       <table className="w-full">
         <thead>
-          <tr className="border-b border-gray-100">
-            <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider px-4 py-3">#</th>
-            <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider px-4 py-3">Student</th>
-            <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider px-4 py-3">Department</th>
-            <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider px-4 py-3">Status</th>
-            <th className="text-right text-xs font-medium text-gray-500 uppercase tracking-wider px-4 py-3">Registered</th>
+          <tr className="border-b border-gray-100 dark:border-[#30363D]">
+            <th className="text-left text-xs font-medium text-gray-500 dark:text-[#8B949E] uppercase tracking-wider px-4 py-3">#</th>
+            <th className="text-left text-xs font-medium text-gray-500 dark:text-[#8B949E] uppercase tracking-wider px-4 py-3">Student</th>
+            <th className="text-left text-xs font-medium text-gray-500 dark:text-[#8B949E] uppercase tracking-wider px-4 py-3">Department</th>
+            <th className="text-left text-xs font-medium text-gray-500 dark:text-[#8B949E] uppercase tracking-wider px-4 py-3">Status</th>
+            <th className="text-right text-xs font-medium text-gray-500 dark:text-[#8B949E] uppercase tracking-wider px-4 py-3">Registered</th>
           </tr>
         </thead>
         <tbody>
           {sorted.length > 0 ? (
             sorted.map((reg, idx) => (
-              <tr key={reg.id} className="border-b border-gray-50 hover:bg-gray-50/50 transition-colors even:bg-gray-50/30">
+              <tr key={reg.id} className="border-b border-gray-50 dark:border-[#30363D] hover:bg-gray-50/50 hover:dark:bg-[#161B22]/50 transition-colors">
                 <td className="px-4 py-4">
                   <RankBadge rank={idx + 1} />
                 </td>
                 <td className="px-4 py-4">
-                  <p className="text-sm font-medium text-gray-900">{reg.userName}</p>
+                  <p className="text-sm font-medium text-gray-900 dark:text-[#F0F6FC]">{reg.userName}</p>
                 </td>
                 <td className="px-4 py-4">
                   <Badge variant="primary" size="sm">{reg.department}</Badge>
@@ -315,14 +311,14 @@ function CompetitionLeaderboardTable({ competitionId }: { competitionId: string 
                 <td className="px-4 py-4">
                   <StatusBadge status={reg.status} />
                 </td>
-                <td className="px-4 py-4 text-right text-sm text-gray-500">
+                <td className="px-4 py-4 text-right text-sm text-gray-500 dark:text-[#8B949E]">
                   {new Date(reg.registeredAt).toLocaleDateString()}
                 </td>
               </tr>
             ))
           ) : (
             <tr>
-              <td colSpan={5} className="text-center py-12 text-gray-500">No registrations yet</td>
+              <td colSpan={5} className="text-center py-12 text-gray-500 dark:text-[#8B949E]">No registrations yet</td>
             </tr>
           )}
         </tbody>

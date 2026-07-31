@@ -20,24 +20,42 @@ export default function SignInPage() {
     setError('')
     setLoading(true)
 
-    if (!email || !password) {
+    const cleanEmail = email.trim()
+    if (!cleanEmail || !password) {
       setError('Please fill in all fields')
       setLoading(false)
       return
     }
 
-    const success = authenticateUser(email, password)
+    const success = authenticateUser(cleanEmail, password)
     if (!success) {
       setError('Invalid email or password')
       setLoading(false)
       return
     }
 
-    const token = 'mock-jwt-' + email + '-' + Date.now()
+    const token = 'mock-jwt-' + cleanEmail + '-' + Date.now()
     apiClient.setToken(token)
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('auth_token', token)
+    }
 
     router.push('/dashboard')
   }
+
+  const fillCredentials = (em: string, pass: string) => {
+    setEmail(em)
+    setPassword(pass)
+    setError('')
+  }
+
+  const testUsers = [
+    { email: 'admin@cit.in', pass: 'admin123', label: 'Super Admin' },
+    { email: 'hod@cit.in', pass: 'hod123', label: 'HOD' },
+    { email: 'coe@cit.in', pass: 'coe123', label: 'COE' },
+    { email: 'advisor@cit.in', pass: 'advisor123', label: 'Advisor' },
+    { email: 'student@cit.in', pass: 'student123', label: 'Student' },
+  ]
 
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
@@ -110,13 +128,21 @@ export default function SignInPage() {
           </p>
         </form>
 
-        <div className="mt-4 p-4 rounded-xl bg-blue-50 border border-blue-100 text-xs text-blue-700 space-y-1">
-          <p className="font-medium text-sm mb-1">Test Credentials:</p>
-          <p>admin@cit.in / admin123 — <span className="font-medium">Super Admin</span></p>
-          <p>hod@cit.in / hod123 — <span className="font-medium">HOD</span></p>
-          <p>coe@cit.in / coe123 — <span className="font-medium">COE</span></p>
-          <p>advisor@cit.in / advisor123 — <span className="font-medium">Advisor</span></p>
-          <p>student@cit.in / student123 — <span className="font-medium">Student</span></p>
+        <div className="mt-4 p-4 rounded-xl bg-blue-50 border border-blue-100 text-xs text-blue-700 space-y-2">
+          <p className="font-medium text-sm">Test Credentials (click to fill):</p>
+          <div className="space-y-1">
+            {testUsers.map((u) => (
+              <button
+                key={u.email}
+                type="button"
+                onClick={() => fillCredentials(u.email, u.pass)}
+                className="w-full text-left p-1.5 hover:bg-blue-100/60 rounded flex justify-between items-center transition-colors text-blue-800"
+              >
+                <span><strong className="font-semibold">{u.email}</strong> / {u.pass}</span>
+                <span className="font-medium text-[11px] bg-blue-200/70 text-blue-900 px-2 py-0.5 rounded-full">{u.label}</span>
+              </button>
+            ))}
+          </div>
         </div>
       </div>
     </div>

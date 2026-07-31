@@ -35,8 +35,8 @@ const departmentOptions = [
   'CSE',
 ]
 
-const inputClass = 'w-full px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent transition-colors'
-const labelClass = 'block text-sm font-medium text-gray-700 mb-1.5'
+const inputClass = 'w-full px-4 py-2.5 bg-white dark:bg-[#161B22] border border-gray-200 dark:border-[#30363D] rounded-xl text-sm text-gray-900 dark:text-[#F0F6FC] placeholder-gray-400 dark:placeholder-[#8B949E] focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent transition-colors'
+const labelClass = 'block text-sm font-medium text-gray-700 dark:text-[#F0F6FC] mb-1.5'
 const selectClass = inputClass
 
 export default function CreateCompetitionPage() {

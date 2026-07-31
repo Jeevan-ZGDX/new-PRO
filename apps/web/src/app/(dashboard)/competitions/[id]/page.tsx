@@ -28,18 +28,18 @@ export default function CompetitionDetailPage() {
   if (isLoading) {
     return (
       <div className="space-y-6">
-        <div className="h-6 w-24 bg-gray-200 rounded animate-pulse" />
-        <div className="h-64 bg-gray-100 rounded-2xl animate-pulse" />
+        <div className="h-6 w-24 bg-gray-200 dark:bg-[#161B22] rounded animate-pulse" />
+        <div className="h-64 bg-gray-100 dark:bg-[#161B22] rounded-2xl animate-pulse" />
       </div>
     )
   }
 
   if (!comp || error) {
     return (
-      <div className="flex flex-col items-center justify-center py-20 text-gray-400">
+      <div className="flex flex-col items-center justify-center py-20 text-gray-400 dark:text-[#8B949E]">
         <Info className="w-12 h-12 mb-3" />
         <p className="text-sm font-medium">Competition not found</p>
-        <button onClick={() => router.back()} className="text-sm text-accent mt-2 hover:underline">Go back</button>
+        <button onClick={() => router.back()} className="text-sm text-accent dark:text-[#38BDF8] mt-2 hover:underline">Go back</button>
       </div>
     )
   }
@@ -50,11 +50,11 @@ export default function CompetitionDetailPage() {
 
   return (
     <div className="space-y-6 max-w-4xl mx-auto">
-      <button onClick={() => router.back()} className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700 transition-colors">
+      <button onClick={() => router.back()} className="flex items-center gap-1.5 text-sm text-gray-500 dark:text-[#8B949E] hover:text-gray-700 dark:hover:text-[#F0F6FC] transition-colors">
         <ArrowLeft className="w-4 h-4" /> Back to Competitions
       </button>
 
-      <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden">
+      <div className="bg-white dark:bg-[#161B22] border border-gray-200 dark:border-[#30363D] rounded-2xl overflow-hidden">
         <div className={`h-2 bg-gradient-to-r ${categoryGradients[comp.category?.toLowerCase()] || 'from-gray-400 to-gray-500'}`} />
         
         <div className="p-6 md:p-8">
@@ -64,72 +64,72 @@ export default function CompetitionDetailPage() {
                 <Badge variant="primary" size="sm">{comp.category || 'Competition'}</Badge>
                 {daysLeft !== null && (
                   <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
-                    isOpen ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-600'
+                    isOpen ? 'bg-green-50 dark:bg-green-950/50 text-green-700 dark:text-green-400 border dark:border-green-800/50' : 'bg-red-50 dark:bg-red-950/50 text-red-600 dark:text-red-400 border dark:border-red-800/50'
                   }`}>
                     {isOpen ? (daysLeft > 0 ? `${daysLeft} days left` : 'Closing soon') : 'Registration closed'}
                   </span>
                 )}
               </div>
-              <h1 className="text-2xl md:text-3xl font-bold text-gray-900">{comp.title}</h1>
-              <p className="text-sm text-gray-500 mt-1">by {comp.organizer}</p>
+              <h1 className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-[#F0F6FC]">{comp.title}</h1>
+              <p className="text-sm text-gray-500 dark:text-[#8B949E] mt-1">by {comp.organizer}</p>
             </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-            <div className="p-4 bg-gray-50 rounded-xl">
-              <div className="flex items-center gap-2 text-xs text-gray-400 mb-1">
+            <div className="p-4 bg-gray-50 dark:bg-[#0D1117] border border-transparent dark:border-[#30363D] rounded-xl">
+              <div className="flex items-center gap-2 text-xs text-gray-400 dark:text-[#8B949E] mb-1">
                 <Calendar className="w-3.5 h-3.5" />
                 Dates
               </div>
-              <p className="text-sm font-medium text-gray-900">
+              <p className="text-sm font-medium text-gray-900 dark:text-[#F0F6FC]">
                 {formatDate(comp.startDate)}{comp.endDate ? ` - ${formatDate(comp.endDate)}` : ''}
               </p>
             </div>
-            <div className="p-4 bg-gray-50 rounded-xl">
-              <div className="flex items-center gap-2 text-xs text-gray-400 mb-1">
+            <div className="p-4 bg-gray-50 dark:bg-[#0D1117] border border-transparent dark:border-[#30363D] rounded-xl">
+              <div className="flex items-center gap-2 text-xs text-gray-400 dark:text-[#8B949E] mb-1">
                 <Clock className="w-3.5 h-3.5" />
                 Deadline
               </div>
-              <p className="text-sm font-medium text-gray-900">
+              <p className="text-sm font-medium text-gray-900 dark:text-[#F0F6FC]">
                 {formatDate(comp.registrationDeadline)}
-                {deadline && !isOpen && <span className="text-red-500 ml-1">(Closed)</span>}
+                {deadline && !isOpen && <span className="text-red-500 dark:text-red-400 ml-1">(Closed)</span>}
               </p>
             </div>
-            <div className="p-4 bg-gray-50 rounded-xl">
-              <div className="flex items-center gap-2 text-xs text-gray-400 mb-1">
+            <div className="p-4 bg-gray-50 dark:bg-[#0D1117] border border-transparent dark:border-[#30363D] rounded-xl">
+              <div className="flex items-center gap-2 text-xs text-gray-400 dark:text-[#8B949E] mb-1">
                 <Trophy className="w-3.5 h-3.5" />
                 Prize Pool
               </div>
-              <p className="text-sm font-bold text-accent">{comp.prizePool || 'N/A'}</p>
+              <p className="text-sm font-bold text-accent dark:text-[#38BDF8]">{comp.prizePool || 'N/A'}</p>
             </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-            <div className="p-4 bg-gray-50 rounded-xl">
-              <div className="flex items-center gap-2 text-xs text-gray-400 mb-1">
+            <div className="p-4 bg-gray-50 dark:bg-[#0D1117] border border-transparent dark:border-[#30363D] rounded-xl">
+              <div className="flex items-center gap-2 text-xs text-gray-400 dark:text-[#8B949E] mb-1">
                 <Building2 className="w-3.5 h-3.5" />
                 Organizer
               </div>
-              <p className="text-sm font-medium text-gray-900">{comp.organizer}</p>
+              <p className="text-sm font-medium text-gray-900 dark:text-[#F0F6FC]">{comp.organizer}</p>
             </div>
-            <div className="p-4 bg-gray-50 rounded-xl">
-              <div className="flex items-center gap-2 text-xs text-gray-400 mb-1">
+            <div className="p-4 bg-gray-50 dark:bg-[#0D1117] border border-transparent dark:border-[#30363D] rounded-xl">
+              <div className="flex items-center gap-2 text-xs text-gray-400 dark:text-[#8B949E] mb-1">
                 <Globe className="w-3.5 h-3.5" />
                 Category
               </div>
-              <p className="text-sm font-medium text-gray-900 capitalize">{comp.category || 'Competition'}</p>
+              <p className="text-sm font-medium text-gray-900 dark:text-[#F0F6FC] capitalize">{comp.category || 'Competition'}</p>
             </div>
           </div>
 
           {comp.eligibility?.yearOfStudy?.filter(Boolean).length > 0 && (
-            <div className="p-4 bg-blue-50 border border-blue-100 rounded-xl mb-6">
+            <div className="p-4 bg-blue-50 dark:bg-blue-950/30 border border-blue-100 dark:border-blue-800/40 rounded-xl mb-6">
               <div className="flex items-start gap-3">
-                <Target className="w-5 h-5 text-blue-600 mt-0.5" />
+                <Target className="w-5 h-5 text-blue-600 dark:text-blue-400 mt-0.5" />
                 <div>
-                  <p className="text-sm font-medium text-blue-900">Eligibility</p>
+                  <p className="text-sm font-medium text-blue-900 dark:text-blue-300">Eligibility</p>
                   <div className="flex flex-wrap gap-1.5 mt-2">
                     {comp.eligibility.yearOfStudy.filter(Boolean).map((y: string) => (
-                      <span key={y} className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded-md text-xs font-medium">{y}</span>
+                      <span key={y} className="px-2 py-0.5 bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 rounded-md text-xs font-medium">{y}</span>
                     ))}
                   </div>
                 </div>

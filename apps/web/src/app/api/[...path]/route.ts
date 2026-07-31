@@ -185,11 +185,13 @@ async function handle(request: NextRequest, pathSegments: string[]) {
 
 function getProfileByEmail(email: string) {
   const roleMap: Record<string, { id: string; email: string; name: string; role: UserRole; department: string }> = {
+    'admin@cit.in': { id: 'user-admin', email: 'admin@cit.in', name: 'Super Admin', role: 'super_admin', department: 'Administration' },
     'hod@cit.in': { id: 'user-hod', email: 'hod@cit.in', name: 'Dr. HOD Kumar', role: 'hod', department: 'CSE' },
+    'coe@cit.in': { id: 'user-coe', email: 'coe@cit.in', name: 'COE Controller', role: 'coe', department: 'Examination' },
     'advisor@cit.in': { id: 'user-adv', email: 'advisor@cit.in', name: 'Dr. Priya Sharma', role: 'advisor', department: 'CSE' },
     'student@cit.in': { id: 'user-stu', email: 'student@cit.in', name: 'Jeevan R', role: 'student', department: 'CSE' },
   }
-  return roleMap[email] || { ...userProfile, email, id: 'user-' + email.split('@')[0] }
+  return roleMap[email.toLowerCase()] || { ...userProfile, email, id: 'user-' + email.split('@')[0] }
 }
 
 function getEmailFromToken(req: NextRequest): string {

@@ -20,17 +20,17 @@ export function RecentVerifiedTable({ data }: RecentVerifiedTableProps) {
       <div className="mt-4 overflow-hidden">
         <table className="w-full">
           <thead>
-            <tr className="border-b border-gray-100">
-              <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider px-4 py-3">
+            <tr className="border-b border-gray-100 dark:border-[#30363D]">
+              <th className="text-left text-xs font-medium text-gray-500 dark:text-[#8B949E] uppercase tracking-wider px-4 py-3">
                 Student
               </th>
-              <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider px-4 py-3">
+              <th className="text-left text-xs font-medium text-gray-500 dark:text-[#8B949E] uppercase tracking-wider px-4 py-3">
                 Competition
               </th>
-              <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider px-4 py-3">
+              <th className="text-left text-xs font-medium text-gray-500 dark:text-[#8B949E] uppercase tracking-wider px-4 py-3">
                 Department
               </th>
-              <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider px-4 py-3">
+              <th className="text-left text-xs font-medium text-gray-500 dark:text-[#8B949E] uppercase tracking-wider px-4 py-3">
                 Verified On
               </th>
             </tr>
@@ -38,22 +38,22 @@ export function RecentVerifiedTable({ data }: RecentVerifiedTableProps) {
           <tbody>
             {data.length === 0 ? (
               <tr>
-                <td colSpan={4} className="text-center py-8 text-gray-500">
+                <td colSpan={4} className="text-center py-8 text-gray-500 dark:text-[#8B949E]">
                   {t('common.noData')}
                 </td>
               </tr>
             ) : (
               data.map((reg) => (
-                <tr key={reg.id} className="border-b border-gray-50 hover:bg-gray-50/50 transition-colors">
+                <tr key={reg.id} className="border-b border-gray-50 dark:border-[#30363D] hover:bg-gray-50/50 hover:dark:bg-[#161B22]/50 transition-colors">
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-3">
                       <Avatar name={reg.userId} size="sm" />
-                      <span className="text-sm font-medium text-gray-900">{reg.userId}</span>
+                      <span className="text-sm font-medium text-gray-900 dark:text-[#F0F6FC]">{reg.userId}</span>
                     </div>
                   </td>
-                  <td className="px-4 py-3 text-sm text-gray-600">{reg.competition.title}</td>
-                  <td className="px-4 py-3 text-sm text-gray-600">{reg.competition.organizer}</td>
-                  <td className="px-4 py-3 text-sm text-gray-500">
+                  <td className="px-4 py-3 text-sm text-gray-600 dark:text-[#8B949E]">{reg.competition.title}</td>
+                  <td className="px-4 py-3 text-sm text-gray-600 dark:text-[#8B949E]">{reg.competition.organizer}</td>
+                  <td className="px-4 py-3 text-sm text-gray-500 dark:text-[#8B949E]">
                     {reg.verifiedAt ? new Date(reg.verifiedAt).toLocaleDateString() : '-'}
                   </td>
                 </tr>

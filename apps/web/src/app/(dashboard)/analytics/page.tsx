@@ -10,11 +10,19 @@ import { exportToCSV } from '@/lib/export-csv'
 import {
   LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts'
+import { useTheme } from '@/components/providers/ThemeProvider'
 
 export default function AnalyticsPage() {
   const { t } = useTranslation()
+  const { isDark } = useTheme()
   const { data: stats, isLoading } = useAdminAnalytics()
   const { data: leaderboard } = useLeaderboardOverall()
+
+  const gridStroke = isDark ? '#374151' : '#E5E7EB'
+  const axisColor = isDark ? '#9CA3AF' : '#6B7280'
+  const tooltipBg = isDark ? '#1F2937' : '#FFFFFF'
+  const tooltipBorder = isDark ? '#374151' : '#E5E7EB'
+  const tooltipText = isDark ? '#F3F4F6' : '#111827'
 
   const classData = (leaderboard || []).reduce<Record<string, { section: string; points: number; wins: number; students: Set<string> }>>((acc, e) => {
     const section = e.section || 'Unknown'
@@ -28,8 +36,6 @@ export default function AnalyticsPage() {
   const classChartData = Object.values(classData)
     .map(c => ({ name: c.section, points: c.points, wins: c.wins, students: c.students.size }))
     .sort((a, b) => b.points - a.points)
-
-  const totalStudents = classChartData.reduce((s, c) => s + c.students, 0)
 
   const handleExport = () => {
     if (!stats) return
@@ -50,7 +56,7 @@ export default function AnalyticsPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900">{t('sidebar.analytics')}</h1>
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">{t('sidebar.analytics')}</h1>
         <Button variant="outline" size="sm" onClick={handleExport}>
           <Download className="w-4 h-4 mr-2" />
           Export
@@ -105,25 +111,27 @@ export default function AnalyticsPage() {
             {stats?.competitionTrends && stats.competitionTrends.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={stats.competitionTrends}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
-                  <XAxis dataKey="date" stroke="#9CA3AF" fontSize={12} tickLine={false} axisLine={false} />
-                  <YAxis stroke="#9CA3AF" fontSize={12} tickLine={false} axisLine={false} />
+                  <CartesianGrid strokeDasharray="3 3" stroke={gridStroke} />
+                  <XAxis dataKey="date" stroke={axisColor} fontSize={12} tickLine={false} axisLine={false} />
+                  <YAxis stroke={axisColor} fontSize={12} tickLine={false} axisLine={false} />
                   <Tooltip
                     contentStyle={{
-                      backgroundColor: 'white',
-                      border: '1px solid #E5E7EB',
+                      backgroundColor: tooltipBg,
+                      borderColor: tooltipBorder,
                       borderRadius: '12px',
+                      color: tooltipText,
                       boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
                     }}
+                    itemStyle={{ color: tooltipText }}
                   />
                   <Line type="monotone" dataKey="count" stroke="#6C4CF1" strokeWidth={2} dot={{ fill: '#6C4CF1', strokeWidth: 2, r: 4 }} activeDot={{ r: 6 }} />
                 </LineChart>
               </ResponsiveContainer>
             ) : (
-              <div className="h-full flex items-center justify-center bg-gray-50 rounded-xl">
+              <div className="h-full flex items-center justify-center bg-gray-50 dark:bg-gray-800/50 rounded-xl">
                 <div className="text-center">
-                  <BarChart3 className="w-12 h-12 text-gray-300 mx-auto mb-2" />
-                  <p className="text-sm text-gray-500">No data available</p>
+                  <BarChart3 className="w-12 h-12 text-gray-300 dark:text-gray-600 mx-auto mb-2" />
+                  <p className="text-sm text-gray-500 dark:text-gray-400">No data available</p>
                 </div>
               </div>
             )}
@@ -138,25 +146,27 @@ export default function AnalyticsPage() {
             {classChartData.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={classChartData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
-                  <XAxis dataKey="name" stroke="#9CA3AF" fontSize={12} tickLine={false} axisLine={false} />
-                  <YAxis stroke="#9CA3AF" fontSize={12} tickLine={false} axisLine={false} />
+                  <CartesianGrid strokeDasharray="3 3" stroke={gridStroke} />
+                  <XAxis dataKey="name" stroke={axisColor} fontSize={12} tickLine={false} axisLine={false} />
+                  <YAxis stroke={axisColor} fontSize={12} tickLine={false} axisLine={false} />
                   <Tooltip
                     contentStyle={{
-                      backgroundColor: 'white',
-                      border: '1px solid #E5E7EB',
+                      backgroundColor: tooltipBg,
+                      borderColor: tooltipBorder,
                       borderRadius: '12px',
+                      color: tooltipText,
                       boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
                     }}
+                    itemStyle={{ color: tooltipText }}
                   />
                   <Bar dataKey="points" name="Total Points" fill="#6C4CF1" radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             ) : (
-              <div className="h-full flex items-center justify-center bg-gray-50 rounded-xl">
+              <div className="h-full flex items-center justify-center bg-gray-50 dark:bg-gray-800/50 rounded-xl">
                 <div className="text-center">
-                  <BarChart3 className="w-12 h-12 text-gray-300 mx-auto mb-2" />
-                  <p className="text-sm text-gray-500">No data available</p>
+                  <BarChart3 className="w-12 h-12 text-gray-300 dark:text-gray-600 mx-auto mb-2" />
+                  <p className="text-sm text-gray-500 dark:text-gray-400">No data available</p>
                 </div>
               </div>
             )}
@@ -172,26 +182,28 @@ export default function AnalyticsPage() {
           {stats?.verificationRateOverTime && stats.verificationRateOverTime.length > 0 ? (
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={stats.verificationRateOverTime}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
-                <XAxis dataKey="date" stroke="#9CA3AF" fontSize={12} tickLine={false} axisLine={false} />
-                <YAxis stroke="#9CA3AF" fontSize={12} tickLine={false} axisLine={false} domain={[0, 100]} />
+                <CartesianGrid strokeDasharray="3 3" stroke={gridStroke} />
+                <XAxis dataKey="date" stroke={axisColor} fontSize={12} tickLine={false} axisLine={false} />
+                <YAxis stroke={axisColor} fontSize={12} tickLine={false} axisLine={false} domain={[0, 100]} />
                 <Tooltip
                   contentStyle={{
-                    backgroundColor: 'white',
-                    border: '1px solid #E5E7EB',
+                    backgroundColor: tooltipBg,
+                    borderColor: tooltipBorder,
                     borderRadius: '12px',
+                    color: tooltipText,
                     boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
                   }}
+                  itemStyle={{ color: tooltipText }}
                   formatter={(value: number) => [`${value}%`, 'Rate']}
                 />
                 <Line type="monotone" dataKey="rate" stroke="#10B981" strokeWidth={2} dot={{ fill: '#10B981', strokeWidth: 2, r: 4 }} activeDot={{ r: 6 }} />
               </LineChart>
             </ResponsiveContainer>
           ) : (
-            <div className="h-full flex items-center justify-center bg-gray-50 rounded-xl">
+            <div className="h-full flex items-center justify-center bg-gray-50 dark:bg-gray-800/50 rounded-xl">
               <div className="text-center">
-                <BarChart3 className="w-12 h-12 text-gray-300 mx-auto mb-2" />
-                <p className="text-sm text-gray-500">No data available</p>
+                <BarChart3 className="w-12 h-12 text-gray-300 dark:text-gray-600 mx-auto mb-2" />
+                <p className="text-sm text-gray-500 dark:text-gray-400">No data available</p>
               </div>
             </div>
           )}

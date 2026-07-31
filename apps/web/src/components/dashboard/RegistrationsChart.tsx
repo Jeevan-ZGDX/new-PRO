@@ -10,6 +10,7 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from 'recharts'
+import { useTheme } from '@/components/providers/ThemeProvider'
 
 interface RegistrationsChartProps {
   data: { date: string; count: number }[]
@@ -17,10 +18,17 @@ interface RegistrationsChartProps {
 
 export function RegistrationsChart({ data }: RegistrationsChartProps) {
   const { t } = useTranslation()
+  const { isDark } = useTheme()
+
+  const gridStroke = isDark ? '#374151' : '#E5E7EB'
+  const axisColor = isDark ? '#9CA3AF' : '#6B7280'
+  const tooltipBg = isDark ? '#1F2937' : '#FFFFFF'
+  const tooltipBorder = isDark ? '#374151' : '#E5E7EB'
+  const tooltipText = isDark ? '#F3F4F6' : '#111827'
 
   if (data.length === 0) {
     return (
-      <div className="h-[300px] flex items-center justify-center text-gray-500">
+      <div className="h-[300px] flex items-center justify-center text-gray-500 dark:text-gray-400">
         {t('common.noData')}
       </div>
     )
@@ -30,27 +38,29 @@ export function RegistrationsChart({ data }: RegistrationsChartProps) {
     <div className="h-[300px]">
       <ResponsiveContainer width="100%" height="100%">
         <LineChart data={data}>
-          <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
+          <CartesianGrid strokeDasharray="3 3" stroke={gridStroke} />
           <XAxis
             dataKey="date"
-            stroke="#9CA3AF"
+            stroke={axisColor}
             fontSize={12}
             tickLine={false}
             axisLine={false}
           />
           <YAxis
-            stroke="#9CA3AF"
+            stroke={axisColor}
             fontSize={12}
             tickLine={false}
             axisLine={false}
           />
           <Tooltip
             contentStyle={{
-              backgroundColor: 'white',
-              border: '1px solid #E5E7EB',
+              backgroundColor: tooltipBg,
+              borderColor: tooltipBorder,
               borderRadius: '12px',
+              color: tooltipText,
               boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
             }}
+            itemStyle={{ color: tooltipText }}
           />
           <Line
             type="monotone"

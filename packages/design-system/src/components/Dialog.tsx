@@ -41,26 +41,26 @@ export function Dialog({ open, onClose, title, description, children, actions, c
 
   return (
     <div className="fixed inset-0 z-[1300] flex items-center justify-center p-4">
-      <div className="fixed inset-0 bg-overlay backdrop-blur-sm" onClick={onClose} />
+      <div className="fixed inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
       <div
         className={cn(
-          'relative w-full max-w-md bg-white rounded-2xl shadow-xl',
+          'relative w-full max-w-md bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-2xl shadow-xl text-gray-900 dark:text-gray-100',
           'animate-in fade-in zoom-in-95 duration-200',
           className
         )}
       >
         <button
           onClick={onClose}
-          className="absolute right-4 top-4 w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center hover:bg-gray-200 transition-colors"
+          className="absolute right-4 top-4 w-8 h-8 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
           aria-label="Close"
         >
-          <X className="w-4 h-4 text-gray-500" />
+          <X className="w-4 h-4 text-gray-500 dark:text-gray-400" />
         </button>
 
         {(title || description) && (
           <div className="p-6 pb-0">
-            {title && <h2 className="text-lg font-semibold text-gray-900">{title}</h2>}
-            {description && <p className="text-sm text-gray-500 mt-1">{description}</p>}
+            {title && <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">{title}</h2>}
+            {description && <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">{description}</p>}
           </div>
         )}
 
@@ -108,18 +108,18 @@ export function BottomSheet({ open, onClose, title, children, className }: Botto
 
   return (
     <div className="fixed inset-0 z-[1300] flex items-end justify-center">
-      <div className="fixed inset-0 bg-overlay" onClick={onClose} />
+      <div className="fixed inset-0 bg-black/60" onClick={onClose} />
       <div
         className={cn(
-          'relative w-full max-w-lg bg-white rounded-t-3xl shadow-xl',
+          'relative w-full max-w-lg bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800 rounded-t-3xl shadow-xl',
           'animate-in slide-in-from-bottom duration-300',
-          'max-h-[85vh] overflow-y-auto',
+          'max-h-[85vh] overflow-y-auto text-gray-900 dark:text-gray-100',
           className
         )}
       >
-        <div className="sticky top-0 bg-white px-6 pt-4 pb-2 border-b border-gray-100">
-          <div className="w-10 h-1 bg-gray-300 rounded-full mx-auto mb-3" />
-          {title && <h2 className="text-lg font-semibold text-gray-900">{title}</h2>}
+        <div className="sticky top-0 bg-white dark:bg-gray-900 px-6 pt-4 pb-2 border-b border-gray-100 dark:border-gray-800">
+          <div className="w-10 h-1 bg-gray-300 dark:bg-gray-700 rounded-full mx-auto mb-3" />
+          {title && <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">{title}</h2>}
         </div>
         <div className="p-6">{children}</div>
       </div>

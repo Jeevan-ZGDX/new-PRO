@@ -1,4 +1,4 @@
-export type UserRole = 'student' | 'advisor' | 'hod' | 'super_admin'
+export type UserRole = 'student' | 'advisor' | 'hod' | 'super_admin' | 'coe'
 
 export interface StoredUser {
   email: string
@@ -8,31 +8,67 @@ export interface StoredUser {
   department: string
 }
 
+export const DEFAULT_USERS: StoredUser[] = [
+  { email: 'admin@cit.in', password: 'admin123', role: 'super_admin', name: 'Super Admin', department: 'Administration' },
+  { email: 'hod@cit.in', password: 'hod123', role: 'hod', name: 'Dr. HOD Kumar', department: 'CSE' },
+  { email: 'coe@cit.in', password: 'coe123', role: 'coe', name: 'COE Controller', department: 'Examination' },
+  { email: 'advisor@cit.in', password: 'advisor123', role: 'advisor', name: 'Dr. Priya Sharma', department: 'CSE' },
+  { email: 'student@cit.in', password: 'student123', role: 'student', name: 'Jeevan R', department: 'CSE' },
+]
+
 const USERS_KEY = 'comp_dash_users'
 const CURRENT_USER_KEY = 'comp_dash_current_user'
 
 export function getStoredUsers(): StoredUser[] {
-  if (typeof window === 'undefined') return []
+  if (typeof window === 'undefined') return DEFAULT_USERS
   try {
-    return JSON.parse(localStorage.getItem(USERS_KEY) || '[]')
+    const raw = localStorage.getItem(USERS_KEY)
+    if (!raw) {
+      localStorage.setItem(USERS_KEY, JSON.stringify(DEFAULT_USERS))
+      return DEFAULT_USERS
+    }
+    let users: StoredUser[] = JSON.parse(raw)
+    if (!Array.isArray(users) || users.length === 0) {
+      localStorage.setItem(USERS_KEY, JSON.stringify(DEFAULT_USERS))
+      return DEFAULT_USERS
+    }
+    // Ensure default test credentials are included
+    const existingEmails = new Set(users.map((u) => u.email.toLowerCase()))
+    let updated = false
+    for (const defUser of DEFAULT_USERS) {
+      if (!existingEmails.has(defUser.email.toLowerCase())) {
+        users.push(defUser)
+        updated = true
+      }
+    }
+    if (updated) {
+      localStorage.setItem(USERS_KEY, JSON.stringify(users))
+    }
+    return users
   } catch {
-    return []
+    return DEFAULT_USERS
   }
 }
 
 export function registerUser(email: string, password: string, role: UserRole = 'student'): boolean {
   const users = getStoredUsers()
-  if (users.find((u) => u.email === email)) return false
-  users.push({ email, password, role, name: email.split('@')[0], department: '' })
-  localStorage.setItem(USERS_KEY, JSON.stringify(users))
+  const cleanEmail = email.trim().toLowerCase()
+  if (users.find((u) => u.email.toLowerCase() === cleanEmail)) return false
+  users.push({ email: cleanEmail, password, role, name: cleanEmail.split('@')[0], department: '' })
+  if (typeof window !== 'undefined') {
+    localStorage.setItem(USERS_KEY, JSON.stringify(users))
+  }
   return true
 }
 
 export function authenticateUser(email: string, password: string): boolean {
   const users = getStoredUsers()
-  const user = users.find((u) => u.email === email && u.password === password)
+  const cleanEmail = email.trim().toLowerCase()
+  const user = users.find((u) => u.email.toLowerCase() === cleanEmail && u.password === password)
   if (user) {
-    localStorage.setItem(CURRENT_USER_KEY, JSON.stringify({ email }))
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(CURRENT_USER_KEY, JSON.stringify({ email: user.email }))
+    }
     return true
   }
   return false
@@ -42,21 +78,25 @@ export function getCurrentUser(): { email: string; role: UserRole; name: string;
   if (typeof window === 'undefined') return null
   try {
     const raw = JSON.parse(localStorage.getItem(CURRENT_USER_KEY) || 'null')
-    if (!raw) return null
+    if (!raw || !raw.email) return null
     const users = getStoredUsers()
-    const match = users.find((u) => u.email === raw.email)
+    const cleanEmail = String(raw.email).trim().toLowerCase()
+    const match = users.find((u) => u.email.toLowerCase() === cleanEmail)
     if (!match) return null
-    return { email: raw.email, role: match.role, name: match.name, department: match.department }
+    return { email: match.email, role: match.role, name: match.name, department: match.department }
   } catch {
     return null
   }
 }
 
 export function logoutUser(): void {
-  localStorage.removeItem(CURRENT_USER_KEY)
-  localStorage.removeItem('auth_token')
+  if (typeof window !== 'undefined') {
+    localStorage.removeItem(CURRENT_USER_KEY)
+    localStorage.removeItem('auth_token')
+  }
 }
 
 export function isAuthenticated(): boolean {
   return !!getCurrentUser()
 }
+

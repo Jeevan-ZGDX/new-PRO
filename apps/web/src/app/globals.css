@@ -16,7 +16,8 @@ body {
 }
 
 .dark body {
-  background-color: #0f172a;
+  background-color: #0D1117;
+  color: #F0F6FC;
 }
 
 /* Custom scrollbar */
@@ -35,7 +36,7 @@ body {
 }
 
 .dark ::-webkit-scrollbar-thumb {
-  background: #475569;
+  background: #30363D;
 }
 
 ::-webkit-scrollbar-thumb:hover {
@@ -43,7 +44,7 @@ body {
 }
 
 .dark ::-webkit-scrollbar-thumb:hover {
-  background: #64748b;
+  background: #484F58;
 }
 
 /* Table styles */
@@ -60,7 +61,7 @@ body {
 }
 
 .dark .table-container th {
-  @apply text-gray-400;
+  @apply text-[#8B949E];
 }
 
 .table-container td {
@@ -68,7 +69,7 @@ body {
 }
 
 .dark .table-container td {
-  @apply text-gray-100;
+  @apply text-[#F0F6FC];
 }
 
 .table-container tr {
@@ -76,7 +77,7 @@ body {
 }
 
 .dark .table-container tr {
-  @apply border-b border-gray-700;
+  @apply border-b border-[#30363D];
 }
 
 .table-container tr:hover {
@@ -84,7 +85,7 @@ body {
 }
 
 .dark .table-container tr:hover {
-  @apply bg-gray-800;
+  @apply bg-[#161B22];
 }
 
 .table-container tr:nth-child(even) {
@@ -92,7 +93,7 @@ body {
 }
 
 .dark .table-container tr:nth-child(even) {
-  @apply bg-gray-800/50;
+  @apply bg-[#161B22]/50;
 }
 
 /* No scrollbar utility */
