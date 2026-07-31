@@ -8,9 +8,6 @@ const nextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
-  compiler: {
-    styledComponents: true,
-  },
   output: 'standalone',
   transpilePackages: [
     '@comp-dash/api',
