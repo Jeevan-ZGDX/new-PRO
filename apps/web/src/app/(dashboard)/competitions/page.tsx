@@ -1,11 +1,12 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useTranslation } from 'react-i18next'
 import { Card, Badge } from '@comp-dash/design-system'
 import { useCompetitions, isSupabaseEnabled } from '@comp-dash/api'
-import { Calendar, MapPin, Users, Clock, ArrowRight, Search } from 'lucide-react'
+import { getCurrentUser } from '@/lib/auth'
+import { Calendar, MapPin, Users, Clock, ArrowRight, Search, Pencil } from 'lucide-react'
 import type { CompetitionCategory } from '@comp-dash/types'
 
 const categoryOptions = [
@@ -33,6 +34,8 @@ function formatDate(dateStr: string | null | undefined) {
 export default function CompetitionsPage() {
   const { t } = useTranslation()
   const router = useRouter()
+  const [user, setUser] = useState<any>(null)
+  useEffect(() => { setUser(getCurrentUser()) }, [])
   const [search, setSearch] = useState('')
   const [selectedCategory, setSelectedCategory] = useState('all')
 
@@ -50,7 +53,7 @@ export default function CompetitionsPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">{t('sidebar.competitions')}</h1>
-          <p className="text-gray-500 mt-1">Browse competitions from across India</p>
+          <p className="text-gray-500 mt-1">Browse competitions from across World</p>
         </div>
         {realtime && (
           <div className="flex items-center gap-1.5 px-3 py-1.5 bg-green-50 border border-green-200 rounded-full text-xs text-green-700">
@@ -144,15 +147,33 @@ export default function CompetitionsPage() {
                     </div>
                   </div>
 
-                  <div className="flex items-center justify-between pt-3 border-t border-gray-100">
-                    <div>
-                      <p className="text-xs text-gray-400">Prize Pool</p>
-                      <p className="text-sm font-bold text-accent">{comp.prizePool || 'N/A'}</p>
+                    <div className="flex items-center justify-between pt-3 border-t border-gray-100">
+                      <div>
+                        <p className="text-xs text-gray-400">Prize Pool</p>
+                        <p className="text-sm font-bold text-accent">{comp.prizePool || 'N/A'}</p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {comp.registrationUrl && (
+                          <a href={comp.registrationUrl} target="_blank" rel="noopener noreferrer"
+                            onClick={(e) => e.stopPropagation()}
+                            className="flex items-center gap-1 px-3 py-1.5 bg-accent text-white rounded-lg text-xs font-medium hover:bg-accent/90 transition-colors"
+                          >
+                            Register Now
+                          </a>
+                        )}
+                        {user?.role === 'super_admin' && (
+                          <button onClick={(e) => { e.stopPropagation(); router.push(`/create-competition?edit=${comp.id}`) }}
+                            className="flex items-center gap-1 px-2.5 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-xs font-medium text-gray-500 hover:text-accent hover:border-accent/30 hover:bg-accent/5 transition-colors"
+                          >
+                            <Pencil className="w-3 h-3" />
+                            Edit
+                          </button>
+                        )}
+                        <div className="flex items-center gap-1 text-sm font-medium text-accent group-hover:gap-2 transition-all">
+                          View Details <ArrowRight className="w-4 h-4" />
+                        </div>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-1 text-sm font-medium text-accent group-hover:gap-2 transition-all">
-                      View Details <ArrowRight className="w-4 h-4" />
-                    </div>
-                  </div>
                 </div>
               </div>
             )

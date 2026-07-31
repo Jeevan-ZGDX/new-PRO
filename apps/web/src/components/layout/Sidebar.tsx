@@ -22,6 +22,7 @@ import {
   ShieldPlus,
   PlusCircle,
   Mail,
+  CheckCircle,
 } from 'lucide-react'
 import { getCurrentUser, logoutUser } from '@/lib/auth'
 import type { UserRole } from '@/lib/auth'
@@ -32,6 +33,7 @@ const navItems: NavItem[] = [
   { label: 'Dashboard', icon: LayoutDashboard, href: '/dashboard', roles: ['student', 'advisor', 'hod', 'super_admin'] },
   { label: 'Competitions', icon: Trophy, href: '/competitions', roles: ['student', 'advisor', 'hod', 'super_admin'] },
   { label: 'Email Verification', icon: Mail, href: '/email-verification', roles: ['student'] },
+  { label: 'Verified Students', icon: CheckCircle, href: '/verified-students', roles: ['student', 'advisor', 'hod', 'super_admin'] },
   { label: 'Leaderboard', icon: Award, href: '/leaderboard', roles: ['student', 'advisor', 'hod', 'super_admin'] },
   { label: 'Notifications', icon: Bell, href: '/notifications', roles: ['student', 'advisor', 'hod', 'super_admin'] },
   { label: 'History', icon: History, href: '/history', roles: ['student'] },

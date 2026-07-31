@@ -6,7 +6,7 @@ import { Card, Badge } from '@comp-dash/design-system'
 import { getCurrentUser } from '@/lib/auth'
 import { Mail, Search, CheckCircle, User, Building2, ChevronDown, ChevronUp, GraduationCap, AtSign } from 'lucide-react'
 
-const YEAR_ORDER = ['1st Year', '2nd Year', '3rd Year', '4th Year']
+const YEAR_ORDER = ['2nd Year', '2nd Year', '3rd Year', '4th Year']
 
 interface EmailProof {
   from: string
