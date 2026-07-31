@@ -6,7 +6,7 @@ import { Card, Badge } from '@comp-dash/design-system'
 import { getCurrentUser } from '@/lib/auth'
 import { Mail, Search, CheckCircle, User, Building2, ChevronDown, ChevronUp, GraduationCap } from 'lucide-react'
 
-const YEAR_ORDER = ['1st Year', '2nd Year', '3rd Year', '4th Year']
+const YEAR_ORDER = ['2nd Year', '2nd Year', '3rd Year', '4th Year']
 
 interface EmailProof {
   from: string
@@ -184,7 +184,7 @@ export default function VerificationRequestsPage() {
   useEffect(() => {
     const u = getCurrentUser()
     setUser(u)
-    if (u && !['advisor', 'hod', 'coe', 'super_admin'].includes(u.role)) {
+    if (u && !['advisor', 'hod', 'super_admin'].includes(u.role)) {
       router.push('/dashboard')
     }
   }, [router])

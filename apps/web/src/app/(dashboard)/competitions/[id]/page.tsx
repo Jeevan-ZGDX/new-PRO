@@ -1,6 +1,5 @@
 'use client'
 
-<<<<<<< HEAD
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { useState, useEffect, Suspense } from 'react'
 import { Card, Badge, Button } from '@comp-dash/design-system'
@@ -11,18 +10,20 @@ import {
   Globe, Building2, Target, Pencil, Mail, CheckCircle, AlertCircle, 
   Loader2, MailCheck, Shield, Sparkles, ChevronDown, ChevronUp, Info
 } from 'lucide-react'
-=======
-import { useParams, useRouter } from 'next/navigation'
-import { Card, Badge } from '@comp-dash/design-system'
-import { useCompetition } from '@comp-dash/api'
-import { Calendar, MapPin, Users, Clock, Trophy, ArrowLeft, ExternalLink, Tag, Info, Globe, Building2, Target } from 'lucide-react'
->>>>>>> parent of 5ec3d99 (student dash updates)
 
 const categoryGradients: Record<string, string> = {
   competition: 'from-violet-500 to-purple-600',
   'c + p': 'from-emerald-500 to-teal-600',
   'c + i': 'from-blue-500 to-cyan-600',
   'start-up': 'from-amber-500 to-orange-600',
+  hackathon: 'from-pink-500 to-rose-600',
+  internship: 'from-indigo-500 to-blue-600',
+  workshop: 'from-orange-500 to-red-600',
+  paper_presentation: 'from-teal-500 to-green-600',
+  project: 'from-cyan-500 to-blue-600',
+  sports: 'from-green-500 to-emerald-600',
+  cultural: 'from-purple-500 to-pink-600',
+  other: 'from-gray-500 to-gray-600',
 }
 
 function formatDate(dateStr: string | null | undefined) {
@@ -35,8 +36,25 @@ function formatDate(dateStr: string | null | undefined) {
 function CompetitionDetailContent() {
   const params = useParams()
   const router = useRouter()
+  const searchParams = useSearchParams()
+
+  const [user, setUser] = useState<any>(null)
+  const [isVerifying, setIsVerifying] = useState(false)
+  const [verificationStatus, setVerificationStatus] = useState<'idle' | 'success' | 'error' | 'loading'>('idle')
+  const [verificationMessage, setVerificationMessage] = useState('')
+  const [showVerificationDetails, setShowVerificationDetails] = useState(false)
+
+  useEffect(() => { setUser(getCurrentUser()) }, [])
 
   const { data: comp, isLoading, error } = useCompetition(params.id as string)
+
+  useEffect(() => {
+    if (searchParams.get('verified') === 'true') {
+      setVerificationStatus('success')
+      setVerificationMessage('Email verified successfully! Your registration has been confirmed.')
+      setTimeout(() => setVerificationStatus('idle'), 5000)
+    }
+  }, [searchParams])
 
   if (isLoading) {
     return (
@@ -49,11 +67,7 @@ function CompetitionDetailContent() {
 
   if (!comp || error) {
     return (
-<<<<<<< HEAD
       <div className="flex flex-col items-center justify-center py-20 text-gray-400 dark:text-[#8B949E]">
-=======
-      <div className="flex flex-col items-center justify-center py-20 text-gray-400">
->>>>>>> parent of 5ec3d99 (student dash updates)
         <Info className="w-12 h-12 mb-3" />
         <p className="text-sm font-medium">Competition not found</p>
         <button onClick={() => router.back()} className="text-sm text-accent dark:text-[#38BDF8] mt-2 hover:underline">Go back</button>
@@ -64,22 +78,46 @@ function CompetitionDetailContent() {
   const deadline = comp.registrationDeadline ? new Date(comp.registrationDeadline) : null
   const isOpen = deadline ? deadline > new Date() : true
   const daysLeft = deadline ? Math.ceil((deadline.getTime() - Date.now()) / (1000 * 60 * 60 * 24)) : null
+  const hasRegistrationLink = comp.registrationLink || comp.registrationUrl
+
+  const handleRegisterNow = () => {
+    const url = comp.registrationLink || comp.registrationUrl
+    if (url) {
+      window.open(url, '_blank', 'noopener,noreferrer')
+    }
+  }
+
+  const handleVerifyEmail = async () => {
+    if (!user) {
+      router.push('/auth/login?redirect=' + encodeURIComponent(window.location.href))
+      return
+    }
+
+    setIsVerifying(true)
+    setVerificationStatus('loading')
+    setVerificationMessage('Connecting to Gmail...')
+
+    try {
+      const oauthUrl = `${process.env.NEXT_PUBLIC_APP_URL}/api/gmail/auth?competitionId=${comp.id}&userEmail=${encodeURIComponent(user.email)}`
+      window.location.href = oauthUrl
+    } catch (err) {
+      setVerificationStatus('error')
+      setVerificationMessage(err instanceof Error ? err.message : 'Failed to start verification')
+      setIsVerifying(false)
+    }
+  }
+
+  const handleManualVerify = () => {
+    router.push(`/email-verification?organizerEmail=${encodeURIComponent(comp.organizerEmail)}&competitionId=${comp.id}`)
+  }
 
   return (
     <div className="space-y-6 max-w-4xl mx-auto">
-<<<<<<< HEAD
       <button onClick={() => router.back()} className="flex items-center gap-1.5 text-sm text-gray-500 dark:text-[#8B949E] hover:text-gray-700 dark:hover:text-[#F0F6FC] transition-colors">
         <ArrowLeft className="w-4 h-4" /> Back to Competitions
       </button>
 
       <div className="bg-white dark:bg-[#161B22] border border-gray-200 dark:border-[#30363D] rounded-2xl overflow-hidden">
-=======
-      <button onClick={() => router.back()} className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700 transition-colors">
-        <ArrowLeft className="w-4 h-4" /> Back to Competitions
-      </button>
-
-      <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden">
->>>>>>> parent of 5ec3d99 (student dash updates)
         <div className={`h-2 bg-gradient-to-r ${categoryGradients[comp.category?.toLowerCase()] || 'from-gray-400 to-gray-500'}`} />
         
         <div className="p-6 md:p-8">
@@ -89,17 +127,12 @@ function CompetitionDetailContent() {
                 <Badge variant="primary" size="sm">{comp.category || 'Competition'}</Badge>
                 {daysLeft !== null && (
                   <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
-<<<<<<< HEAD
                     isOpen ? 'bg-green-50 dark:bg-green-950/50 text-green-700 dark:text-green-400 border dark:border-green-800/50' : 'bg-red-50 dark:bg-red-950/50 text-red-600 dark:text-red-400 border dark:border-red-800/50'
-=======
-                    isOpen ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-600'
->>>>>>> parent of 5ec3d99 (student dash updates)
                   }`}>
                     {isOpen ? (daysLeft > 0 ? `${daysLeft} days left` : 'Closing soon') : 'Registration closed'}
                   </span>
                 )}
               </div>
-<<<<<<< HEAD
               <h1 className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-[#F0F6FC]">{comp.title}</h1>
               <p className="text-sm text-gray-500 dark:text-[#8B949E] mt-1">by {comp.organizer}</p>
             </div>
@@ -124,15 +157,10 @@ function CompetitionDetailContent() {
                   Edit
                 </Button>
               )}
-=======
-              <h1 className="text-2xl md:text-3xl font-bold text-gray-900">{comp.title}</h1>
-              <p className="text-sm text-gray-500 mt-1">by {comp.organizer}</p>
->>>>>>> parent of 5ec3d99 (student dash updates)
             </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-<<<<<<< HEAD
             <div className="p-4 bg-gray-50 dark:bg-[#0D1117] border border-transparent dark:border-[#30363D] rounded-xl">
               <div className="flex items-center gap-2 text-xs text-gray-400 dark:text-[#8B949E] mb-1">
                 <Calendar className="w-3.5 h-3.5" />
@@ -158,38 +186,10 @@ function CompetitionDetailContent() {
                 Prize Pool
               </div>
               <p className="text-sm font-bold text-accent dark:text-[#38BDF8]">{comp.prizePool || 'N/A'}</p>
-=======
-            <div className="p-4 bg-gray-50 rounded-xl">
-              <div className="flex items-center gap-2 text-xs text-gray-400 mb-1">
-                <Calendar className="w-3.5 h-3.5" />
-                Dates
-              </div>
-              <p className="text-sm font-medium text-gray-900">
-                {formatDate(comp.startDate)}{comp.endDate ? ` - ${formatDate(comp.endDate)}` : ''}
-              </p>
-            </div>
-            <div className="p-4 bg-gray-50 rounded-xl">
-              <div className="flex items-center gap-2 text-xs text-gray-400 mb-1">
-                <Clock className="w-3.5 h-3.5" />
-                Deadline
-              </div>
-              <p className="text-sm font-medium text-gray-900">
-                {formatDate(comp.registrationDeadline)}
-                {deadline && !isOpen && <span className="text-red-500 ml-1">(Closed)</span>}
-              </p>
-            </div>
-            <div className="p-4 bg-gray-50 rounded-xl">
-              <div className="flex items-center gap-2 text-xs text-gray-400 mb-1">
-                <Trophy className="w-3.5 h-3.5" />
-                Prize Pool
-              </div>
-              <p className="text-sm font-bold text-accent">{comp.prizePool || 'N/A'}</p>
->>>>>>> parent of 5ec3d99 (student dash updates)
             </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-<<<<<<< HEAD
             <div className="p-4 bg-gray-50 dark:bg-[#0D1117] border border-transparent dark:border-[#30363D] rounded-xl">
               <div className="flex items-center gap-2 text-xs text-gray-400 dark:text-[#8B949E] mb-1">
                 <Building2 className="w-3.5 h-3.5" />
@@ -225,40 +225,12 @@ function CompetitionDetailContent() {
                   <div className="flex flex-wrap gap-1.5 mt-2">
                     {comp.eligibility.yearOfStudy.filter(Boolean).map((y: string) => (
                       <span key={y} className="px-2 py-0.5 bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 rounded-md text-xs font-medium">{y}</span>
-=======
-            <div className="p-4 bg-gray-50 rounded-xl">
-              <div className="flex items-center gap-2 text-xs text-gray-400 mb-1">
-                <Building2 className="w-3.5 h-3.5" />
-                Organizer
-              </div>
-              <p className="text-sm font-medium text-gray-900">{comp.organizer}</p>
-            </div>
-            <div className="p-4 bg-gray-50 rounded-xl">
-              <div className="flex items-center gap-2 text-xs text-gray-400 mb-1">
-                <Globe className="w-3.5 h-3.5" />
-                Category
-              </div>
-              <p className="text-sm font-medium text-gray-900 capitalize">{comp.category || 'Competition'}</p>
-            </div>
-          </div>
-
-          {comp.eligibility?.yearOfStudy?.filter(Boolean).length > 0 && (
-            <div className="p-4 bg-blue-50 border border-blue-100 rounded-xl mb-6">
-              <div className="flex items-start gap-3">
-                <Target className="w-5 h-5 text-blue-600 mt-0.5" />
-                <div>
-                  <p className="text-sm font-medium text-blue-900">Eligibility</p>
-                  <div className="flex flex-wrap gap-1.5 mt-2">
-                    {comp.eligibility.yearOfStudy.filter(Boolean).map((y: string) => (
-                      <span key={y} className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded-md text-xs font-medium">{y}</span>
->>>>>>> parent of 5ec3d99 (student dash updates)
                     ))}
                   </div>
                 </div>
               </div>
             </div>
           )}
-<<<<<<< HEAD
 
           <div className="mt-8 pt-6 border-t border-gray-100 dark:border-[#30363D]">
             <h2 className="text-lg font-semibold text-gray-900 dark:text-[#F0F6FC] mb-4 flex items-center gap-2">
@@ -335,14 +307,11 @@ function CompetitionDetailContent() {
               )}
             </div>
           </div>
-=======
->>>>>>> parent of 5ec3d99 (student dash updates)
         </div>
       </div>
     </div>
   )
 }
-<<<<<<< HEAD
 
 export default function CompetitionDetailPage() {
   return (
@@ -351,5 +320,3 @@ export default function CompetitionDetailPage() {
     </Suspense>
   )
 }
-=======
->>>>>>> parent of 5ec3d99 (student dash updates)

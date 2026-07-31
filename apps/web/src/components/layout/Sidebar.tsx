@@ -17,9 +17,9 @@ import {
   LogOut,
   History,
   Award,
-  ShieldPlus,
   PlusCircle,
   Mail,
+  CheckCircle,
 } from 'lucide-react'
 import { getCurrentUser, logoutUser } from '@/lib/auth'
 import type { UserRole } from '@/lib/auth'
@@ -30,15 +30,14 @@ const navItems: NavItem[] = [
   { label: 'Dashboard', icon: LayoutDashboard, href: '/dashboard', roles: ['student', 'advisor', 'hod', 'super_admin'] },
   { label: 'Competitions', icon: Trophy, href: '/competitions', roles: ['student', 'advisor', 'hod', 'super_admin'] },
   { label: 'Email Verification', icon: Mail, href: '/email-verification', roles: ['student'] },
+  { label: 'Verified Students', icon: CheckCircle, href: '/verified-students', roles: ['advisor', 'super_admin'] },
   { label: 'Leaderboard', icon: Award, href: '/leaderboard', roles: ['student', 'advisor', 'hod', 'super_admin'] },
   { label: 'History', icon: History, href: '/history', roles: ['student'] },
   { label: 'Verification Requests', icon: Mail, href: '/verification-requests', roles: ['advisor', 'hod', 'super_admin'] },
   { label: 'Create Competition', icon: PlusCircle, href: '/create-competition', roles: ['super_admin'] },
-  { label: 'Role Access', icon: ShieldPlus, href: '/role-access', roles: ['super_admin'] },
-  { label: 'Registrations', icon: ClipboardList, href: '/registrations', roles: ['hod', 'super_admin'] },
+  { label: 'Registrations', icon: ClipboardList, href: '/registrations', roles: ['super_admin'] },
   { label: 'Students', icon: Users, href: '/students', roles: ['hod', 'super_admin'] },
   { label: 'Advisors', icon: GraduationCap, href: '/advisors', roles: ['hod', 'super_admin'] },
-  { label: 'Departments', icon: Building2, href: '/departments', roles: ['super_admin'] },
   { label: 'Analytics', icon: BarChart3, href: '/analytics', roles: ['hod'] },
   { label: 'Winners', icon: Medal, href: '/winners', roles: ['hod', 'advisor', 'student', 'super_admin'] },
 ]

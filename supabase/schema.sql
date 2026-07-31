@@ -7,7 +7,7 @@ create table if not exists students (
   name text not null,
   email text unique not null,
   department text default 'CSE',
-  year text default '1st Year',
+  year text default '2nd Year',
   section text default 'A',
   roll_number text,
   phone text,

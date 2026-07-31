@@ -6,7 +6,7 @@ import { useHodDashboardStats } from '@comp-dash/api'
 import { Users, UserCheck, BookOpen, GraduationCap, Mail, Trophy, CheckCircle, Clock } from 'lucide-react'
 import { getCurrentUser } from '@/lib/auth'
 
-const YEARS = ['1st Year', '2nd Year', '3rd Year', '4th Year']
+const YEARS = ['2nd Year', '2nd Year', '3rd Year', '4th Year']
 
 export default function HODDashboard() {
   const { data: stats, isLoading } = useHodDashboardStats()

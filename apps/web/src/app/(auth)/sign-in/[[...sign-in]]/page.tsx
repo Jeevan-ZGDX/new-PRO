@@ -52,11 +52,8 @@ export default function SignInPage() {
   const testUsers = [
     { email: 'admin@citchennai.net', pass: 'admin123', label: 'Super Admin' },
     { email: 'hod@citchennai.net', pass: 'hod123', label: 'HOD' },
-    { email: 'coe@citchennai.net', pass: 'coe123', label: 'COE' },
     { email: 'advisor@citchennai.net', pass: 'advisor123', label: 'Advisor' },
     { email: 'student@citchennai.net', pass: 'student123', label: 'Student' },
-    { email: 'krssellamuthu2007@gmail.com', pass: 'admin123', label: 'Dev Sellamuthu' },
-    { email: 'jeevansri15@gmail.com', pass: 'admin123', label: 'Dev Jeevansri' },
   ]
 
   return (

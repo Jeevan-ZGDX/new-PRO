@@ -45,7 +45,7 @@ const rows = (payload.students || []).map((student) => ({
   name: student.name,
   email: student.email || null,
   department: student.department || 'CSE',
-  year: student.year || '1st Year',
+  year: student.year || '2nd Year',
   section: student.section || 'A',
   registered_competitions: student.registeredCompetitions || 0,
   verified_competitions: student.verifiedCompetitions || 0,
