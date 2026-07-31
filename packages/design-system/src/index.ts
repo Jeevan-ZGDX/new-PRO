@@ -27,8 +27,6 @@ export { CompetitionCard } from './components/CompetitionCard'
 
 export { NotificationItem } from './components/NotificationItem'
 
-export { SettingsRow } from './components/SettingsRow'
-
 export { SearchBar } from './components/SearchBar'
 export type { SearchBarProps } from './components/SearchBar'
 
