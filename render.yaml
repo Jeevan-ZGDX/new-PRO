@@ -1,19 +1,56 @@
+# Render Blueprint — defines the production web service.
+# Deployments are triggered automatically on every push to `main`
+# (either via Render's GitHub integration or the GitHub Actions
+# workflow in .github/workflows/deploy.yml).
+#
+# Setup:
+#   1. Push this file to `main`.
+#   2. In Render, create the service via "Blueprint" (it reads render.yaml).
+#   3. Fill in the `sync: false` secrets in the Render dashboard.
+#   4. (Optional) Set the deploy hook secret in GitHub:
+#      repo Settings -> Secrets and variables -> Actions -> RENDER_DEPLOY_HOOK_URL
+#      (Render -> your service -> Deploy -> Deploy Hook)
+
 services:
   - type: web
     name: comp-dash-web
-    env: node
+    runtime: node
     region: singapore
     plan: free
-    buildCommand: npm install && npm run build
+    buildCommand: npm ci --legacy-peer-deps && npm run build
     startCommand: npm run start
+    healthCheckPath: /
+    autoDeploy: true
     envVars:
       - key: NODE_ENV
         value: production
+
+      # Public, baked in at build time
+      - key: NEXT_PUBLIC_SUPABASE_URL
+        sync: false
+      - key: NEXT_PUBLIC_SUPABASE_ANON_KEY
+        sync: false
+      - key: NEXT_PUBLIC_API_URL
+        value: https://comp-dash-web.onrender.com/api
+
+      # Google OAuth (private)
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: NEXT_PUBLIC_GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: GOOGLE_REDIRECT_URI
+        value: https://comp-dash-web.onrender.com/api/auth/gmail/callback
+
+      # Supabase server-side + database (private)
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
       - key: DATABASE_URL
         sync: false
       - key: DIRECT_URL
         sync: false
-      - key: NEXT_PUBLIC_SUPABASE_URL
-        sync: false
-      - key: NEXT_PUBLIC_SUPABASE_ANON_KEY
+
+      # Firebase Admin service account (JSON string, private)
+      - key: FIREBASE_SERVICE_ACCOUNT
         sync: false
