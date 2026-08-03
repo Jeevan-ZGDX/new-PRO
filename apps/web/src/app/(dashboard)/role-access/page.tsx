@@ -64,7 +64,7 @@ export default function RoleAccessPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900">Role Access</h1>
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-[#F0F6FC]">Role Access</h1>
       </div>
 
       <Card padding="none" className="overflow-hidden">

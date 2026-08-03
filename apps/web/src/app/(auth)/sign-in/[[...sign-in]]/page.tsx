@@ -50,11 +50,13 @@ export default function SignInPage() {
   }
 
   const testUsers = [
-    { email: 'admin@cit.in', pass: 'admin123', label: 'Super Admin' },
-    { email: 'hod@cit.in', pass: 'hod123', label: 'HOD' },
-    { email: 'coe@cit.in', pass: 'coe123', label: 'COE' },
-    { email: 'advisor@cit.in', pass: 'advisor123', label: 'Advisor' },
-    { email: 'student@cit.in', pass: 'student123', label: 'Student' },
+    { email: 'admin@citchennai.net', pass: 'admin123', label: 'Super Admin' },
+    { email: 'hod@citchennai.net', pass: 'hod123', label: 'HOD' },
+    { email: 'coe@citchennai.net', pass: 'coe123', label: 'COE' },
+    { email: 'advisor@citchennai.net', pass: 'advisor123', label: 'Advisor' },
+    { email: 'student@citchennai.net', pass: 'student123', label: 'Student' },
+    { email: 'krssellamuthu2007@gmail.com', pass: 'admin123', label: 'Dev Sellamuthu' },
+    { email: 'jeevansri15@gmail.com', pass: 'admin123', label: 'Dev Jeevansri' },
   ]
 
   return (
@@ -84,8 +86,8 @@ export default function SignInPage() {
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="you@example.com"
-              className="w-full h-11 px-4 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent"
+              placeholder="admin@cit.in"
+              className="w-full h-11 px-4 rounded-xl border border-gray-300 bg-white text-gray-900 placeholder-gray-400 font-medium text-sm focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent"
             />
           </div>
 
@@ -100,7 +102,7 @@ export default function SignInPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="Enter your password"
-                className="w-full h-11 px-4 pr-11 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent"
+                className="w-full h-11 px-4 pr-11 rounded-xl border border-gray-300 bg-white text-gray-900 placeholder-gray-400 font-medium text-sm focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent"
               />
               <button
                 type="button"
