@@ -13,12 +13,10 @@ export interface Competition {
   scope: CompetitionScope
   mode: CompetitionMode
   organizer: string
-  organizerEmail: string
   organizerLogo: string | null
   bannerUrl: string | null
   websiteUrl: string
   registrationUrl: string
-  registrationLink: string
   teamSizeMin: number
   teamSizeMax: number
   prizePool: string

@@ -5,7 +5,7 @@ create table if not exists public.students (
   name text not null,
   email text,
   department text not null default 'CSE',
-  year text not null default '2nd Year',
+  year text not null default '1st Year',
   section text not null default 'A',
   registered_competitions integer not null default 0,
   verified_competitions integer not null default 0,

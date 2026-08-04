@@ -17,16 +17,6 @@ create table if not exists public.competition_dashboard (
   total_prize_amount text not null default '',
   category text not null default 'Competition',
   organizer text not null,
-  website_url text not null default '',
-  registration_link text not null default '',
-  description text not null default '',
-  short_description text not null default '',
-  scope text not null default 'national',
-  mode text not null default 'online',
-  organizer_email text not null default '',
-  team_size_min integer not null default 1,
-  team_size_max integer not null default 1,
-  tags jsonb not null default '[]',
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );

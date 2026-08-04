@@ -1,6 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { apiClient } from '../client'
-import { getSupabaseClient, isSupabaseEnabled } from '../supabase-manager'
 import type {
   Registration,
   RegistrationListResponse,
@@ -15,8 +14,6 @@ import type {
   CompetitionDashboardData,
   HistoryEntry,
 } from '@comp-dash/types'
-
-const DASHBOARD_TABLE = 'competition_dashboard'
 
 export function useRegistrations(params?: {
   status?: RegistrationStatus
@@ -50,34 +47,11 @@ export function useRegistrationStats() {
 export function useRegisterForCompetition() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: async (data: RegistrationCreate) => {
-      const result = await apiClient.post<Registration, RegistrationCreate>('/registrations', data)
-
-      if (isSupabaseEnabled()) {
-        const sb = getSupabaseClient()
-        if (sb) {
-          const { error } = await sb.from('student_competitions').upsert({
-            student_id: data.userId || '',
-            student_email: data.userEmail || '',
-            student_name: data.userName || '',
-            competition_id: data.competitionId || '',
-            competition_name: data.competitionTitle || '',
-            verification_status: 'pending',
-            verification_method: 'manual',
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          })
-          if (error) console.error('Supabase student_competitions insert error:', error.message)
-        }
-      }
-
-      return result
-    },
+    mutationFn: (data: RegistrationCreate) =>
+      apiClient.post<Registration, RegistrationCreate>('/registrations', data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['registrations'] })
       queryClient.invalidateQueries({ queryKey: ['registrations', 'stats'] })
-      queryClient.invalidateQueries({ queryKey: ['competitions'], refetchType: 'all' })
-      queryClient.invalidateQueries({ queryKey: ['supabase-competitions'], refetchType: 'all' })
     },
   })
 }
@@ -207,43 +181,9 @@ export function useSendReminder() {
 export function useCreateCompetition() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: async (data: Record<string, unknown>) => {
-      const result = await apiClient.post('/competitions', data)
-
-      if (isSupabaseEnabled()) {
-        const sb = getSupabaseClient()
-        if (sb) {
-          const { error } = await sb.from(DASHBOARD_TABLE).insert({
-            competition_name: (data.title as string) || '',
-            category: (data.category as string) || 'competition',
-            organizer: (data.organizer as string) || '',
-            total_prize_amount: (data.prizePool as string) || '',
-            website_url: (data.registrationUrl as string) || (data.websiteUrl as string) || '',
-            registration_link: (data.registrationLink as string) || '',
-            description: (data.description as string) || '',
-            short_description: (data.shortDescription as string) || '',
-            scope: (data.scope as string) || 'national',
-            mode: (data.mode as string) || 'online',
-            organizer_email: (data.organizerEmail as string) || '',
-            team_size_min: (data.teamSizeMin as number) ?? 1,
-            team_size_max: (data.teamSizeMax as number) ?? 1,
-            tags: data.tags ? JSON.stringify(data.tags) : '[]',
-            reg_deadline: (data.registrationDeadline as string) || null,
-            r1_date: (data.startDate as string) || null,
-            r2_date: (data.endDate as string) || null,
-            eligible_year: ((data.eligibility as Record<string, unknown>)?.yearOfStudy as string[])?.[0] || '',
-            competition_status: 'On Going',
-            serial_no: Math.floor(Date.now() / 1000),
-          })
-          if (error) throw new Error(error.message)
-        }
-      }
-
-      return result
-    },
+    mutationFn: (data: Record<string, unknown>) => apiClient.post('/competitions', data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['competitions'], refetchType: 'all' })
-      queryClient.invalidateQueries({ queryKey: ['supabase-competitions'], refetchType: 'all' })
+      queryClient.invalidateQueries({ queryKey: ['competitions'] })
     },
   })
 }
@@ -251,45 +191,10 @@ export function useCreateCompetition() {
 export function useUpdateCompetition() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: async ({ id, data }: { id: string; data: Record<string, unknown> }) => {
-      const result = await apiClient.put(`/competitions/${id}`, data)
-
-      if (isSupabaseEnabled()) {
-        const sb = getSupabaseClient()
-        if (sb) {
-          const updates: Record<string, unknown> = {}
-          if (data.title !== undefined) updates.competition_name = data.title as string
-          if (data.description !== undefined) updates.description = data.description as string
-          if (data.shortDescription !== undefined) updates.short_description = data.shortDescription as string
-          if (data.category !== undefined) updates.category = data.category as string
-          if (data.scope !== undefined) updates.scope = data.scope as string
-          if (data.mode !== undefined) updates.mode = data.mode as string
-          if (data.organizer !== undefined) updates.organizer = data.organizer as string
-          if (data.organizerEmail !== undefined) updates.organizer_email = data.organizerEmail as string
-          if (data.prizePool !== undefined) updates.total_prize_amount = data.prizePool as string
-          if (data.teamSizeMin !== undefined) updates.team_size_min = data.teamSizeMin as number
-          if (data.teamSizeMax !== undefined) updates.team_size_max = data.teamSizeMax as number
-          if (data.registrationUrl !== undefined) updates.website_url = data.registrationUrl as string
-          else if (data.websiteUrl !== undefined) updates.website_url = data.websiteUrl as string
-          if (data.registrationLink !== undefined) updates.registration_link = data.registrationLink as string
-          if (data.tags !== undefined) updates.tags = JSON.stringify(data.tags)
-          if (data.registrationDeadline !== undefined) updates.reg_deadline = (data.registrationDeadline as string) || null
-          if (data.startDate !== undefined) updates.r1_date = (data.startDate as string) || null
-          if (data.endDate !== undefined) updates.r2_date = (data.endDate as string) || null
-          if (data.eligibility !== undefined) {
-            updates.eligible_year = ((data.eligibility as Record<string, unknown>)?.yearOfStudy as string[])?.[0] || ''
-          }
-          updates.updated_at = new Date().toISOString()
-          const { error } = await sb.from(DASHBOARD_TABLE).update(updates).eq('id', id)
-          if (error) throw new Error(error.message)
-        }
-      }
-
-      return result
-    },
+    mutationFn: ({ id, data }: { id: string; data: Record<string, unknown> }) =>
+      apiClient.put(`/competitions/${id}`, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['competitions'], refetchType: 'all' })
-      queryClient.invalidateQueries({ queryKey: ['supabase-competitions'], refetchType: 'all' })
+      queryClient.invalidateQueries({ queryKey: ['competitions'] })
     },
   })
 }
@@ -299,8 +204,7 @@ export function useDeleteCompetition() {
   return useMutation({
     mutationFn: (id: string) => apiClient.delete(`/competitions/${id}`),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['competitions'], refetchType: 'all' })
-      queryClient.invalidateQueries({ queryKey: ['supabase-competitions'], refetchType: 'all' })
+      queryClient.invalidateQueries({ queryKey: ['competitions'] })
     },
   })
 }

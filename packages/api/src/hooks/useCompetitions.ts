@@ -67,26 +67,24 @@ function mapDashboardRow(row: any): Competition {
   return {
     id: row.id,
     title: row.competition_name || '',
-    description: row.description || '',
-    shortDescription: row.short_description || '',
+    description: '',
+    shortDescription: '',
     category: (row.category || 'other').toLowerCase(),
-    scope: row.scope || 'national',
-    mode: row.mode || 'online',
+    scope: 'national',
+    mode: 'online',
     organizer: row.organizer || '',
-    organizerEmail: row.organizer_email || '',
     organizerLogo: null,
     bannerUrl: null,
-    websiteUrl: row.website_url || '',
-    registrationUrl: row.website_url || '',
-    registrationLink: row.registration_link || '',
-    teamSizeMin: row.team_size_min ?? 1,
-    teamSizeMax: row.team_size_max ?? 1,
+    websiteUrl: '',
+    registrationUrl: '',
+    teamSizeMin: 1,
+    teamSizeMax: 1,
     prizePool: row.total_prize_amount || '',
     registrationDeadline: row.reg_deadline || '',
     startDate: row.r1_date || '',
     endDate: row.r2_date || '',
     eligibility: { departments: [], yearOfStudy: [row.eligible_year || ''], description: '' },
-    tags: typeof row.tags === 'string' ? JSON.parse(row.tags) : (row.tags || []),
+    tags: [],
     createdAt: row.created_at || new Date().toISOString(),
     updatedAt: row.updated_at || new Date().toISOString(),
   }
@@ -103,7 +101,7 @@ export function useCompetitions(filters?: CompetitionFilters) {
       }
       return apiClient.get<CompetitionListResponse>('/competitions', filters as Record<string, unknown>)
     },
-    staleTime: 30 * 1000,
+    staleTime: 2 * 60 * 1000,
   })
 }
 

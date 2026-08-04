@@ -15,7 +15,7 @@ const excelFiles = [
   {
     filePath: '/home/vampire/Downloads/ORIGINAL NAMELIST.xlsx',
     sheetName: 'Sheet1',
-    year: '2nd Year',
+    year: '1st Year',
     batch: '2025',
   },
 ]

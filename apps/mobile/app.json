@@ -1,0 +1,32 @@
+{
+  "expo": {
+    "name": "Comp-Dash",
+    "slug": "comp-dash",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#FFFFFF"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.compdash.app"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#FFFFFF"
+      },
+      "package": "com.compdash.app"
+    },
+    "plugins": ["expo-router"],
+    "scheme": "comp-dash",
+    "extra": {
+      "apiUrl": "http://localhost:3001/api"
+    }
+  }
+}

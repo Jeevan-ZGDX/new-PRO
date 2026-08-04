@@ -191,15 +191,6 @@ export async function fetchEmailDetail(userId: string, emailId: string): Promise
   } catch { return null }
 }
 
-export async function fetchRecentEmails(userId: string, maxResults = 30): Promise<StoredEmail[]> {
-  const accessToken = await fetchValidAccessToken(userId)
-  if (!accessToken) return []
-  try {
-    const data = await fetchApi('/gmail/recent', { userId, accessToken, maxResults: String(maxResults) })
-    return data.emails || []
-  } catch { return [] }
-}
-
 export function extractCompetitionHint(email: StoredEmail): string | null {
   const subject = (email.subject || '').toLowerCase()
   const from = (email.from || '').toLowerCase()

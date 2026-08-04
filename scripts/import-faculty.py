@@ -57,7 +57,15 @@ if DIRECT_URL:
               updated_at timestamptz default now()
             );
         """)
-
+        cur.execute("alter table public.advisors enable row level security;")
+        try:
+            cur.execute("create policy \"Allow all on advisors\" on public.advisors for all using (true);")
+        except Exception:
+            pass  # policy may already exist
+        conn.commit()
+        cur.close()
+        conn.close()
+        print("Advisors table ensured.")
     except Exception as e:
         print(f"Could not create table: {e}")
         print("Ensure advisors table exists in Supabase before running.")

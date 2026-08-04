@@ -20,7 +20,7 @@ function parsePrizeValue(prizeStr: string): number {
 function yearToDigit(year: string): string {
   const match = year.match(/(\d+)/)
   const digit = match ? match[1] : '1'
-  // shift 2nd Year → 2, 2nd year → 3, etc.
+  // shift 1st year → 2, 2nd year → 3, etc.
   return String(Number(digit) + 1)
 }
 

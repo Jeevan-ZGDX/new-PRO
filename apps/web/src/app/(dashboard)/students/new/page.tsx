@@ -7,7 +7,7 @@ import { UserPlus, ArrowLeft, CheckCircle } from 'lucide-react'
 
 export default function AddStudentPage() {
   const router = useRouter()
-  const [form, setForm] = useState({ name: '', email: '', year: '2nd Year', section: 'A' })
+  const [form, setForm] = useState({ name: '', email: '', year: '1st Year', section: 'A' })
   const [submitting, setSubmitting] = useState(false)
   const [success, setSuccess] = useState(false)
 
@@ -61,7 +61,7 @@ export default function AddStudentPage() {
                   <label className="block text-xs font-medium text-gray-500 mb-1.5">Year</label>
                   <select value={form.year} onChange={e => setForm({ ...form, year: e.target.value })}
                     className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent bg-white">
-                    <option value="2nd Year">2nd Year</option>
+                    <option value="1st Year">1st Year</option>
                     <option value="2nd Year">2nd Year</option>
                     <option value="3rd Year">3rd Year</option>
                     <option value="4th Year">4th Year</option>

@@ -1,10 +1,10 @@
 'use client'
 
-import { Suspense, useState, useEffect, useCallback, useRef } from 'react'
+import { Suspense, useState, useEffect, useCallback } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { Card, CardHeader, CardTitle, Badge } from '@comp-dash/design-system'
 import { getCurrentUser } from '@/lib/auth'
-import { setGmailTokens, setHistoryId, getSyncedEmails, setSyncedEmails, appendSyncedEmails, clearGmailTokens, getHistoryId, fetchRecentEmails } from '@/lib/gmail-sync'
+import { setGmailTokens, setHistoryId, getSyncedEmails, setSyncedEmails, appendSyncedEmails, clearGmailTokens, getHistoryId } from '@/lib/gmail-sync'
 import { Mail, Search, Send, CheckCircle, Inbox, Clock, Shield, RefreshCw } from 'lucide-react'
 
 type Step = 'signin' | 'permissions' | 'inbox'
@@ -29,21 +29,6 @@ function EmailVerificationContent() {
   const [lastSync, setLastSync] = useState<string | null>(null)
 
   const userId = user?.email || ''
-  const organizerEmailRef = useRef('')
-
-  // On mount, check URL param or localStorage for organizerEmail
-  useEffect(() => {
-    const fromUrl = searchParams.get('organizerEmail')
-    const fromStorage = typeof window !== 'undefined' ? localStorage.getItem('pending_organizer_email') : null
-    const val = fromUrl || fromStorage || ''
-    organizerEmailRef.current = val
-    if (val && typeof window !== 'undefined') {
-      localStorage.setItem('pending_organizer_email', val)
-    }
-    if (fromUrl && typeof window !== 'undefined') {
-      localStorage.setItem('pending_organizer_email', fromUrl)
-    }
-  }, [searchParams])
 
   // Handle OAuth redirect back from server
   useEffect(() => {
@@ -63,17 +48,13 @@ function EmailVerificationContent() {
       if (historyId) setHistoryId(userId, historyId)
       setUseGmail(true)
       setStep('inbox')
-      // Clean URL params but preserve organizerEmail in ref
-      const orgEmail = organizerEmailRef.current || searchParams.get('organizerEmail') || ''
-      if (!organizerEmailRef.current && orgEmail) organizerEmailRef.current = orgEmail
+      // Clean URL params
       router.replace('/email-verification')
-
-      if (orgEmail) {
-        const searchQuery = `from:${orgEmail}`
-        setKeyword(searchQuery)
-        handleSearchGmail(searchQuery)
-      } else {
-        handleFetchRecent(userId)
+      // Load stored emails
+      const stored = getSyncedEmails(userId)
+      if (stored.length > 0) {
+        setEmails(stored)
+        setLastSync(new Date().toISOString())
       }
     }
   }, [searchParams, userId, router])
@@ -87,22 +68,7 @@ function EmailVerificationContent() {
   }, [searchParams])
 
   useEffect(() => {
-    if (step === 'inbox') {
-      if (useGmail && userId) {
-        if (organizerEmailRef.current) {
-          const searchQuery = `from:${organizerEmailRef.current}`
-          setKeyword(searchQuery)
-          handleSearchGmail(searchQuery)
-          localStorage.removeItem('pending_organizer_email')
-          organizerEmailRef.current = ''
-          router.replace('/email-verification')
-        } else {
-          handleFetchRecent(userId)
-        }
-      } else if (user?.email) {
-        fetchInternalEmails(user.email)
-      }
-    }
+    if (step === 'inbox' && !useGmail && user?.email) fetchInternalEmails(user.email)
   }, [step, useGmail, user])
 
   // Auto incremental sync every 30 seconds when Gmail is connected
@@ -145,12 +111,7 @@ function EmailVerificationContent() {
   }
 
   const handleGoogleSignIn = () => setStep('permissions')
-  const handleAllowAccess = () => {
-    if (organizerEmailRef.current) {
-      localStorage.setItem('pending_organizer_email', organizerEmailRef.current)
-    }
-    window.location.href = '/api/auth/gmail'
-  }
+  const handleAllowAccess = () => { window.location.href = '/api/auth/gmail' }
   const handleDeny = () => setStep('signin')
 
   const handleSkipGmail = () => {
@@ -159,12 +120,11 @@ function EmailVerificationContent() {
     if (user?.email) fetchInternalEmails(user.email)
   }
 
-  const handleSearchGmail = async (query?: string) => {
-    const searchQuery = query || keyword.trim()
-    if (!searchQuery) return
+  const handleSearchGmail = async () => {
+    if (!keyword.trim()) return
     setGmailSearching(true)
     try {
-      const res = await fetch(`/api/gmail/search?userId=${encodeURIComponent(userId)}&keyword=${encodeURIComponent(searchQuery)}`)
+      const res = await fetch(`/api/gmail/search?userId=${encodeURIComponent(userId)}&keyword=${encodeURIComponent(keyword.trim())}`)
       if (res.status === 401) { setStep('signin'); return }
       const json = await res.json()
       const fetched = json.data?.emails || []
@@ -179,20 +139,6 @@ function EmailVerificationContent() {
       setGmailSearching(false)
     }
   }
-
-  const handleFetchRecent = useCallback(async (uid?: string) => {
-    const targetUid = uid || userId
-    if (!targetUid) return
-    setLoading(true)
-    try {
-      const recent = await fetchRecentEmails(targetUid, 30)
-      if (recent.length > 0) {
-        setEmails(recent)
-        setSyncedEmails(targetUid, recent)
-        setLastSync(new Date().toISOString())
-      }
-    } catch { /* ignore */ } finally { setLoading(false) }
-  }, [userId])
 
   const handleSync = useCallback(async () => {
     if (!userId || syncing) return
@@ -372,14 +318,8 @@ function EmailVerificationContent() {
               <div className="flex items-center justify-between px-4 py-2 bg-gray-50 rounded-xl border border-gray-200">
                 <div className="flex items-center gap-2 text-xs text-gray-500">
                   <RefreshCw className={`w-3.5 h-3.5 ${syncing ? 'animate-spin text-accent' : ''}`} />
-                  {syncing ? 'Syncing...' : loading ? 'Fetching inbox...' : lastSync ? `Last sync: ${new Date(lastSync).toLocaleTimeString()}` : 'Auto-sync every 30s'}
+                  {syncing ? 'Syncing...' : lastSync ? `Last sync: ${new Date(lastSync).toLocaleTimeString()}` : 'Auto-sync every 30s'}
                 </div>
-                <button onClick={() => handleFetchRecent()} disabled={loading}
-                  className="text-xs font-medium text-accent hover:text-accent/80 disabled:opacity-50"
-                >
-                  Fetch Inbox
-                </button>
-                <span className="text-gray-300">|</span>
                 <button onClick={handleSync} disabled={syncing}
                   className="text-xs font-medium text-accent hover:text-accent/80 disabled:opacity-50"
                 >
@@ -410,11 +350,11 @@ function EmailVerificationContent() {
                   </button>
                 </div>
 
-                {(gmailSearching || (loading && useGmail)) && (
+                {gmailSearching && (
                   <div className="px-4 pb-4">
                     <div className="flex items-center gap-3 p-4 bg-blue-50 border border-blue-200 rounded-xl">
                       <div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
-                      <p className="text-sm text-blue-700">{loading ? 'Fetching your recent inbox...' : 'Searching your Gmail inbox...'}</p>
+                      <p className="text-sm text-blue-700">Searching your Gmail inbox...</p>
                     </div>
                   </div>
                 )}
@@ -459,7 +399,7 @@ function EmailVerificationContent() {
                     <div className="flex flex-col items-center justify-center py-10 text-gray-400">
                       {keyword ? <Search className="w-10 h-10 mb-2" /> : <Inbox className="w-10 h-10 mb-2" />}
                       <p className="text-sm">{keyword ? 'No matching emails' : 'No emails'}</p>
-                      <p className="text-xs mt-1">{keyword ? 'Try a different keyword' : useGmail ? 'Click "Fetch Inbox" to load your recent emails' : 'Register for a competition first'}</p>
+                      <p className="text-xs mt-1">{keyword ? 'Try a different keyword' : useGmail ? 'Enter a keyword to search' : 'Register for a competition first'}</p>
                     </div>
                   </div>
                 )}
