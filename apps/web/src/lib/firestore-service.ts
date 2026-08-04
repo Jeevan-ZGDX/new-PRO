@@ -3,7 +3,6 @@ const roleAccessData: Record<string, any> = {
   'advisor@cit.in': { email: 'advisor@cit.in', role: 'advisor', department: 'CSE', granted: true },
   'student@cit.in': { email: 'student@cit.in', role: 'student', department: 'CSE', granted: true },
   'admin@cit.in': { email: 'admin@cit.in', role: 'super_admin', department: 'Administration', granted: true },
-  'coe@cit.in': { email: 'coe@cit.in', role: 'coe', department: 'Examination', granted: true },
 }
 
 export async function checkUserAccess(email: string): Promise<any> {

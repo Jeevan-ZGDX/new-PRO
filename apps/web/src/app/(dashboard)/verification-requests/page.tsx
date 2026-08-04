@@ -184,7 +184,7 @@ export default function VerificationRequestsPage() {
   useEffect(() => {
     const u = getCurrentUser()
     setUser(u)
-    if (u && !['advisor', 'hod', 'coe', 'super_admin'].includes(u.role)) {
+    if (u && !['advisor', 'hod', 'super_admin'].includes(u.role)) {
       router.push('/dashboard')
     }
   }, [router])

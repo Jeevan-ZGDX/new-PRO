@@ -3,7 +3,7 @@
 import { useRouter } from 'next/navigation'
 import { Card, CardHeader, CardTitle, StatCard, Button, Badge } from '@comp-dash/design-system'
 import { useCoeDashboardStats, useCompetitions } from '@comp-dash/api'
-import { Trophy, Users, UserCheck, UserCog, Building2, Plus, Shield, Calendar, ExternalLink, Mail, Send } from 'lucide-react'
+import { Trophy, Users, UserCheck, UserCog, Building2, Plus, Calendar, ExternalLink, Mail, Send } from 'lucide-react'
 
 export default function COEDashboard() {
   const router = useRouter()
@@ -45,10 +45,6 @@ export default function COEDashboard() {
           <Button variant="primary" size="sm" onClick={() => router.push('/create-competition')}>
             <Plus className="w-4 h-4" />
             Create Competition
-          </Button>
-          <Button variant="outline" size="sm" onClick={() => router.push('/role-access')}>
-            <Shield className="w-4 h-4" />
-            Role Access
           </Button>
         </div>
       </div>

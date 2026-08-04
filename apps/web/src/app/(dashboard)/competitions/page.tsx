@@ -53,7 +53,7 @@ export default function CompetitionsPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-[#F0F6FC]">{t('sidebar.competitions')}</h1>
-          <p className="text-gray-500 dark:text-[#8B949E] mt-1">Browse competitions from across India</p>
+          <p className="text-gray-500 dark:text-[#8B949E] mt-1">Browse competitions from across World</p>
         </div>
         {realtime && (
           <div className="flex items-center gap-1.5 px-3 py-1.5 bg-green-50 dark:bg-green-950/40 border border-green-200 dark:border-green-800 rounded-full text-xs text-green-700 dark:text-green-400">
@@ -153,6 +153,14 @@ export default function CompetitionsPage() {
                       <p className="text-sm font-bold text-accent dark:text-[#38BDF8]">{comp.prizePool || 'N/A'}</p>
                     </div>
                     <div className="flex items-center gap-2">
+                      {comp.registrationUrl && (
+                        <a href={comp.registrationUrl} target="_blank" rel="noopener noreferrer"
+                          onClick={(e) => e.stopPropagation()}
+                          className="flex items-center gap-1 px-3 py-1.5 bg-accent text-white rounded-lg text-xs font-medium hover:bg-accent/90 transition-colors"
+                        >
+                          Register Now
+                        </a>
+                      )}
                       {user?.role === 'super_admin' && (
                         <button onClick={(e) => { e.stopPropagation(); router.push(`/create-competition?edit=${comp.id}`) }}
                           className="flex items-center gap-1 px-2.5 py-1.5 bg-gray-50 dark:bg-[#0D1117] border border-gray-200 dark:border-[#30363D] rounded-lg text-xs font-medium text-gray-500 dark:text-[#8B949E] hover:text-accent dark:hover:text-[#38BDF8] transition-colors"
