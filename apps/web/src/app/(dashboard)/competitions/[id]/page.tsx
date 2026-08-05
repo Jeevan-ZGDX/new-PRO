@@ -3,12 +3,13 @@
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { useState, useEffect, Suspense } from 'react'
 import { Card, Badge, Button } from '@comp-dash/design-system'
-import { useCompetition } from '@comp-dash/api'
+import { useCompetition, useAdvisorCompetitionStats } from '@comp-dash/api'
 import { getCurrentUser } from '@/lib/auth'
 import { 
   Calendar, MapPin, Users, Clock, Trophy, ArrowLeft, ExternalLink, 
   Globe, Building2, Target, Pencil, Mail, CheckCircle, AlertCircle, 
-  Loader2, MailCheck, Shield, Sparkles, ChevronDown, ChevronUp, Info
+  Loader2, MailCheck, Shield, Sparkles, ChevronDown, ChevronUp, Info,
+  Download, UserX
 } from 'lucide-react'
 
 const categoryGradients: Record<string, string> = {
@@ -79,6 +80,7 @@ function CompetitionDetailContent() {
   const isOpen = deadline ? deadline > new Date() : true
   const daysLeft = deadline ? Math.ceil((deadline.getTime() - Date.now()) / (1000 * 60 * 60 * 24)) : null
   const hasRegistrationLink = comp.registrationLink || comp.registrationUrl
+  const { data: advisorStats, isLoading: statsLoading } = useAdvisorCompetitionStats(comp?.id)
 
   const handleRegisterNow = () => {
     const url = comp.registrationLink || comp.registrationUrl
@@ -308,6 +310,83 @@ function CompetitionDetailContent() {
             </div>
           </div>
         </div>
+
+        {user?.role === 'advisor' && (
+          <div className="mt-8 pt-6 border-t border-gray-100 dark:border-[#30363D]">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-[#F0F6FC] flex items-center gap-2">
+                <Users className="w-5 h-5 text-accent dark:text-[#38BDF8]" />
+                Student Applications Report
+              </h2>
+              <Button
+                onClick={() => router.push(`/competitions/${comp.id}/report`)}
+                variant="outline"
+                size="sm"
+                className="flex items-center gap-2"
+              >
+                <Download className="w-4 h-4" />
+                Download Report
+              </Button>
+            </div>
+            {statsLoading ? (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                {Array.from({ length: 3 }).map((_, i) => (
+                  <Card key={i} className="p-5">
+                    <div className="flex items-start gap-3">
+                      <div className="w-10 h-10 rounded-lg bg-gray-100 dark:bg-[#161B22] animate-pulse" />
+                      <div className="flex-1">
+                        <div className="h-4 w-24 bg-gray-100 dark:bg-[#161B22] rounded animate-pulse mb-2" />
+                        <div className="h-6 w-12 bg-gray-100 dark:bg-[#161B22] rounded animate-pulse" />
+                      </div>
+                    </div>
+                  </Card>
+                ))}
+              </div>
+            ) : advisorStats ? (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                <Card className="p-5">
+                  <div className="flex items-start gap-3">
+                    <div className="w-10 h-10 rounded-lg bg-blue-50 dark:bg-blue-950/50 flex items-center justify-center flex-shrink-0">
+                      <Users className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-500 dark:text-[#8B949E] mb-1">Total Students</p>
+                      <p className="text-2xl font-bold text-gray-900 dark:text-[#F0F6FC]">
+                        {advisorStats.totalStudents || 0}
+                      </p>
+                    </div>
+                  </div>
+                </Card>
+                <Card className="p-5">
+                  <div className="flex items-start gap-3">
+                    <div className="w-10 h-10 rounded-lg bg-green-50 dark:bg-green-950/50 flex items-center justify-center flex-shrink-0">
+                      <CheckCircle className="w-5 h-5 text-green-600 dark:text-green-400" />
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-500 dark:text-[#8B949E] mb-1">Applied Students</p>
+                      <p className="text-2xl font-bold text-gray-900 dark:text-[#F0F6FC]">
+                        {advisorStats.appliedStudents || 0}
+                      </p>
+                    </div>
+                  </div>
+                </Card>
+                <Card className="p-5">
+                  <div className="flex items-start gap-3">
+                    <div className="w-10 h-10 rounded-lg bg-red-50 dark:bg-red-950/50 flex items-center justify-center flex-shrink-0">
+                      <UserX className="w-5 h-5 text-red-600 dark:text-red-400" />
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-500 dark:text-[#8B949E] mb-1">Not Applied</p>
+                      <p className="text-2xl font-bold text-gray-900 dark:text-[#F0F6FC]">
+                        {advisorStats.unregisteredStudents || 0}
+                      </p>
+                    </div>
+                  </div>
+                </Card>
+              </div>
+            ) : null}
+          </div>
+        )}
       </div>
     </div>
   )

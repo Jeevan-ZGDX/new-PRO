@@ -162,6 +162,25 @@ export function useCompetitionDashboard(id: string) {
   })
 }
 
+export function useAdvisorCompetitionStats(competitionId?: string) {
+  return useQuery({
+    queryKey: ['advisor', 'competition', competitionId, 'stats'],
+    queryFn: async () => {
+      if (!competitionId) return null
+      const response = await apiClient.get<any>(`/advisor/competitions/${competitionId}/stats`)
+      return {
+        totalStudents: response.totalStudents || 0,
+        appliedStudents: response.appliedStudents || 0,
+        unregisteredStudents: response.unregisteredStudents || 0,
+        registrationsByDepartment: response.registrationsByDepartment || [],
+        studentsWithDetails: response.studentsWithDetails || [],
+      }
+    },
+    enabled: !!competitionId,
+    staleTime: 5 * 60 * 1000,
+  })
+}
+
 export function useAdvisorDashboardStats() {
   return useQuery({
     queryKey: ['advisor', 'dashboard', 'stats'],
