@@ -97,7 +97,7 @@ export default function WinnersPage() {
                 ))
               ) : data?.data && data.data.length > 0 ? (
                 data.data.map((winner: any) => (
-                  <tr key={winner.id} className="border-b border-gray-50 hover:bg-gray-50/50 transition-colors">
+                  <tr key={winner.id} className="border-b border-gray-50 hover:cursor-pointer transition-colors">
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
                         <Avatar name={winner.studentName} size="sm" />
