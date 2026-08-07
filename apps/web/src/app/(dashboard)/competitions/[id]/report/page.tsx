@@ -51,10 +51,10 @@ export default function CompetitionReportPage() {
   return (
     <div className="space-y-6 max-w-4xl mx-auto">
       <div className="flex items-center gap-4">
-        <button onClick={() => router.back()} className="flex items-center gap-1.5 text-sm text-gray-500 dark:text-[#8B949E] hover:text-gray-700 dark:hover:text-[#F0F6FC] transition-colors">
+        <button onClick={() => router.back()} className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700 transition-colors">
           <ArrowLeft className="w-4 h-4" /> Back
         </button>
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-[#F0F6FC]">Competition Report</h1>
+        <h1 className="text-2xl font-bold text-gray-900">Competition Report</h1>
       </div>
 
       {user?.role === 'advisor' && (
@@ -71,34 +71,34 @@ export default function CompetitionReportPage() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <Card className="p-5">
               <div className="flex items-start gap-3">
-                <div className="w-10 h-10 rounded-lg bg-blue-50 dark:bg-blue-950/50 flex items-center justify-center flex-shrink-0">
-                  <Users className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                <div className="w-10 h-10 rounded-lg bg-blue-50 flex items-center justify-center flex-shrink-0">
+                  <Users className="w-5 h-5 text-blue-600" />
                 </div>
                 <div>
-                  <p className="text-sm text-gray-500 dark:text-[#8B949E] mb-1">Total Students</p>
-                  <p className="text-2xl font-bold text-gray-900 dark:text-[#F0F6FC]">{stats.totalStudents || 0}</p>
+                  <p className="text-sm text-gray-500 mb-1">Total Students</p>
+                  <p className="text-2xl font-bold text-gray-900">{stats.totalStudents || 0}</p>
                 </div>
               </div>
             </Card>
             <Card className="p-5">
               <div className="flex items-start gap-3">
-                <div className="w-10 h-10 rounded-lg bg-green-50 dark:bg-green-950/50 flex items-center justify-center flex-shrink-0">
-                  <CheckCircle className="w-5 h-5 text-green-600 dark:text-green-400" />
+                <div className="w-10 h-10 rounded-lg bg-green-50 flex items-center justify-center flex-shrink-0">
+                  <CheckCircle className="w-5 h-5 text-green-600" />
                 </div>
                 <div>
-                  <p className="text-sm text-gray-500 dark:text-[#8B949E] mb-1">Applied Students</p>
-                  <p className="text-2xl font-bold text-gray-900 dark:text-[#F0F6FC]">{stats.appliedStudents || 0}</p>
+                  <p className="text-sm text-gray-500 mb-1">Applied Students</p>
+                  <p className="text-2xl font-bold text-gray-900">{stats.appliedStudents || 0}</p>
                 </div>
               </div>
             </Card>
             <Card className="p-5">
               <div className="flex items-start gap-3">
-                <div className="w-10 h-10 rounded-lg bg-red-50 dark:bg-red-950/50 flex items-center justify-center flex-shrink-0">
-                  <UserX className="w-5 h-5 text-red-600 dark:text-red-400" />
+                <div className="w-10 h-10 rounded-lg bg-red-50 flex items-center justify-center flex-shrink-0">
+                  <UserX className="w-5 h-5 text-red-600" />
                 </div>
                 <div>
-                  <p className="text-sm text-gray-500 dark:text-[#8B949E] mb-1">Not Applied</p>
-                  <p className="text-2xl font-bold text-gray-900 dark:text-[#F0F6FC]">{stats.unregisteredStudents || 0}</p>
+                  <p className="text-sm text-gray-500 mb-1">Not Applied</p>
+                  <p className="text-2xl font-bold text-gray-900">{stats.unregisteredStudents || 0}</p>
                 </div>
               </div>
             </Card>

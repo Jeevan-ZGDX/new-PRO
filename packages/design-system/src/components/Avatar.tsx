@@ -3,7 +3,7 @@ import { cva, type VariantProps } from 'class-variance-authority'
 import { cn } from '../utils/cn'
 
 const avatarVariants = cva(
-  'relative inline-flex items-center justify-center overflow-hidden rounded-full bg-gray-100 dark:bg-[#21262D] border dark:border-[#30363D]',
+  'relative inline-flex items-center justify-center overflow-hidden rounded-full bg-gray-100 border',
   {
     variants: {
       size: {
@@ -48,7 +48,7 @@ export function Avatar({ className, size, src, alt, name, status, ...props }: Av
             {...props}
           />
         ) : (
-          <span className="font-medium text-gray-500 dark:text-[#F0F6FC] select-none">
+          <span className="font-medium text-gray-500 select-none">
             {initials || '?'}
           </span>
         )}
@@ -56,7 +56,7 @@ export function Avatar({ className, size, src, alt, name, status, ...props }: Av
       {status && (
         <span
           className={cn(
-            'absolute bottom-0 right-0 block rounded-full ring-2 ring-white dark:ring-[#0D1117]',
+            'absolute bottom-0 right-0 block rounded-full ring-2 ring-white',
             status === 'online' && 'bg-success',
             status === 'offline' && 'bg-gray-400',
             status === 'away' && 'bg-warning',

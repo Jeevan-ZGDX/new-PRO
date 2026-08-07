@@ -17,7 +17,7 @@ export function FilterChip({ label, active = false, onPress, count, className }:
         'transition-all duration-200 whitespace-nowrap',
         active
           ? 'bg-accent text-white shadow-sm'
-          : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700',
+          : 'bg-gray-100 text-gray-600 hover:bg-gray-200',
         className
       )}
     >
@@ -26,7 +26,7 @@ export function FilterChip({ label, active = false, onPress, count, className }:
         <span
           className={cn(
             'text-xs',
-            active ? 'text-white/80' : 'text-gray-400 dark:text-gray-500'
+            active ? 'text-white/80' : 'text-gray-400'
           )}
         >
           ({count})

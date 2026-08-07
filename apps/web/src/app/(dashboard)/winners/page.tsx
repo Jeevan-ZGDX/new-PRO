@@ -58,7 +58,7 @@ export default function WinnersPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-[#F0F6FC]">{t('sidebar.winners')}</h1>
+        <h1 className="text-2xl font-bold text-gray-900">{t('sidebar.winners')}</h1>
         <div className="flex items-center gap-3">
           <Button variant="outline" size="sm" onClick={handleExport}>
             <Download className="w-4 h-4 mr-2" />
@@ -77,40 +77,40 @@ export default function WinnersPage() {
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
-              <tr className="border-b border-gray-100 dark:border-[#30363D]">
-                <th className="text-left text-xs font-medium text-gray-500 dark:text-[#8B949E] uppercase tracking-wider px-6 py-3">Student</th>
-                <th className="text-left text-xs font-medium text-gray-500 dark:text-[#8B949E] uppercase tracking-wider px-6 py-3">Competition</th>
-                <th className="text-left text-xs font-medium text-gray-500 dark:text-[#8B949E] uppercase tracking-wider px-6 py-3">Department</th>
-                <th className="text-left text-xs font-medium text-gray-500 dark:text-[#8B949E] uppercase tracking-wider px-6 py-3">Position</th>
-                <th className="text-left text-xs font-medium text-gray-500 dark:text-[#8B949E] uppercase tracking-wider px-6 py-3">Prize</th>
-                <th className="text-left text-xs font-medium text-gray-500 dark:text-[#8B949E] uppercase tracking-wider px-6 py-3">Date</th>
+              <tr className="border-b border-gray-100">
+                <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider px-6 py-3">Student</th>
+                <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider px-6 py-3">Competition</th>
+                <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider px-6 py-3">Department</th>
+                <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider px-6 py-3">Position</th>
+                <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider px-6 py-3">Prize</th>
+                <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider px-6 py-3">Date</th>
               </tr>
             </thead>
             <tbody>
               {isLoading ? (
                 Array.from({ length: 5 }).map((_, i) => (
-                  <tr key={i} className="border-b border-gray-50 dark:border-[#30363D]">
+                  <tr key={i} className="border-b border-gray-50">
                     <td colSpan={6} className="px-6 py-4">
-                      <div className="h-10 bg-gray-100 dark:bg-[#161B22] rounded animate-pulse" />
+                      <div className="h-10 bg-gray-100 rounded animate-pulse" />
                     </td>
                   </tr>
                 ))
               ) : data?.data && data.data.length > 0 ? (
                 data.data.map((winner: any) => (
-                  <tr key={winner.id} className="border-b border-gray-50 dark:border-[#30363D] hover:bg-gray-50/50 hover:dark:bg-[#161B22]/50 transition-colors">
+                  <tr key={winner.id} className="border-b border-gray-50 hover:bg-gray-50/50 transition-colors">
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
                         <Avatar name={winner.studentName} size="sm" />
                         <div>
-                          <p className="text-sm font-medium text-gray-900 dark:text-[#F0F6FC]">{winner.studentName}</p>
-                          <p className="text-xs text-gray-500 dark:text-[#8B949E]">{winner.email}</p>
+                          <p className="text-sm font-medium text-gray-900">{winner.studentName}</p>
+                          <p className="text-xs text-gray-500">{winner.email}</p>
                         </div>
                       </div>
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-2">
                         <Trophy className="w-4 h-4 text-yellow-500" />
-                        <span className="text-sm text-gray-900 dark:text-[#F0F6FC]">{winner.competition}</span>
+                        <span className="text-sm text-gray-900">{winner.competition}</span>
                       </div>
                     </td>
                     <td className="px-6 py-4">
@@ -119,15 +119,15 @@ export default function WinnersPage() {
                     <td className="px-6 py-4">
                       <Badge variant={positionColors[winner.position] || 'primary'} size="sm">{winner.position}</Badge>
                     </td>
-                    <td className="px-6 py-4 text-sm font-medium text-gray-900 dark:text-[#F0F6FC]">{winner.prize}</td>
-                    <td className="px-6 py-4 text-sm text-gray-600 dark:text-[#8B949E]">
+                    <td className="px-6 py-4 text-sm font-medium text-gray-900">{winner.prize}</td>
+                    <td className="px-6 py-4 text-sm text-gray-600">
                       {new Date(winner.date).toLocaleDateString()}
                     </td>
                   </tr>
                 ))
               ) : (
                 <tr>
-                  <td colSpan={6} className="text-center py-12 text-gray-500 dark:text-[#8B949E]">
+                  <td colSpan={6} className="text-center py-12 text-gray-500">
                     No winners found
                   </td>
                 </tr>
@@ -137,8 +137,8 @@ export default function WinnersPage() {
         </div>
 
         {data && data.total > 10 && (
-          <div className="flex items-center justify-between px-6 py-4 border-t border-gray-100 dark:border-[#30363D]">
-            <p className="text-sm text-gray-500 dark:text-[#8B949E]">
+          <div className="flex items-center justify-between px-6 py-4 border-t border-gray-100">
+            <p className="text-sm text-gray-500">
               Showing {((page - 1) * 10) + 1} to {Math.min(page * 10, data.total)} of {data.total}
             </p>
             <div className="flex gap-2">
@@ -151,44 +151,44 @@ export default function WinnersPage() {
 
       {showModal && (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4" onClick={() => !submitting && setShowModal(false)}>
-          <div className="bg-white dark:bg-[#161B22] border dark:border-[#30363D] rounded-2xl w-full max-w-lg p-6 shadow-xl" onClick={e => e.stopPropagation()}>
+          <div className="bg-white border rounded-2xl w-full max-w-lg p-6 shadow-xl" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-lg font-semibold text-gray-900 dark:text-[#F0F6FC]">Add New Winner</h2>
-              <button onClick={() => setShowModal(false)} className="p-1 hover:bg-gray-100 dark:hover:bg-[#21262D] rounded-lg transition-colors">
-                <X className="w-5 h-5 text-gray-400 dark:text-[#8B949E]" />
+              <h2 className="text-lg font-semibold text-gray-900">Add New Winner</h2>
+              <button onClick={() => setShowModal(false)} className="p-1 hover:bg-gray-100 rounded-lg transition-colors">
+                <X className="w-5 h-5 text-gray-400" />
               </button>
             </div>
 
             {success ? (
               <div className="text-center py-8">
                 <CheckCircle className="w-12 h-12 text-green-500 mx-auto mb-3" />
-                <p className="text-base font-semibold text-gray-900 dark:text-[#F0F6FC]">Winner Added Successfully!</p>
+                <p className="text-base font-semibold text-gray-900">Winner Added Successfully!</p>
               </div>
             ) : (
               <div className="space-y-4">
                 <div>
-                  <label className="block text-xs font-medium text-gray-700 dark:text-[#F0F6FC] mb-1">Student Name</label>
-                  <input type="text" value={form.studentName} onChange={e => setForm({ ...form, studentName: e.target.value })} className="w-full px-3 py-2 bg-white dark:bg-[#0D1117] border border-gray-200 dark:border-[#30363D] rounded-xl text-sm text-gray-900 dark:text-[#F0F6FC]" />
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Student Name</label>
+                  <input type="text" value={form.studentName} onChange={e => setForm({ ...form, studentName: e.target.value })} className="w-full px-3 py-2 bg-white border border-gray-200 rounded-xl text-sm text-gray-900" />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-gray-700 dark:text-[#F0F6FC] mb-1">Email</label>
-                  <input type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} className="w-full px-3 py-2 bg-white dark:bg-[#0D1117] border border-gray-200 dark:border-[#30363D] rounded-xl text-sm text-gray-900 dark:text-[#F0F6FC]" />
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Email</label>
+                  <input type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} className="w-full px-3 py-2 bg-white border border-gray-200 rounded-xl text-sm text-gray-900" />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-gray-700 dark:text-[#F0F6FC] mb-1">Competition</label>
-                  <input type="text" value={form.competition} onChange={e => setForm({ ...form, competition: e.target.value })} className="w-full px-3 py-2 bg-white dark:bg-[#0D1117] border border-gray-200 dark:border-[#30363D] rounded-xl text-sm text-gray-900 dark:text-[#F0F6FC]" />
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Competition</label>
+                  <input type="text" value={form.competition} onChange={e => setForm({ ...form, competition: e.target.value })} className="w-full px-3 py-2 bg-white border border-gray-200 rounded-xl text-sm text-gray-900" />
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-xs font-medium text-gray-700 dark:text-[#F0F6FC] mb-1">Position</label>
-                    <input type="text" placeholder="1st, 2nd, 3rd" value={form.position} onChange={e => setForm({ ...form, position: e.target.value })} className="w-full px-3 py-2 bg-white dark:bg-[#0D1117] border border-gray-200 dark:border-[#30363D] rounded-xl text-sm text-gray-900 dark:text-[#F0F6FC]" />
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Position</label>
+                    <input type="text" placeholder="1st, 2nd, 3rd" value={form.position} onChange={e => setForm({ ...form, position: e.target.value })} className="w-full px-3 py-2 bg-white border border-gray-200 rounded-xl text-sm text-gray-900" />
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-gray-700 dark:text-[#F0F6FC] mb-1">Prize</label>
-                    <input type="text" placeholder="$500 / Trophy" value={form.prize} onChange={e => setForm({ ...form, prize: e.target.value })} className="w-full px-3 py-2 bg-white dark:bg-[#0D1117] border border-gray-200 dark:border-[#30363D] rounded-xl text-sm text-gray-900 dark:text-[#F0F6FC]" />
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Prize</label>
+                    <input type="text" placeholder="$500 / Trophy" value={form.prize} onChange={e => setForm({ ...form, prize: e.target.value })} className="w-full px-3 py-2 bg-white border border-gray-200 rounded-xl text-sm text-gray-900" />
                   </div>
                 </div>
-                <div className="flex justify-end gap-3 pt-4 border-t border-gray-100 dark:border-[#30363D]">
+                <div className="flex justify-end gap-3 pt-4 border-t border-gray-100">
                   <Button variant="outline" size="sm" onClick={() => setShowModal(false)}>Cancel</Button>
                   <Button variant="primary" size="sm" onClick={handleSubmit} isLoading={submitting}>Add Winner</Button>
                 </div>

@@ -276,7 +276,7 @@ function EmailVerificationContent() {
   return (
     <div className="space-y-6 max-w-3xl mx-auto">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-[#F0F6FC]">Email Verification</h1>
+        <h1 className="text-2xl font-bold text-gray-900">Email Verification</h1>
         <p className="text-gray-500 mt-1">Fetch email proof from your inbox — advisors can view submitted proofs</p>
       </div>
 

@@ -14,7 +14,7 @@ export default function DashboardLayout({
 
   return (
     <Providers>
-      <div className="min-h-screen bg-gray-50 dark:bg-[#0D1117] text-gray-900 dark:text-[#F0F6FC] transition-colors duration-200">
+      <div className="min-h-screen bg-gray-50 text-gray-900 transition-colors duration-200">
         <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
         <div className={`${sidebarOpen ? 'ml-64' : 'ml-0'} transition-all duration-300`}>
           <DashboardHeader onMenuToggle={() => setSidebarOpen(!sidebarOpen)} />

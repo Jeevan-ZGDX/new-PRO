@@ -10,19 +10,17 @@ import { exportToCSV } from '@/lib/export-csv'
 import {
   LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts'
-import { useTheme } from '@/components/providers/ThemeProvider'
 
 export default function AnalyticsPage() {
   const { t } = useTranslation()
-  const { isDark } = useTheme()
   const { data: stats, isLoading } = useAdminAnalytics()
   const { data: leaderboard } = useLeaderboardOverall()
 
-  const gridStroke = isDark ? '#374151' : '#E5E7EB'
-  const axisColor = isDark ? '#9CA3AF' : '#6B7280'
-  const tooltipBg = isDark ? '#1F2937' : '#FFFFFF'
-  const tooltipBorder = isDark ? '#374151' : '#E5E7EB'
-  const tooltipText = isDark ? '#F3F4F6' : '#111827'
+  const gridStroke = '#E5E7EB'
+  const axisColor = '#6B7280'
+  const tooltipBg = '#FFFFFF'
+  const tooltipBorder = '#E5E7EB'
+  const tooltipText = '#111827'
 
   const classData = (leaderboard || []).reduce<Record<string, { section: string; points: number; wins: number; students: Set<string> }>>((acc, e) => {
     const section = e.section || 'Unknown'
@@ -56,7 +54,7 @@ export default function AnalyticsPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">{t('sidebar.analytics')}</h1>
+        <h1 className="text-2xl font-bold text-gray-900">{t('sidebar.analytics')}</h1>
         <Button variant="outline" size="sm" onClick={handleExport}>
           <Download className="w-4 h-4 mr-2" />
           Export
@@ -128,10 +126,10 @@ export default function AnalyticsPage() {
                 </LineChart>
               </ResponsiveContainer>
             ) : (
-              <div className="h-full flex items-center justify-center bg-gray-50 dark:bg-gray-800/50 rounded-xl">
+              <div className="h-full flex items-center justify-center bg-gray-50 rounded-xl">
                 <div className="text-center">
-                  <BarChart3 className="w-12 h-12 text-gray-300 dark:text-gray-600 mx-auto mb-2" />
-                  <p className="text-sm text-gray-500 dark:text-gray-400">No data available</p>
+                  <BarChart3 className="w-12 h-12 text-gray-300 mx-auto mb-2" />
+                  <p className="text-sm text-gray-500">No data available</p>
                 </div>
               </div>
             )}
@@ -163,10 +161,10 @@ export default function AnalyticsPage() {
                 </BarChart>
               </ResponsiveContainer>
             ) : (
-              <div className="h-full flex items-center justify-center bg-gray-50 dark:bg-gray-800/50 rounded-xl">
+              <div className="h-full flex items-center justify-center bg-gray-50 rounded-xl">
                 <div className="text-center">
-                  <BarChart3 className="w-12 h-12 text-gray-300 dark:text-gray-600 mx-auto mb-2" />
-                  <p className="text-sm text-gray-500 dark:text-gray-400">No data available</p>
+                  <BarChart3 className="w-12 h-12 text-gray-300 mx-auto mb-2" />
+                  <p className="text-sm text-gray-500">No data available</p>
                 </div>
               </div>
             )}
@@ -200,10 +198,10 @@ export default function AnalyticsPage() {
               </LineChart>
             </ResponsiveContainer>
           ) : (
-            <div className="h-full flex items-center justify-center bg-gray-50 dark:bg-gray-800/50 rounded-xl">
+            <div className="h-full flex items-center justify-center bg-gray-50 rounded-xl">
               <div className="text-center">
-                <BarChart3 className="w-12 h-12 text-gray-300 dark:text-gray-600 mx-auto mb-2" />
-                <p className="text-sm text-gray-500 dark:text-gray-400">No data available</p>
+                <BarChart3 className="w-12 h-12 text-gray-300 mx-auto mb-2" />
+                <p className="text-sm text-gray-500">No data available</p>
               </div>
             </div>
           )}

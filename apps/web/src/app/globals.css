@@ -15,11 +15,6 @@ body {
   background-color: #F9FAFB;
 }
 
-.dark body {
-  background-color: #0D1117;
-  color: #F0F6FC;
-}
-
 /* Custom scrollbar */
 ::-webkit-scrollbar {
   width: 6px;
@@ -35,16 +30,8 @@ body {
   border-radius: 3px;
 }
 
-.dark ::-webkit-scrollbar-thumb {
-  background: #30363D;
-}
-
 ::-webkit-scrollbar-thumb:hover {
   background: #9CA3AF;
-}
-
-.dark ::-webkit-scrollbar-thumb:hover {
-  background: #484F58;
 }
 
 /* Table styles */
@@ -60,40 +47,20 @@ body {
   @apply text-left text-xs font-medium text-gray-500 uppercase tracking-wider px-6 py-3;
 }
 
-.dark .table-container th {
-  @apply text-[#8B949E];
-}
-
 .table-container td {
   @apply px-6 py-4 text-sm text-gray-900;
-}
-
-.dark .table-container td {
-  @apply text-[#F0F6FC];
 }
 
 .table-container tr {
   @apply border-b border-gray-100;
 }
 
-.dark .table-container tr {
-  @apply border-b border-[#30363D];
-}
-
 .table-container tr:hover {
   @apply bg-gray-50;
 }
 
-.dark .table-container tr:hover {
-  @apply bg-[#161B22];
-}
-
 .table-container tr:nth-child(even) {
   @apply bg-gray-50/50;
-}
-
-.dark .table-container tr:nth-child(even) {
-  @apply bg-[#161B22]/50;
 }
 
 /* No scrollbar utility */
