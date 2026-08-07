@@ -3,15 +3,15 @@ import { cva, type VariantProps } from 'class-variance-authority'
 import { cn } from '../utils/cn'
 
 const cardVariants = cva(
-  'bg-white text-gray-900 rounded-2xl transition-all duration-200',
+  'bg-white text-gray-900 rounded-2xl transition-all duration-200 dark:bg-obsidian-surface dark:text-ink-primary',
   {
     variants: {
       variant: {
-        default: 'border border-gray-100 shadow-card',
+        default: 'border border-gray-100 shadow-card dark:border-obsidian-border',
         elevated: 'shadow-lg',
-        outlined: 'border border-gray-200',
+        outlined: 'border border-gray-200 dark:border-obsidian-border',
         ghost: 'border-none shadow-none',
-        interactive: 'border border-gray-100 shadow-card hover:shadow-cardHover hover:border-gray-200 cursor-pointer active:scale-[0.99]',
+        interactive: 'border border-gray-100 shadow-card hover:shadow-cardHover hover:border-gray-200 cursor-pointer active:scale-[0.99] dark:border-obsidian-border dark:hover:border-obsidian-hover',
       },
       padding: {
         none: 'p-0',
@@ -55,14 +55,14 @@ CardHeader.displayName = 'CardHeader'
 
 export const CardTitle = forwardRef<HTMLHeadingElement, HTMLAttributes<HTMLHeadingElement>>(
   ({ className, ...props }, ref) => (
-    <h3 ref={ref} className={cn('text-lg font-semibold text-gray-900', className)} {...props} />
+    <h3 ref={ref} className={cn('text-lg font-semibold text-gray-900 dark:text-ink-primary', className)} {...props} />
   )
 )
 CardTitle.displayName = 'CardTitle'
 
 export const CardDescription = forwardRef<HTMLParagraphElement, HTMLAttributes<HTMLParagraphElement>>(
   ({ className, ...props }, ref) => (
-    <p ref={ref} className={cn('text-sm text-gray-500', className)} {...props} />
+    <p ref={ref} className={cn('text-sm text-gray-500 dark:text-ink-muted', className)} {...props} />
   )
 )
 CardDescription.displayName = 'CardDescription'

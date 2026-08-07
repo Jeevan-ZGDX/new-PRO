@@ -3,17 +3,17 @@ import { cva, type VariantProps } from 'class-variance-authority'
 import { cn } from '../utils/cn'
 
 const buttonVariants = cva(
-  'inline-flex items-center justify-center gap-2 rounded-2xl font-semibold transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none active:scale-[0.98]',
+  'inline-flex items-center justify-center gap-2 rounded-2xl font-semibold transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:focus-visible:ring-gemini/40 disabled:opacity-50 disabled:pointer-events-none active:scale-[0.98]',
   {
     variants: {
       variant: {
-        primary: 'bg-accent text-white hover:bg-accentHover shadow-sm hover:shadow-md',
-        secondary: 'bg-gray-100 text-gray-700 hover:bg-gray-200',
-        outline: 'border-2 border-gray-200 bg-transparent text-gray-700 hover:bg-gray-50',
-        ghost: 'text-gray-600 hover:bg-gray-100 hover:text-gray-900',
+        primary: 'bg-accent text-white hover:bg-accentHover shadow-sm hover:shadow-md dark:bg-striver dark:hover:bg-striver',
+        secondary: 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-obsidian-hover dark:text-ink-primary dark:hover:bg-obsidian-surface',
+        outline: 'border-2 border-gray-200 bg-transparent text-gray-700 hover:bg-gray-50 dark:border-obsidian-border dark:text-ink-primary dark:hover:bg-obsidian-hover',
+        ghost: 'text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-ink-muted dark:hover:bg-obsidian-hover dark:hover:text-ink-primary',
         danger: 'bg-error text-white hover:bg-errorDark',
         success: 'bg-success text-white hover:bg-successDark',
-        link: 'text-accent underline-offset-4 hover:underline p-0 h-auto',
+        link: 'text-accent underline-offset-4 hover:underline p-0 h-auto dark:text-striver',
       },
       size: {
         xs: 'h-8 px-3 text-xs rounded-xl',

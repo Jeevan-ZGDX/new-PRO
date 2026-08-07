@@ -18,14 +18,14 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
         {label && (
           <label
             htmlFor={inputId}
-            className="block text-sm font-medium text-gray-700 mb-1.5"
+            className="block text-sm font-medium text-gray-700 dark:text-ink-muted mb-1.5"
           >
             {label}
           </label>
         )}
         <div className="relative">
           {leftIcon && (
-            <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+            <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-obsidian-faint">
               {leftIcon}
             </div>
           )}
@@ -33,13 +33,13 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
             ref={ref}
             id={inputId}
             className={cn(
-              'w-full h-11 rounded-xl border bg-white px-4 text-base text-gray-900 placeholder:text-gray-400',
+              'w-full h-11 rounded-xl border bg-white px-4 text-base text-gray-900 placeholder:text-gray-400 dark:bg-obsidian-surface dark:border-obsidian-border dark:text-ink-primary dark:placeholder-obsidian-faint',
               'transition-all duration-200',
-              'focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-0',
-              'disabled:cursor-not-allowed disabled:opacity-50 disabled:bg-gray-50',
+              'focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-0 dark:focus:ring-gemini/30',
+              'disabled:cursor-not-allowed disabled:opacity-50 disabled:bg-gray-50 dark:disabled:bg-obsidian-canvas',
               error
                 ? 'border-error focus:ring-error'
-                : 'border-gray-200 hover:border-gray-300',
+                : 'border-gray-200 hover:border-gray-300 dark:border-obsidian-border dark:hover:border-obsidian-hover',
               leftIcon && 'pl-10',
               rightIcon && 'pr-10',
               className
@@ -47,7 +47,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
             {...props}
           />
           {rightIcon && (
-            <div className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">
+            <div className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-obsidian-faint">
               {rightIcon}
             </div>
           )}
@@ -55,7 +55,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
         {(error || helperText) && (
           <p className={cn(
             'mt-1.5 text-sm',
-            error ? 'text-error' : 'text-gray-500'
+            error ? 'text-error' : 'text-gray-500 dark:text-ink-muted'
           )}>
             {error || helperText}
           </p>
@@ -82,7 +82,7 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
         {label && (
           <label
             htmlFor={textareaId}
-            className="block text-sm font-medium text-gray-700 mb-1.5"
+            className="block text-sm font-medium text-gray-700 dark:text-ink-muted mb-1.5"
           >
             {label}
           </label>
@@ -91,13 +91,13 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
           ref={ref}
           id={textareaId}
           className={cn(
-            'w-full min-h-[100px] rounded-xl border bg-white px-4 py-3 text-base text-gray-900 placeholder:text-gray-400',
+            'w-full min-h-[100px] rounded-xl border bg-white px-4 py-3 text-base text-gray-900 placeholder:text-gray-400 dark:bg-obsidian-surface dark:border-obsidian-border dark:text-ink-primary dark:placeholder-obsidian-faint',
             'transition-all duration-200 resize-y',
-            'focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-0',
-            'disabled:cursor-not-allowed disabled:opacity-50 disabled:bg-gray-50',
+            'focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-0 dark:focus:ring-gemini/30',
+            'disabled:cursor-not-allowed disabled:opacity-50 disabled:bg-gray-50 dark:disabled:bg-obsidian-canvas',
             error
               ? 'border-error focus:ring-error'
-              : 'border-gray-200 hover:border-gray-300',
+              : 'border-gray-200 hover:border-gray-300 dark:border-obsidian-border dark:hover:border-obsidian-hover',
             className
           )}
           {...props}
@@ -105,7 +105,7 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
         {(error || helperText) && (
           <p className={cn(
             'mt-1.5 text-sm',
-            error ? 'text-error' : 'text-gray-500'
+            error ? 'text-error' : 'text-gray-500 dark:text-ink-muted'
           )}>
             {error || helperText}
           </p>

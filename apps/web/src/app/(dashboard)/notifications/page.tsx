@@ -43,9 +43,9 @@ export default function NotificationsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">{t('sidebar.notifications')}</h1>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-ink-primary">{t('sidebar.notifications')}</h1>
           {data && data.unreadCount > 0 && (
-            <p className="text-sm text-gray-500 mt-1">{data.unreadCount} unread</p>
+            <p className="text-sm text-gray-500 mt-1 dark:text-obsidian-faint">{data.unreadCount} unread</p>
           )}
         </div>
         <Button variant="outline" size="sm" onClick={handleMarkAllRead}>
@@ -60,10 +60,10 @@ export default function NotificationsPage() {
             {[1, 2, 3, 4, 5].map((i) => (
               <div key={i} className="p-4">
                 <div className="flex items-start gap-3">
-                  <div className="w-10 h-10 rounded-full bg-gray-100 animate-pulse" />
+                  <div className="w-10 h-10 rounded-full bg-gray-100 animate-pulse dark:bg-obsidian-hover" />
                   <div className="flex-1 space-y-2">
-                    <div className="h-4 bg-gray-100 rounded w-1/3 animate-pulse" />
-                    <div className="h-3 bg-gray-100 rounded w-2/3 animate-pulse" />
+                    <div className="h-4 bg-gray-100 rounded w-1/3 animate-pulse dark:bg-obsidian-hover" />
+                    <div className="h-3 bg-gray-100 rounded w-2/3 animate-pulse dark:bg-obsidian-hover" />
                   </div>
                 </div>
               </div>
@@ -75,7 +75,7 @@ export default function NotificationsPage() {
               <button
                 key={notification.id}
                 onClick={() => handleMarkRead(notification.id)}
-                className={`w-full text-left p-4 transition-colors hover:bg-gray-50 ${
+                className={`w-full text-left p-4 transition-colors hover:bg-gray-50 dark:hover:bg-obsidian-hover ${
                   !notification.isRead ? 'bg-accent/5' : ''
                 }`}
               >
@@ -86,18 +86,18 @@ export default function NotificationsPage() {
                     }`}
                   />
                   <div className="flex-1 min-w-0">
-                    <p className={`text-sm ${!notification.isRead ? 'font-semibold text-gray-900' : 'font-medium text-gray-700'}`}>
+                    <p className={`text-sm ${!notification.isRead ? 'font-semibold text-gray-900 dark:text-ink-primary' : 'font-medium text-gray-700 dark:text-ink-muted'}`}>
                       {notification.title}
                     </p>
-                    <p className="text-xs text-gray-500 mt-0.5">{notification.message}</p>
-                    <p className="text-[10px] text-gray-400 mt-1">{timeAgo(notification.createdAt)}</p>
+                    <p className="text-xs text-gray-500 mt-0.5 dark:text-obsidian-faint">{notification.message}</p>
+                    <p className="text-[10px] text-gray-400 mt-1 dark:text-obsidian-faint">{timeAgo(notification.createdAt)}</p>
                   </div>
                 </div>
               </button>
             ))}
           </div>
         ) : (
-          <div className="text-center py-12 text-gray-500">No notifications yet</div>
+          <div className="text-center py-12 text-gray-500 dark:text-obsidian-faint">No notifications yet</div>
         )}
       </Card>
     </div>

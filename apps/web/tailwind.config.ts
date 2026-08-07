@@ -1,14 +1,38 @@
 import type { Config } from 'tailwindcss'
 
 const config: Config = {
+  darkMode: 'class',
   content: [
     './src/pages/**/*.{js,ts,jsx,tsx,mdx}',
     './src/components/**/*.{js,ts,jsx,tsx,mdx}',
     './src/app/**/*.{js,ts,jsx,tsx,mdx}',
+    '../../packages/design-system/src/**/*.{ts,tsx}',
   ],
   theme: {
     extend: {
       colors: {
+        obsidian: {
+          canvas: '#131314',
+          surface: '#1E1F20',
+          hover: '#2A2B2D',
+          elevated: '#252627',
+          border: '#333537',
+          faint: '#6B7074',
+        },
+        ink: {
+          primary: '#FFFFFF',
+          muted: '#9AA0A6',
+        },
+        striver: {
+          DEFAULT: '#F97316',
+          hover: '#EA580C',
+        },
+        gemini: {
+          DEFAULT: '#8AB4F8',
+        },
+        uv: {
+          DEFAULT: '#C084FC',
+        },
         primary: {
           50: '#F5F3FF',
           100: '#EDE9FE',
@@ -73,6 +97,7 @@ const config: Config = {
         card: '0 2px 8px rgba(0, 0, 0, 0.06), 0 1px 3px rgba(0, 0, 0, 0.04)',
         cardHover: '0 8px 24px rgba(0, 0, 0, 0.08), 0 4px 12px rgba(0, 0, 0, 0.04)',
         elevated: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1)',
+        glow: '0 0 0 1px rgba(139, 180, 248, 0.15), 0 8px 30px rgba(0, 0, 0, 0.5)',
       },
       fontFamily: {
         sans: ['Inter', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],

@@ -157,8 +157,8 @@ export default function VerifiedStudentsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Verified Students</h1>
-          <p className="text-gray-500 mt-1">
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-ink-primary">Verified Students</h1>
+          <p className="text-gray-500 mt-1 dark:text-obsidian-faint">
             {user?.role === 'student'
               ? 'Your verified submissions with email proof metadata'
               : 'Students who have been verified with their submitted email proof metadata'}
@@ -178,15 +178,15 @@ export default function VerifiedStudentsPage() {
         <Card>
           <div className="p-4 text-center">
             <p className="text-2xl font-bold text-green-600">{verified.length}</p>
-            <p className="text-xs text-gray-500 mt-1">Total Verified</p>
+            <p className="text-xs text-gray-500 mt-1 dark:text-obsidian-faint">Total Verified</p>
           </div>
         </Card>
         <Card>
           <div className="p-4 text-center">
-            <p className="text-2xl font-bold text-gray-900">
+            <p className="text-2xl font-bold text-gray-900 dark:text-ink-primary">
               {new Set(verified.map(v => v.studentId)).size}
             </p>
-            <p className="text-xs text-gray-500 mt-1">Unique Students</p>
+            <p className="text-xs text-gray-500 mt-1 dark:text-obsidian-faint">Unique Students</p>
           </div>
         </Card>
         <Card>
@@ -194,7 +194,7 @@ export default function VerifiedStudentsPage() {
             <p className="text-2xl font-bold text-accent">
               {new Set(verified.map(v => v.competitionTitle)).size}
             </p>
-            <p className="text-xs text-gray-500 mt-1">Competitions Verified</p>
+            <p className="text-xs text-gray-500 mt-1 dark:text-obsidian-faint">Competitions Verified</p>
           </div>
         </Card>
       </div>
@@ -202,20 +202,20 @@ export default function VerifiedStudentsPage() {
       <div className="space-y-3">
         <div className="flex items-center gap-2">
           <button onClick={() => setShowFilterInput(!showFilterInput)}
-            className="flex items-center gap-1.5 px-3 py-2 bg-white border border-gray-200 rounded-xl text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors"
+            className="flex items-center gap-1.5 px-3 py-2 bg-white border border-gray-200 rounded-xl text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors dark:bg-obsidian-surface dark:border-obsidian-border dark:text-ink-muted dark:hover:bg-obsidian-hover"
           >
             <Filter className="w-4 h-4" />
             Filters {filterTags.length > 0 && `(${filterTags.length})`}
           </button>
           {filterTags.length > 0 && (
             <button onClick={clearAllFilters}
-              className="text-xs text-gray-400 hover:text-gray-600 underline"
+              className="text-xs text-gray-400 hover:text-gray-600 underline dark:text-obsidian-faint dark:hover:text-ink-muted"
             >
               Clear all
             </button>
           )}
           {filtered.length > 0 && (
-            <span className="text-xs text-gray-400">
+            <span className="text-xs text-gray-400 dark:text-obsidian-faint">
               {filtered.length} result{filtered.length !== 1 ? 's' : ''}
             </span>
           )}
@@ -224,7 +224,7 @@ export default function VerifiedStudentsPage() {
         {showFilterInput && (
           <div className="flex items-center gap-2 flex-wrap">
             <select value={filterType} onChange={e => setFilterType(e.target.value as any)}
-              className="px-3 py-2.5 bg-white border border-gray-200 rounded-xl text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent"
+              className="px-3 py-2.5 bg-white border border-gray-200 rounded-xl text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent dark:bg-obsidian-hover dark:border-obsidian-border dark:text-ink-primary"
             >
               <option value="name">Name</option>
               <option value="email">Email ID</option>
@@ -234,7 +234,7 @@ export default function VerifiedStudentsPage() {
               value={filterInput} onChange={e => setFilterInput(e.target.value)}
               onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addFilterTag() } }}
               placeholder={`Filter by ${filterType}...`}
-              className="flex-1 min-w-[200px] px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm text-gray-700 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent"
+              className="flex-1 min-w-[200px] px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm text-gray-700 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent dark:bg-obsidian-hover dark:border-obsidian-border dark:text-ink-primary dark:placeholder:text-obsidian-faint"
             />
             <button onClick={addFilterTag}
               className="px-4 py-2.5 bg-accent text-white text-sm font-medium rounded-xl hover:bg-accent/90 transition-colors"
@@ -250,7 +250,7 @@ export default function VerifiedStudentsPage() {
               <span key={i}
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-accent/10 text-accent text-xs font-medium rounded-full"
               >
-                <span className="text-gray-400 font-normal">{tag.type}:</span>
+                <span className="text-gray-400 font-normal dark:text-obsidian-faint">{tag.type}:</span>
                 {tag.value}
                 <button onClick={() => removeFilterTag(i)} className="hover:text-accent/80">
                   <X className="w-3 h-3" />
@@ -263,11 +263,11 @@ export default function VerifiedStudentsPage() {
 
       {loading ? (
         <div className="space-y-3">
-          {[1, 2, 3, 4].map(i => <div key={i} className="h-28 bg-gray-100 rounded-xl animate-pulse" />)}
+          {[1, 2, 3, 4].map(i => <div key={i} className="h-28 bg-gray-100 rounded-xl animate-pulse dark:bg-obsidian-hover" />)}
         </div>
       ) : filtered.length === 0 ? (
         <Card>
-          <div className="flex flex-col items-center justify-center py-12 text-gray-400">
+          <div className="flex flex-col items-center justify-center py-12 text-gray-400 dark:text-obsidian-faint">
             <CheckCircle className="w-10 h-10 mb-3" />
             <p className="text-sm font-medium">
               {filterTags.length > 0 ? 'No matching verified submissions' : 'No verified submissions'}
@@ -284,7 +284,7 @@ export default function VerifiedStudentsPage() {
       ) : (
         <div className="space-y-2">
           {filtered.map(v => (
-            <div key={v.id} className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+            <div key={v.id} className="bg-white border border-gray-200 rounded-xl overflow-hidden dark:bg-obsidian-surface dark:border-obsidian-border">
               <div
                 className="p-4 cursor-pointer hover:bg-gray-50/50 transition-colors"
                 onClick={() => setExpandedId(expandedId === v.id ? null : v.id)}
@@ -296,15 +296,15 @@ export default function VerifiedStudentsPage() {
                     </div>
                     <div className="min-w-0">
                       <div className="flex items-center gap-2">
-                        <span className="text-sm font-semibold text-gray-900">{v.studentName}</span>
+                        <span className="text-sm font-semibold text-gray-900 dark:text-ink-primary">{v.studentName}</span>
                         <Badge size="sm" variant="success">Verified</Badge>
                       </div>
                       <div className="flex items-center gap-3 mt-0.5">
-                        <span className="flex items-center gap-1 text-xs text-gray-400">
+                        <span className="flex items-center gap-1 text-xs text-gray-400 dark:text-obsidian-faint">
                           <User className="w-3 h-3" />
                           {v.studentEmail || v.studentId}
                         </span>
-                        <span className="flex items-center gap-1 text-xs text-gray-400">
+                        <span className="flex items-center gap-1 text-xs text-gray-400 dark:text-obsidian-faint">
                           <Building2 className="w-3 h-3" />
                           {v.department}
                         </span>
@@ -312,41 +312,41 @@ export default function VerifiedStudentsPage() {
                     </div>
                   </div>
                   <div className="flex items-center gap-3 flex-shrink-0">
-                    <span className="text-xs text-gray-400">{v.reviewedAt ? new Date(v.reviewedAt).toLocaleDateString() : ''}</span>
-                    {expandedId === v.id ? <ChevronUp className="w-4 h-4 text-gray-400" /> : <ChevronDown className="w-4 h-4 text-gray-400" />}
+                    <span className="text-xs text-gray-400 dark:text-obsidian-faint">{v.reviewedAt ? new Date(v.reviewedAt).toLocaleDateString() : ''}</span>
+                    {expandedId === v.id ? <ChevronUp className="w-4 h-4 text-gray-400 dark:text-obsidian-faint" /> : <ChevronDown className="w-4 h-4 text-gray-400 dark:text-obsidian-faint" />}
                   </div>
                 </div>
-                <p className="text-xs text-gray-500 mt-2 ml-[52px]">
+                <p className="text-xs text-gray-500 mt-2 ml-[52px] dark:text-obsidian-faint">
                   <span className="font-medium">Competition:</span> {v.competitionTitle}
                 </p>
               </div>
 
               {expandedId === v.id && v.emailProof && (
-                <div className="border-t border-gray-100 bg-gray-50/50">
+                <div className="border-t border-gray-100 bg-gray-50/50 dark:border-obsidian-border">
                   <div className="p-4 space-y-4">
-                    <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Submitted Email Proof Metadata</p>
+                    <p className="text-xs font-medium text-gray-500 uppercase tracking-wider dark:text-obsidian-faint">Submitted Email Proof Metadata</p>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      <div className="p-3 bg-white border border-green-200 rounded-xl md:col-span-2">
-                        <p className="text-xs text-gray-400 uppercase tracking-wider mb-1">From</p>
-                        <p className="text-sm font-medium text-gray-900 break-all">{v.emailProof.from}</p>
+                      <div className="p-3 bg-white border border-green-200 rounded-xl md:col-span-2 dark:bg-obsidian-surface">
+                        <p className="text-xs text-gray-400 uppercase tracking-wider mb-1 dark:text-obsidian-faint">From</p>
+                        <p className="text-sm font-medium text-gray-900 dark:text-ink-primary break-all">{v.emailProof.from}</p>
                       </div>
-                      <div className="p-3 bg-white border border-green-200 rounded-xl md:col-span-2">
-                        <p className="text-xs text-gray-400 uppercase tracking-wider mb-1">To</p>
-                        <p className="text-sm font-medium text-gray-900 break-all">{v.emailProof.to}</p>
+                      <div className="p-3 bg-white border border-green-200 rounded-xl md:col-span-2 dark:bg-obsidian-surface">
+                        <p className="text-xs text-gray-400 uppercase tracking-wider mb-1 dark:text-obsidian-faint">To</p>
+                        <p className="text-sm font-medium text-gray-900 dark:text-ink-primary break-all">{v.emailProof.to}</p>
                       </div>
-                      <div className="p-3 bg-white border border-green-200 rounded-xl md:col-span-2">
-                        <p className="text-xs text-gray-400 uppercase tracking-wider mb-1">Subject</p>
-                        <p className="text-sm font-medium text-gray-900">{v.emailProof.subject}</p>
+                      <div className="p-3 bg-white border border-green-200 rounded-xl md:col-span-2 dark:bg-obsidian-surface">
+                        <p className="text-xs text-gray-400 uppercase tracking-wider mb-1 dark:text-obsidian-faint">Subject</p>
+                        <p className="text-sm font-medium text-gray-900 dark:text-ink-primary">{v.emailProof.subject}</p>
                       </div>
-                      <div className="p-3 bg-white border border-green-200 rounded-xl md:col-span-2">
-                        <p className="text-xs text-gray-400 uppercase tracking-wider mb-1">Date & Time</p>
-                        <p className="text-sm font-medium text-gray-900">
+                      <div className="p-3 bg-white border border-green-200 rounded-xl md:col-span-2 dark:bg-obsidian-surface">
+                        <p className="text-xs text-gray-400 uppercase tracking-wider mb-1 dark:text-obsidian-faint">Date & Time</p>
+                        <p className="text-sm font-medium text-gray-900 dark:text-ink-primary">
                           {v.emailProof.date ? new Date(v.emailProof.date).toLocaleString() : 'N/A'}
                         </p>
                       </div>
                     </div>
                     {v.reviewedAt && (
-                      <div className="flex items-center gap-2 text-xs text-gray-400">
+                      <div className="flex items-center gap-2 text-xs text-gray-400 dark:text-obsidian-faint">
                         <Calendar className="w-3.5 h-3.5" />
                         Verified on {new Date(v.reviewedAt).toLocaleString()}
                       </div>
@@ -356,8 +356,8 @@ export default function VerifiedStudentsPage() {
               )}
 
               {expandedId === v.id && !v.emailProof && (
-                <div className="border-t border-gray-100 bg-gray-50/50 p-4 text-center">
-                  <p className="text-sm text-gray-400">No email proof metadata available</p>
+                <div className="border-t border-gray-100 bg-gray-50/50 p-4 text-center dark:border-obsidian-border">
+                  <p className="text-sm text-gray-400 dark:text-obsidian-faint">No email proof metadata available</p>
                 </div>
               )}
             </div>
