@@ -36,11 +36,11 @@ export default function HistoryPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-[#F0F6FC]">My History</h1>
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-ink-primary">My History</h1>
       </div>
 
       <Card padding="none" className="overflow-hidden">
-        <div className="flex border-b border-gray-100 overflow-x-auto">
+        <div className="flex border-b border-gray-100 dark:border-obsidian-border overflow-x-auto">
           {tabs.map((tab) => {
             const Icon = tab.icon
             return (
@@ -50,16 +50,16 @@ export default function HistoryPage() {
                 className={`flex items-center gap-2 px-5 py-3 text-sm font-medium whitespace-nowrap transition-colors ${
                   activeTab === tab.key
                     ? 'text-accent border-b-2 border-accent bg-accent/5'
-                    : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+                    : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50 dark:text-obsidian-faint dark:hover:text-ink-muted dark:hover:bg-obsidian-hover'
                 }`}
               >
                 <Icon className="w-4 h-4" />
                 {tab.label}
                 {history && activeTab === 'all' && (
-                  <span className="ml-1 px-1.5 py-0.5 text-[10px] bg-gray-100 text-gray-500 rounded-full">{history.length}</span>
+                  <span className="ml-1 px-1.5 py-0.5 text-[10px] bg-gray-100 text-gray-500 rounded-full dark:bg-obsidian-hover dark:text-obsidian-faint">{history.length}</span>
                 )}
                 {history && activeTab !== 'all' && (
-                  <span className="ml-1 px-1.5 py-0.5 text-[10px] bg-gray-100 text-gray-500 rounded-full">
+                  <span className="ml-1 px-1.5 py-0.5 text-[10px] bg-gray-100 text-gray-500 rounded-full dark:bg-obsidian-hover dark:text-obsidian-faint">
                     {history.filter((h) => h.status === activeTab).length}
                   </span>
                 )}
@@ -72,7 +72,7 @@ export default function HistoryPage() {
           {isLoading ? (
             <div className="space-y-4">
               {Array.from({ length: 4 }).map((_, i) => (
-                <div key={i} className="h-20 bg-gray-100 rounded-xl animate-pulse" />
+                <div key={i} className="h-20 bg-gray-100 dark:bg-obsidian-hover rounded-xl animate-pulse" />
               ))}
             </div>
           ) : filtered.length > 0 ? (
@@ -82,7 +82,7 @@ export default function HistoryPage() {
                 return (
                   <div
                     key={entry.registration.id}
-                    className="flex items-center justify-between p-4 bg-white border border-gray-100 rounded-xl hover:shadow-sm transition-shadow"
+                    className="flex items-center justify-between p-4 bg-white border border-gray-100 rounded-xl hover:shadow-sm transition-shadow dark:bg-obsidian-surface dark:border-obsidian-border"
                   >
                     <div className="flex items-center gap-4">
                       <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
@@ -101,8 +101,8 @@ export default function HistoryPage() {
                         )}
                       </div>
                       <div>
-                        <p className="text-sm font-medium text-gray-900">{entry.competition.title}</p>
-                        <div className="flex items-center gap-3 mt-1 text-xs text-gray-500">
+                        <p className="text-sm font-medium text-gray-900 dark:text-ink-primary">{entry.competition.title}</p>
+                        <div className="flex items-center gap-3 mt-1 text-xs text-gray-500 dark:text-obsidian-faint">
                           <span className="flex items-center gap-1">
                             <Calendar className="w-3 h-3" />
                             {new Date(entry.registration.registeredAt).toLocaleDateString()}
@@ -132,10 +132,10 @@ export default function HistoryPage() {
             </div>
           ) : (
             <div className="text-center py-16">
-              <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 rounded-full flex items-center justify-center">
+              <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 dark:bg-obsidian-hover rounded-full flex items-center justify-center">
                 <Filter className="w-8 h-8 text-gray-300" />
               </div>
-              <p className="text-gray-500 text-sm">
+              <p className="text-gray-500 text-sm dark:text-obsidian-faint">
                 {activeTab === 'all'
                   ? 'No history entries yet'
                   : `No ${tabs.find(t => t.key === activeTab)?.label.toLowerCase() || ''} entries`}

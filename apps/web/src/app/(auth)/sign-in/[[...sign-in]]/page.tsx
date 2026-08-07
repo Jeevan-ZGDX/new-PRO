@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { Eye, EyeOff } from 'lucide-react'
 import { authenticateUser } from '@/lib/auth'
 import { apiClient } from '@comp-dash/api'
+import { ThemeToggle } from '@/components/common/ThemeToggle'
 
 export default function SignInPage() {
   const router = useRouter()
@@ -57,17 +58,20 @@ export default function SignInPage() {
   ]
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-gray-50 dark:bg-obsidian-canvas relative flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+      <div className="absolute top-4 right-4">
+        <ThemeToggle />
+      </div>
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
           <div className="w-16 h-16 rounded-2xl bg-accent/10 flex items-center justify-center mx-auto mb-4">
             <span className="text-2xl font-bold text-accent">C</span>
           </div>
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Welcome Back</h1>
-          <p className="text-gray-500">Sign in to your Comp-Dash account</p>
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-ink-primary mb-2">Welcome Back</h1>
+          <p className="text-gray-500 dark:text-obsidian-faint">Sign in to your Comp-Dash account</p>
         </div>
 
-        <form onSubmit={handleSubmit} className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 space-y-5">
+        <form onSubmit={handleSubmit} className="bg-white dark:bg-obsidian-surface rounded-2xl shadow-sm border border-gray-100 dark:border-obsidian-border p-8 space-y-5">
           {error && (
             <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-red-600 text-sm">
               {error}
@@ -75,7 +79,7 @@ export default function SignInPage() {
           )}
 
           <div>
-            <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1.5">
+            <label htmlFor="email" className="block text-sm font-medium text-gray-700 dark:text-ink-muted mb-1.5">
               Email
             </label>
             <input
@@ -84,12 +88,12 @@ export default function SignInPage() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="admin@cit.in"
-              className="w-full h-11 px-4 rounded-xl border border-gray-300 bg-white text-gray-900 placeholder-gray-400 font-medium text-sm focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent"
+              className="w-full h-11 px-4 rounded-xl border border-gray-300 dark:border-obsidian-border bg-white dark:bg-obsidian-hover text-gray-900 dark:text-ink-primary placeholder-gray-400 dark:placeholder-obsidian-faint font-medium text-sm focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent"
             />
           </div>
 
           <div>
-            <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1.5">
+            <label htmlFor="password" className="block text-sm font-medium text-gray-700 dark:text-ink-muted mb-1.5">
               Password
             </label>
             <div className="relative">
@@ -99,12 +103,12 @@ export default function SignInPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="Enter your password"
-                className="w-full h-11 px-4 pr-11 rounded-xl border border-gray-300 bg-white text-gray-900 placeholder-gray-400 font-medium text-sm focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent"
+                className="w-full h-11 px-4 pr-11 rounded-xl border border-gray-300 dark:border-obsidian-border bg-white dark:bg-obsidian-hover text-gray-900 dark:text-ink-primary placeholder-gray-400 dark:placeholder-obsidian-faint font-medium text-sm focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent"
               />
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-obsidian-faint hover:text-gray-600 dark:hover:text-ink-muted"
               >
                 {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
               </button>
@@ -114,14 +118,14 @@ export default function SignInPage() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full h-11 bg-accent text-white rounded-xl font-medium text-sm hover:bg-accent/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="w-full h-11 bg-accent dark:bg-striver text-white rounded-xl font-medium text-sm hover:bg-accent/90 dark:hover:bg-striver-hover disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             {loading ? 'Signing in...' : 'Sign In'}
           </button>
 
-          <p className="text-center text-sm text-gray-500">
+          <p className="text-center text-sm text-gray-500 dark:text-obsidian-faint">
             Don&apos;t have an account?{' '}
-            <Link href="/sign-up" className="text-accent font-medium hover:underline">
+            <Link href="/sign-up" className="text-accent dark:text-uv font-medium hover:underline">
               Create one
             </Link>
           </p>
