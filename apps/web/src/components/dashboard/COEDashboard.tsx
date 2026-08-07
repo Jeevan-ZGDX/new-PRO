@@ -132,7 +132,7 @@ export default function COEDashboard() {
               competitions.map((comp) => (
                 <div
                   key={comp.id}
-                  className="flex items-center justify-between px-4 py-3 rounded-xl hover:bg-gray-50 transition-colors cursor-pointer"
+                  className="flex items-center justify-between px-4 py-3 rounded-xl hover:cursor-pointer transition-colors"
                   onClick={() => router.push(`/competitions/${comp.id}`)}
                 >
                   <div className="flex items-center gap-3">
@@ -140,7 +140,7 @@ export default function COEDashboard() {
                       <Trophy className="w-4 h-4 text-accent" />
                     </div>
                     <div>
-                      <p className="text-sm font-medium text-gray-900">{comp.title}</p>
+                      <p className="text-sm font-medium text-white-900">{comp.title}</p>
                       <div className="flex items-center gap-2 mt-0.5">
                         <Badge variant="primary" size="xs">{comp.category}</Badge>
                         <span className="text-xs text-gray-400">{comp.mode}</span>
