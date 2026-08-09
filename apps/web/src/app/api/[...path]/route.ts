@@ -372,6 +372,50 @@ register('GET', '/competitions/:id/match-feedback', async (req, seg) => {
   return ok({ feedback: `Your performance in ${competitions.find(c => c.id === id)?.title || 'this competition'}` })
 })
 
+register('GET', '/competitions/:id/dashboard', async (req, seg) => {
+  const id = seg[1]
+  const comp = competitions.find(c => c.id === id)
+  if (!comp) return NextResponse.json({ success: false, error: { code: 'NOT_FOUND', message: 'Competition not found' } }, { status: 404 })
+  
+  const compRegistrations = registrations.filter(r => r.competitionId === id)
+  const registeredStudents = compRegistrations.map(r => {
+    const student = students.find(s => s.id === r.userId)
+    return {
+      id: r.id,
+      userId: r.userId,
+      userName: student?.name || r.userName,
+      department: student?.department || r.department,
+      status: r.status,
+      registeredAt: r.registeredAt,
+    }
+  })
+  
+  const registeredStudentIds = new Set(compRegistrations.map(r => r.userId))
+  const unregisteredStudents = students
+    .filter(s => !registeredStudentIds.has(s.id))
+    .map(s => ({
+      id: s.id,
+      name: s.name,
+      email: s.email,
+      department: s.department,
+      section: s.section,
+    }))
+  
+  const registrationsByDepartment = departments.map(dept => ({
+    department: dept.name,
+    count: registeredStudents.filter(s => s.department === dept.name).length,
+  })).filter(d => d.count > 0)
+  
+  return ok({
+    competition: comp,
+    registeredStudents,
+    unregisteredStudents,
+    totalRegistered: registeredStudents.length,
+    totalUnregistered: unregisteredStudents.length,
+    registrationsByDepartment,
+  })
+})
+
 register('GET', '/advisor/competitions/:id/stats', async (req, seg) => {
   const id = seg[1]
   const comp = competitions.find(c => c.id === id)

@@ -1,9 +1,10 @@
 'use client'
 
 import { useParams } from 'next/navigation'
+import { useEffect, useState } from 'react'
 import { Card, CardHeader, CardTitle, Badge, Button, StatCard } from '@comp-dash/design-system'
-import { useCompetitionDashboard, useSendReminder } from '@comp-dash/api'
-import { Trophy, Users, UserCheck, UserX, Calendar, Building2, Send, Bell } from 'lucide-react'
+import { useCompetitionDashboard, useCompetitionDashboardRealtime, useSendReminder, isSupabaseEnabled } from '@comp-dash/api'
+import { Trophy, Users, UserCheck, UserX, Calendar, Building2, Send, Bell, Wifi, WifiOff } from 'lucide-react'
 
 const statusConfig: Record<string, { variant: 'warning' | 'success' | 'info' | 'danger'; label: string }> = {
   pending_verification: { variant: 'warning', label: 'Pending' },
@@ -17,6 +18,16 @@ export default function CompetitionDashboardPage() {
   const id = params.id as string
   const { data, isLoading } = useCompetitionDashboard(id)
   const sendReminder = useSendReminder()
+  const realtime = isSupabaseEnabled()
+  const [isConnected, setIsConnected] = useState(false)
+
+  useCompetitionDashboardRealtime(id)
+
+  useEffect(() => {
+    if (realtime) {
+      setIsConnected(true)
+    }
+  }, [realtime])
 
   if (isLoading) {
     return (
@@ -57,6 +68,12 @@ export default function CompetitionDashboardPage() {
             </p>
           )}
         </div>
+        {realtime && (
+          <div className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/60 rounded-full text-xs text-emerald-700 dark:text-emerald-400 shadow-sm">
+            <span className={`w-2 h-2 rounded-full ${isConnected ? 'bg-emerald-500 animate-pulse' : 'bg-gray-400'}`} />
+            {isConnected ? 'Live' : 'Connecting...'}
+          </div>
+        )}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
