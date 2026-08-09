@@ -24,6 +24,8 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
+      - key: NODE_VERSION
+        value: 20.18.0
 
       # Public, baked in at build time
       - key: NEXT_PUBLIC_SUPABASE_URL
@@ -53,4 +55,28 @@ services:
 
       # Firebase Admin service account (JSON string, private)
       - key: FIREBASE_SERVICE_ACCOUNT
+        sync: false
+
+  - type: cron
+    name: comp-dash-cron
+    env: node
+    region: singapore
+    plan: free
+    buildCommand: npm ci --legacy-peer-deps && npm run db:generate
+    startCommand: npm run cron
+    schedule: "0 8 * * *"
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NODE_VERSION
+        value: 20.18.0
+      - key: NEXT_PUBLIC_SUPABASE_URL
+        sync: false
+      - key: NEXT_PUBLIC_SUPABASE_ANON_KEY
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: DATABASE_URL
+        sync: false
+      - key: DIRECT_URL
         sync: false

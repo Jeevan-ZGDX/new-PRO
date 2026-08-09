@@ -1,4 +1,12 @@
-export type UserRole = 'student' | 'advisor' | 'hod' | 'super_admin' | 'coe'
+export const OFFICIAL_COLLEGE_DOMAIN = 'citchennai.net'
+
+export function isAllowedEmail(email: string): boolean {
+  const clean = email.trim().toLowerCase()
+  if (clean.endsWith(`@${OFFICIAL_COLLEGE_DOMAIN.toLowerCase()}`)) return true
+  return false
+}
+
+export type UserRole = 'student' | 'advisor' | 'hod' | 'super_admin'
 
 export interface StoredUser {
   email: string
@@ -9,11 +17,10 @@ export interface StoredUser {
 }
 
 export const DEFAULT_USERS: StoredUser[] = [
-  { email: 'admin@cit.in', password: 'admin123', role: 'super_admin', name: 'Super Admin', department: 'Administration' },
-  { email: 'hod@cit.in', password: 'hod123', role: 'hod', name: 'Dr. HOD Kumar', department: 'CSE' },
-  { email: 'coe@cit.in', password: 'coe123', role: 'coe', name: 'COE Controller', department: 'Examination' },
-  { email: 'advisor@cit.in', password: 'advisor123', role: 'advisor', name: 'Dr. Priya Sharma', department: 'CSE' },
-  { email: 'student@cit.in', password: 'student123', role: 'student', name: 'Jeevan R', department: 'CSE' },
+  { email: 'admin@citchennai.net', password: 'admin123', role: 'super_admin', name: 'Super Admin', department: 'Administration' },
+  { email: 'hod@citchennai.net', password: 'hod123', role: 'hod', name: 'Dr. HOD Kumar', department: 'CSE' },
+  { email: 'advisor@citchennai.net', password: 'advisor123', role: 'advisor', name: 'Dr. Priya Sharma', department: 'CSE' },
+  { email: 'student@citchennai.net', password: 'student123', role: 'student', name: 'Jeevan R', department: 'CSE' },
 ]
 
 const USERS_KEY = 'comp_dash_users'

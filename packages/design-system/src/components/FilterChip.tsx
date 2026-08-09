@@ -16,8 +16,8 @@ export function FilterChip({ label, active = false, onPress, count, className }:
         'inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium',
         'transition-all duration-200 whitespace-nowrap',
         active
-          ? 'bg-accent text-white shadow-sm'
-          : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700',
+          ? 'bg-accent text-white shadow-sm dark:bg-striver dark:hover:bg-striver'
+          : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-obsidian-hover dark:text-ink-muted dark:hover:bg-obsidian-surface dark:hover:text-ink-primary',
         className
       )}
     >
@@ -26,7 +26,7 @@ export function FilterChip({ label, active = false, onPress, count, className }:
         <span
           className={cn(
             'text-xs',
-            active ? 'text-white/80' : 'text-gray-400 dark:text-gray-500'
+            active ? 'text-white/80' : 'text-gray-400 dark:text-obsidian-faint'
           )}
         >
           ({count})

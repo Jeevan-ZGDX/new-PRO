@@ -22,6 +22,8 @@ export {
   useCreateCompetition,
   useUpdateCompetition,
   useDeleteCompetition,
+  useAdvisorCompetitionStats,
+  useCompetitionDashboardRealtime,
 } from './hooks/useRegistrations'
 export { useNotifications, useMarkNotificationRead, useMarkAllNotificationsRead, useUnreadNotificationCount } from './hooks/useNotifications'
 export { useBookmarks, useToggleBookmark, useIsBookmarked } from './hooks/useBookmarks'

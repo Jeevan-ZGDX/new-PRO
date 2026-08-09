@@ -1,15 +1,13 @@
 import axios, { type AxiosInstance, type AxiosError, type InternalAxiosRequestConfig } from 'axios'
 import type { ApiResponse, ApiError } from '@comp-dash/types'
 
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api'
-
 class ApiClient {
   private instance: AxiosInstance
   private token: string | null = null
 
   constructor() {
     this.instance = axios.create({
-      baseURL: API_BASE_URL,
+      baseURL: '/api',
       timeout: 15000,
       headers: {
         'Content-Type': 'application/json',

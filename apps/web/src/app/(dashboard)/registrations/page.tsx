@@ -70,7 +70,7 @@ export default function RegistrationsPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900">{t('sidebar.registrations')}</h1>
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-ink-primary">{t('sidebar.registrations')}</h1>
         <Button variant="outline" size="sm" onClick={handleExport}>
           <Download className="w-4 h-4 mr-2" />
           Export
@@ -95,7 +95,7 @@ export default function RegistrationsPage() {
                 className={`px-4 py-2 rounded-xl text-sm font-medium transition-colors ${
                   selectedStatus === status.value
                     ? 'bg-accent text-white'
-                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-obsidian-hover dark:text-ink-muted'
                 }`}
               >
                 {status.label}
@@ -109,13 +109,13 @@ export default function RegistrationsPage() {
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
-              <tr className="border-b border-gray-100">
-                <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider px-6 py-3">Student</th>
-                <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider px-6 py-3">Competition</th>
-                <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider px-6 py-3">Status</th>
-                <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider px-6 py-3">Registered On</th>
-                <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider px-6 py-3">Verified On</th>
-                <th className="text-right text-xs font-medium text-gray-500 uppercase tracking-wider px-6 py-3">Actions</th>
+              <tr className="border-b border-gray-100 dark:border-obsidian-border">
+                <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider px-6 py-3 dark:text-obsidian-faint">Student</th>
+                <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider px-6 py-3 dark:text-obsidian-faint">Competition</th>
+                <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider px-6 py-3 dark:text-obsidian-faint">Status</th>
+                <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider px-6 py-3 dark:text-obsidian-faint">Registered On</th>
+                <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider px-6 py-3 dark:text-obsidian-faint">Verified On</th>
+                <th className="text-right text-xs font-medium text-gray-500 uppercase tracking-wider px-6 py-3 dark:text-obsidian-faint">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -123,7 +123,7 @@ export default function RegistrationsPage() {
                 Array.from({ length: 5 }).map((_, i) => (
                   <tr key={i} className="border-b border-gray-50">
                     <td colSpan={6} className="px-6 py-4">
-                      <div className="h-10 bg-gray-100 rounded animate-pulse" />
+                      <div className="h-10 bg-gray-100 rounded animate-pulse dark:bg-obsidian-hover" />
                     </td>
                   </tr>
                 ))
@@ -132,15 +132,15 @@ export default function RegistrationsPage() {
                   const loading = actionId === reg.id
                   return (
                     <tr key={reg.id} className="border-b border-gray-50 hover:bg-gray-50/50 transition-colors">
-                      <td className="px-6 py-4 text-sm font-medium text-gray-900">{reg.userId}</td>
-                      <td className="px-6 py-4 text-sm text-gray-600">{reg.competition.title}</td>
+                      <td className="px-6 py-4 text-sm font-medium text-gray-900 dark:text-ink-primary">{reg.userId}</td>
+                      <td className="px-6 py-4 text-sm text-gray-600 dark:text-ink-muted">{reg.competition.title}</td>
                       <td className="px-6 py-4">
                         <StatusBadge status={reg.status as 'pending' | 'verified' | 'completed' | 'rejected'} size="sm" />
                       </td>
-                      <td className="px-6 py-4 text-sm text-gray-600">
+                      <td className="px-6 py-4 text-sm text-gray-600 dark:text-ink-muted">
                         {new Date(reg.registeredAt).toLocaleDateString()}
                       </td>
-                      <td className="px-6 py-4 text-sm text-gray-600">
+                      <td className="px-6 py-4 text-sm text-gray-600 dark:text-ink-muted">
                         {reg.verifiedAt ? new Date(reg.verifiedAt).toLocaleDateString() : '-'}
                       </td>
                       <td className="px-6 py-4 text-right">
@@ -176,7 +176,7 @@ export default function RegistrationsPage() {
                 })
               ) : (
                 <tr>
-                  <td colSpan={6} className="text-center py-12 text-gray-500">No registrations found</td>
+                  <td colSpan={6} className="text-center py-12 text-gray-500 dark:text-obsidian-faint">No registrations found</td>
                 </tr>
               )}
             </tbody>
@@ -184,8 +184,8 @@ export default function RegistrationsPage() {
         </div>
 
         {data && data.total > 10 && (
-          <div className="flex items-center justify-between px-6 py-4 border-t border-gray-100">
-            <p className="text-sm text-gray-500">
+          <div className="flex items-center justify-between px-6 py-4 border-t border-gray-100 dark:border-obsidian-border">
+            <p className="text-sm text-gray-500 dark:text-obsidian-faint">
               Showing {((page - 1) * 10) + 1} to {Math.min(page * 10, data.total)} of {data.total}
             </p>
             <div className="flex gap-2">

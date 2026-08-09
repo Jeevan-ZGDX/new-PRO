@@ -43,7 +43,7 @@ export function CompetitionCard({
       onClick={onPress}
     >
       {/* Banner Image */}
-      <div className="relative h-44 bg-gray-100 dark:bg-gray-800 overflow-hidden">
+      <div className="relative h-44 bg-gray-100 dark:bg-obsidian-hover overflow-hidden">
         {imageUrl ? (
           <img
             src={imageUrl}
@@ -52,8 +52,8 @@ export function CompetitionCard({
             loading="lazy"
           />
         ) : (
-          <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-primary-100 to-primary-200 dark:from-primary-950 dark:to-primary-900">
-            <Trophy className="w-12 h-12 text-primary-400 dark:text-primary-500" />
+          <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-primary-100 to-primary-200 dark:from-obsidian-hover dark:to-obsidian-hover">
+            <Trophy className="w-12 h-12 text-primary-400 dark:text-ink-muted" />
           </div>
         )}
         <Badge
@@ -72,7 +72,7 @@ export function CompetitionCard({
             className={cn(
               'absolute top-3 right-3 w-8 h-8 rounded-full flex items-center justify-center',
               'backdrop-blur-sm transition-all duration-200',
-              bookmarked ? 'bg-accent text-white' : 'bg-white/80 dark:bg-gray-900/80 text-gray-600 dark:text-gray-300 hover:bg-white dark:hover:bg-gray-900'
+              bookmarked ? 'bg-accent text-white' : 'bg-white/80 text-gray-600 hover:bg-white dark:bg-obsidian-elevated/80 dark:text-ink-muted dark:hover:bg-obsidian-elevated'
             )}
             aria-label={bookmarked ? 'Remove bookmark' : 'Add bookmark'}
           >
@@ -86,11 +86,11 @@ export function CompetitionCard({
 
       {/* Content */}
       <div className="p-4 space-y-2">
-        <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100 line-clamp-2 leading-tight">
+        <h3 className="text-base font-semibold text-gray-900 dark:text-white line-clamp-2 leading-tight">
           {title}
         </h3>
         <div className="flex items-center gap-1">
-          <p className="text-sm text-gray-500 dark:text-gray-400">{organizer}</p>
+          <p className="text-sm text-gray-500 dark:text-ink-muted">{organizer}</p>
           {organizerVerified && (
             <svg className="w-4 h-4 text-info" fill="currentColor" viewBox="0 0 20 20">
               <path fillRule="evenodd" d="M6.267 3.455a3.066 3.066 0 001.745-.723 3.066 3.066 0 013.976 0 3.066 3.066 0 001.745.723 3.066 3.066 0 012.812 2.812c.051.643.304 1.254.723 1.745a3.066 3.066 0 010 3.976 3.066 3.066 0 00-.723 1.745 3.066 3.066 0 01-2.812 2.812 3.066 3.066 0 00-1.745.723 3.066 3.066 0 01-3.976 0 3.066 3.066 0 00-1.745-.723 3.066 3.066 0 01-2.812-2.812 3.066 3.066 0 00-.723-1.745 3.066 3.066 0 010-3.976 3.066 3.066 0 00.723-1.745 3.066 3.066 0 012.812-2.812zm7.44 5.252a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
@@ -100,7 +100,7 @@ export function CompetitionCard({
       </div>
 
       {/* Metadata */}
-      <div className="px-4 pb-4 flex items-center gap-4 text-xs text-gray-500 dark:text-gray-400">
+      <div className="px-4 pb-4 flex items-center gap-4 text-xs text-gray-500 dark:text-ink-muted">
         <div className="flex items-center gap-1">
           <Users className="w-3.5 h-3.5" />
           <span>{teamSize}</span>
