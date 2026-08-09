@@ -44,11 +44,11 @@ export default function AnalyticsPage() {
       'analytics',
       ['Metric', 'Value'],
       [
-        ['Total Competitions', String(stats.totalCompetitions)],
-        ['Total Participants', String(stats.totalParticipants)],
-        ['Win Rate', `${stats.winRate}%`],
-        ['Verification Rate', `${stats.verificationRate}%`],
-        ['Trend Data Points', String(stats.competitionTrends.length)],
+        ['Total Competitions', String(stats.totalCompetitions ?? 0)],
+        ['Total Participants', String(stats.totalParticipants ?? 0)],
+        ['Win Rate', `${stats.winRate ?? 0}%`],
+        ['Verification Rate', `${stats.verificationRate ?? 0}%`],
+        ['Trend Data Points', String(stats.competitionTrends?.length ?? 0)],
         ['Classes Tracked', String(classChartData.length)],
       ]
     )

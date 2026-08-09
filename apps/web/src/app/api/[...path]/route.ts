@@ -642,6 +642,141 @@ register('GET', '/admin/dashboard/stats', async () => {
   return ok({ totalCompetitions, totalRegistrations, verifiedRegistrations, verificationRate, registrationsOverTime, topDepartments, recentVerified, pendingVerifications, selfVerificationRequests })
 })
 
+// ─── HOD DASHBOARD ──────────────────────────────────────────────────────
+register('GET', '/hod/dashboard/stats', async (req) => {
+  const qs = new URL(req.url).searchParams
+  const userId = qs.get('userId') || 'user-hod'
+  const user = students.find(s => s.id === userId) || { id: userId, name: 'HOD User', department: 'CSE' }
+  const deptName = user.department || 'CSE'
+  const deptStudents = students.filter(s => s.department === deptName)
+  const deptRegistrations = registrations.filter(r => deptStudents.some(s => s.id === r.userId))
+  const verifiedCount = deptRegistrations.filter(r => r.status === 'verified' || r.status === 'completed').length
+  const pendingCount = deptRegistrations.filter(r => r.status === 'pending_verification').length
+  const rejectedCount = deptRegistrations.filter(r => r.status === 'rejected').length
+  const yearWise = ['1st Year', '2nd Year', '3rd Year', '4th Year'].map(year => {
+    const yearStudents = deptStudents.filter(s => s.year === year)
+    const yearRegs = deptRegistrations.filter(r => yearStudents.some(s => s.id === r.userId))
+    return {
+      year,
+      studentCount: yearStudents.length,
+      registrationCount: yearRegs.length,
+      verifiedCount: yearRegs.filter(r => r.status === 'verified' || r.status === 'completed').length,
+      pendingCount: yearRegs.filter(r => r.status === 'pending_verification').length,
+    }
+  })
+  const selfVerificationRequests = verificationRequests.filter(v => v.status === 'pending' && deptStudents.some(s => s.id === v.studentId)).slice(0, 10)
+  const recentRegs = deptRegistrations
+    .map(r => ({
+      ...r,
+      competition: competitions.find(c => c.id === r.competitionId),
+      userName: deptStudents.find(s => s.id === r.userId)?.name || r.userName,
+    }))
+    .sort((a, b) => new Date(b.registeredAt).getTime() - new Date(a.registeredAt).getTime())
+    .slice(0, 10)
+
+  return ok({
+    totalStudents: deptStudents.length,
+    registeredCount: deptRegistrations.length,
+    verifiedCount,
+    pendingCount,
+    rejectedCount,
+    yearWise,
+    selfVerificationRequests,
+    registrations: recentRegs,
+  })
+})
+
+// ─── ADVISOR DASHBOARD ──────────────────────────────────────────────────
+register('GET', '/advisor/dashboard/stats', async (req) => {
+  const qs = new URL(req.url).searchParams
+  const userId = qs.get('userId') || 'user-adv'
+  const advisor = advisors.find(a => a.id === userId) || { id: userId, name: 'Advisor', department: 'CSE', assignedSections: ['A'] }
+  const deptName = advisor.department || 'CSE'
+  const assignedSections = advisor.assignedSections || ['A']
+  const deptStudents = students.filter(s => s.department === deptName && assignedSections.includes(s.section))
+  const deptRegistrations = registrations.filter(r => deptStudents.some(s => s.id === r.userId))
+  const verifiedCount = deptRegistrations.filter(r => r.status === 'verified' || r.status === 'completed').length
+  const pendingCount = deptRegistrations.filter(r => r.status === 'pending_verification').length
+  const rejectedCount = deptRegistrations.filter(r => r.status === 'rejected').length
+  const verificationRequestsList = verificationRequests.filter(v => v.status === 'pending' && deptStudents.some(s => s.id === v.studentId)).slice(0, 10)
+  const recentRegs = deptRegistrations
+    .map(r => ({
+      ...r,
+      competition: competitions.find(c => c.id === r.competitionId),
+      userName: deptStudents.find(s => s.id === r.userId)?.name || r.userName,
+    }))
+    .sort((a, b) => new Date(b.registeredAt).getTime() - new Date(a.registeredAt).getTime())
+    .slice(0, 10)
+
+  return ok({
+    totalStudents: deptStudents.length,
+    registeredCount: deptRegistrations.length,
+    verifiedCount,
+    pendingCount,
+    rejectedCount,
+    verificationRequests: verificationRequestsList,
+    registrations: recentRegs,
+  })
+})
+
+// ─── COE DASHBOARD ──────────────────────────────────────────────────────
+register('GET', '/coe/dashboard/stats', async () => {
+  const totalCompetitions = competitions.length
+  const totalRegistrations = registrations.length
+  const verifiedRegistrations = registrations.filter(r => r.status === 'verified' || r.status === 'completed').length
+  const verificationRate = totalRegistrations > 0 ? Math.round((verifiedRegistrations / totalRegistrations) * 100) : 0
+  const registrationsOverTime = [
+    { date: '2025-04-01', count: 2 }, { date: '2025-04-08', count: 4 }, { date: '2025-04-15', count: 1 },
+    { date: '2025-04-22', count: 4 }, { date: '2025-05-01', count: 5 }, { date: '2025-05-08', count: 3 },
+    { date: '2025-05-15', count: 7 }, { date: '2025-05-22', count: 4 }, { date: '2025-06-01', count: 6 },
+    { date: '2025-06-08', count: 8 }, { date: '2025-06-15', count: 5 }, { date: '2025-06-22', count: 3 },
+  ]
+  const topDepartments = departments.map(d => ({ name: d.name, count: students.filter(s => s.department === d.name).length * 3 })).sort((a, b) => b.count - a.count).slice(0, 5)
+  const recentVerified = registrations.filter(r => r.verifiedAt).sort((a, b) => new Date(b.verifiedAt!).getTime() - new Date(a.verifiedAt!).getTime()).slice(0, 5)
+  const pendingVerifications = registrations.filter(r => r.status === 'pending_verification').slice(0, 5)
+  const selfVerificationRequests = verificationRequests.filter(v => v.status === 'pending').slice(0, 5)
+
+  return ok({ totalCompetitions, totalRegistrations, verifiedRegistrations, verificationRate, registrationsOverTime, topDepartments, recentVerified, pendingVerifications, selfVerificationRequests })
+})
+
+// ─── STUDENT DASHBOARD ──────────────────────────────────────────────────
+register('GET', '/student/dashboard/stats', async (req) => {
+  const qs = new URL(req.url).searchParams
+  const userId = qs.get('userId') || 'user-stu'
+  const userRegs = registrations.filter(r => r.userId === userId)
+  const verifiedCount = userRegs.filter(r => r.status === 'verified' || r.status === 'completed').length
+  const pendingCount = userRegs.filter(r => r.status === 'pending_verification').length
+  const rejectedCount = userRegs.filter(r => r.status === 'rejected').length
+  const upcomingCompetitions = competitions
+    .filter(c => new Date(c.startDate) > new Date())
+    .slice(0, 5)
+    .map(c => ({
+      ...c,
+      registration: userRegs.find(r => r.competitionId === c.id),
+    }))
+
+  return ok({
+    totalRegistered: userRegs.length,
+    verifiedCount,
+    pendingCount,
+    rejectedCount,
+    upcomingCompetitions,
+    registrations: userRegs.map(r => ({
+      ...r,
+      competition: competitions.find(c => c.id === r.competitionId),
+    })),
+  })
+})
+
+// ─── NOTIFICATIONS UNREAD COUNT ─────────────────────────────────────────
+register('GET', '/notifications/unread-count', async (req) => {
+  const qs = new URL(req.url).searchParams
+  const userId = qs.get('userId')
+  if (!userId) return NextResponse.json({ success: false, error: { code: 'BAD_REQUEST', message: 'userId required' } }, { status: 400 })
+  const count = notifications.filter(n => n.userId === userId && !n.isRead).length
+  return ok({ count })
+})
+
 register('GET', '/admin/registrations/stats', async () => {
   const totalRegistered = registrations.length
   const totalVerified = registrations.filter(r => r.status === 'verified' || r.status === 'completed').length
@@ -782,7 +917,7 @@ register('GET', '/admin/analytics/stats', async () => {
 register('GET', '/auth/gmail', async (req) => {
   const url = new URL('https://accounts.google.com/o/oauth2/v2/auth')
   url.searchParams.set('client_id', process.env.GOOGLE_CLIENT_ID || '')
-  url.searchParams.set('redirect_uri', process.env.GOOGLE_REDIRECT_URI || 'http://localhost:3000/api/auth/gmail/callback')
+  url.searchParams.set('redirect_uri', process.env.GOOGLE_REDIRECT_URI)
   url.searchParams.set('response_type', 'code')
   url.searchParams.set('scope', 'https://www.googleapis.com/auth/gmail.readonly openid email')
   url.searchParams.set('access_type', 'offline')
@@ -803,7 +938,7 @@ register('GET', '/auth/gmail/callback', async (req) => {
       client_id: process.env.GOOGLE_CLIENT_ID || '',
       client_secret: process.env.GOOGLE_CLIENT_SECRET || '',
       code,
-      redirect_uri: process.env.GOOGLE_REDIRECT_URI || 'http://localhost:3000/api/auth/gmail/callback',
+      redirect_uri: process.env.GOOGLE_REDIRECT_URI,
       grant_type: 'authorization_code',
     }).toString(),
   })

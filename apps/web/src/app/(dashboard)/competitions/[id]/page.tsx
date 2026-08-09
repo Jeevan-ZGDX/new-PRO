@@ -48,6 +48,7 @@ function CompetitionDetailContent() {
   useEffect(() => { setUser(getCurrentUser()) }, [])
 
   const { data: comp, isLoading, error } = useCompetition(params.id as string)
+  const { data: advisorStats, isLoading: statsLoading } = useAdvisorCompetitionStats(comp?.id)
 
   useEffect(() => {
     if (searchParams.get('verified') === 'true') {
@@ -80,7 +81,6 @@ function CompetitionDetailContent() {
   const isOpen = deadline ? deadline > new Date() : true
   const daysLeft = deadline ? Math.ceil((deadline.getTime() - Date.now()) / (1000 * 60 * 60 * 24)) : null
   const hasRegistrationLink = comp.registrationLink || comp.registrationUrl
-  const { data: advisorStats, isLoading: statsLoading } = useAdvisorCompetitionStats(comp?.id)
 
   const handleRegisterNow = () => {
     const url = comp.registrationLink || comp.registrationUrl

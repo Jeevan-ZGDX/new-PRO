@@ -26,12 +26,12 @@ export default function AdminDashboard() {
       'dashboard-stats',
       ['Metric', 'Value'],
       [
-        ['Total Competitions', String(stats.totalCompetitions)],
-        ['Total Registrations', String(stats.totalRegistrations)],
-        ['Verified Registrations', String(stats.verifiedRegistrations)],
-        ['Verification Rate', `${stats.verificationRate}%`],
-        ...stats.registrationsOverTime.map(r => [`Registrations (${r.date})`, String(r.count)]),
-        ...stats.topDepartments.map(d => [`Department - ${d.name}`, String(d.count)]),
+        ['Total Competitions', String(stats.totalCompetitions ?? 0)],
+        ['Total Registrations', String(stats.totalRegistrations ?? 0)],
+        ['Verified Registrations', String(stats.verifiedRegistrations ?? 0)],
+        ['Verification Rate', `${stats.verificationRate ?? 0}%`],
+        ...(stats.registrationsOverTime ?? []).map(r => [`Registrations (${r.date})`, String(r.count)]),
+        ...(stats.topDepartments ?? []).map(d => [`Department - ${d.name}`, String(d.count)]),
       ]
     )
   }

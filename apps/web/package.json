@@ -10,7 +10,8 @@
     "db:generate": "npx prisma generate",
     "db:push": "npx prisma db push",
     "db:seed": "node scripts/seed-supabase-students.mjs",
-    "db:studio": "npx prisma studio"
+    "db:studio": "npx prisma studio",
+    "cron": "tsx scripts/cron-deadline-reminders.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
