@@ -167,9 +167,9 @@ export default function CompetitionsPage() {
                       <p className="text-sm font-bold text-accent">{comp.prizePool || 'N/A'}</p>
                     </div>
                     <div className="flex items-center gap-2">
-                      {comp.registrationUrl && (
+                      {(comp.registrationLink || comp.registrationUrl) && (
                         <a 
-                          href={comp.registrationUrl} 
+                          href={comp.registrationLink || comp.registrationUrl} 
                           target="_blank" 
                           rel="noopener noreferrer"
                           onClick={(e) => e.stopPropagation()}
