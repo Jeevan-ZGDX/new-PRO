@@ -65,6 +65,7 @@ function CreateCompetitionContent() {
     organizerEmail: '',
     websiteUrl: '',
     registrationUrl: '',
+    registrationLink: '',
     teamSizeMin: 1,
     teamSizeMax: 1,
     prizePool: '',
@@ -90,6 +91,7 @@ function CreateCompetitionContent() {
         organizerEmail: (existingComp as any).organizerEmail || '',
         websiteUrl: existingComp.websiteUrl || '',
         registrationUrl: existingComp.registrationUrl || '',
+        registrationLink: existingComp.registrationLink || '',
         teamSizeMin: existingComp.teamSizeMin || 1,
         teamSizeMax: existingComp.teamSizeMax || 1,
         prizePool: existingComp.prizePool || '',
@@ -299,6 +301,17 @@ function CreateCompetitionContent() {
                   className={inputClass}
                   placeholder="https://"
                 />
+              </div>
+              <div>
+                <label className={labelClass}>Registration Link <span className="text-gray-400 dark:text-zinc-500 font-normal">(optional)</span></label>
+                <input
+                  type="url"
+                  value={form.registrationLink}
+                  onChange={(e) => update('registrationLink', e.target.value)}
+                  className={inputClass}
+                  placeholder="https://"
+                />
+                <p className="text-xs text-gray-500 dark:text-zinc-400 mt-1.5">Direct registration link (used for Supabase dashboard sync)</p>
               </div>
             </div>
           </div>

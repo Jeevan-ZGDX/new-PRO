@@ -246,7 +246,7 @@ register('POST', '/auth/logout', async () => ok(null))
 // --- COMPETITIONS ---
 register('POST', '/competitions', async (req) => {
   const body = await req.json()
-  const { title, description, shortDescription, category, scope, mode, organizer, organizerEmail, websiteUrl, registrationUrl, teamSizeMin, teamSizeMax, prizePool, registrationDeadline, startDate, endDate, eligibility, tags } = body
+  const { title, description, shortDescription, category, scope, mode, organizer, organizerEmail, websiteUrl, registrationUrl, registrationLink, teamSizeMin, teamSizeMax, prizePool, registrationDeadline, startDate, endDate, eligibility, tags } = body
   if (!title || !category || !scope || !mode || !organizer) {
     return NextResponse.json({ success: false, error: { code: 'BAD_REQUEST', message: 'title, category, scope, mode, and organizer are required' } }, { status: 400 })
   }
@@ -265,6 +265,7 @@ register('POST', '/competitions', async (req) => {
     bannerUrl: null,
     websiteUrl: websiteUrl || '',
     registrationUrl: registrationUrl || '',
+    registrationLink: registrationLink || '',
     teamSizeMin: teamSizeMin || 1,
     teamSizeMax: teamSizeMax || 1,
     prizePool: prizePool || '',
@@ -335,7 +336,7 @@ register('PUT', '/competitions/:id', async (req, seg) => {
   if (!comp) return NextResponse.json({ success: false, error: { code: 'NOT_FOUND', message: 'Competition not found' } }, { status: 404 })
   const body = await req.json()
   const idx = competitions.indexOf(comp)
-  const updated = {
+const updated = {
     ...comp,
     title: body.title ?? comp.title,
     description: body.description ?? comp.description,
@@ -347,6 +348,7 @@ register('PUT', '/competitions/:id', async (req, seg) => {
     organizerEmail: body.organizerEmail ?? comp.organizerEmail,
     websiteUrl: body.websiteUrl ?? comp.websiteUrl,
     registrationUrl: body.registrationUrl ?? comp.registrationUrl,
+    registrationLink: body.registrationLink ?? comp.registrationLink,
     teamSizeMin: body.teamSizeMin ?? comp.teamSizeMin,
     teamSizeMax: body.teamSizeMax ?? comp.teamSizeMax,
     prizePool: body.prizePool ?? comp.prizePool,
