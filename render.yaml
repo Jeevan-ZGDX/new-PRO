@@ -13,13 +13,19 @@
 
 services:
   - type: web
-    name: comp-dash-web
+    # Must match the live Render service name — it drives the
+    # <name>.onrender.com hostname. The live service is "comp-dash"
+    # (comp-dash.onrender.com); "comp-dash-web" was a separate,
+    # now-suspended service and must not be reused here.
+    name: comp-dash
     runtime: node
     region: singapore
     plan: free
     buildCommand: npm ci --legacy-peer-deps && npm run build
     startCommand: npm run start
-    healthCheckPath: /
+    # Cheap, DB-free endpoint. Using `/` here means a slow or failing page
+    # render can fail an otherwise healthy deploy.
+    healthCheckPath: /api/ping
     autoDeploy: true
     envVars:
       - key: NODE_ENV
@@ -33,7 +39,7 @@ services:
       - key: NEXT_PUBLIC_SUPABASE_ANON_KEY
         sync: false
       - key: NEXT_PUBLIC_API_URL
-        value: https://comp-dash-web.onrender.com/api
+        value: https://comp-dash.onrender.com/api
 
       # Google OAuth (private)
       - key: GOOGLE_CLIENT_ID
@@ -43,7 +49,7 @@ services:
       - key: GOOGLE_CLIENT_SECRET
         sync: false
       - key: GOOGLE_REDIRECT_URI
-        value: https://comp-dash-web.onrender.com/api/auth/gmail/callback
+        value: https://comp-dash.onrender.com/api/auth/gmail/callback
 
       # Supabase server-side + database (private)
       - key: SUPABASE_SERVICE_ROLE_KEY
