@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { getSupabaseClient, isSupabaseEnabled } from '../supabase-manager'
 import { apiClient } from '../client'
+import { ACTIVE_YEAR_LABELS, normalizeSection } from '@comp-dash/utils'
 import type { LeaderboardEntry, DepartmentLeaderboardEntry } from '@comp-dash/types'
 
 function parsePrizeValue(prizeStr: string): number {
@@ -15,13 +16,6 @@ function parsePrizeValue(prizeStr: string): number {
     .trim()
   const num = parseFloat(cleaned)
   return isNaN(num) ? 0 : num
-}
-
-function yearToDigit(year: string): string {
-  const match = year.match(/(\d+)/)
-  const digit = match ? match[1] : '1'
-  // shift 2nd Year → 2, 2nd year → 3, etc.
-  return String(Number(digit) + 1)
 }
 
 function extractNumericPrize(prizeStr: string): number {
@@ -56,17 +50,30 @@ async function fetchLeaderboardOverallFromSupabase(): Promise<LeaderboardEntry[]
   const sb = getSupabaseClient()
   if (!sb) return []
 
-  const { data: students } = await sb
-    .from('students')
-    .select('id, name, email, department, section, year')
-    .order('name')
+  // Paged and scoped to the cohorts we report on. Previously this was an
+  // unbounded select, so PostgREST's 1,000-row cap silently truncated 2,200+
+  // students and every section count was partial.
+  const students: any[] = []
+  const PAGE = 1000
+  for (let offset = 0; ; offset += PAGE) {
+    const { data, error } = await sb
+      .from('students')
+      .select('id, name, email, department, section, year')
+      .in('year', ACTIVE_YEAR_LABELS as string[])
+      .order('name')
+      .range(offset, offset + PAGE - 1)
+    if (error) break
+    const batch = data ?? []
+    students.push(...batch)
+    if (batch.length < PAGE) break
+  }
 
   const { data: winners } = await sb
     .from('winners')
     .select('student_name, email, competition, prize, date')
     .order('date', { ascending: false })
 
-  if (!students) return []
+  if (!students.length) return []
 
   const winsByEmail = new Map<string, { count: number; totalPrize: number; recentComp: string; recentDate: string }>()
 
@@ -83,16 +90,18 @@ async function fetchLeaderboardOverallFromSupabase(): Promise<LeaderboardEntry[]
     winsByEmail.set(email, existing)
   }
 
-  const entries: LeaderboardEntry[] = students.map((s) => {
+  const entries: LeaderboardEntry[] = students.map((s: any) => {
     const email = (s.email || '').toLowerCase().trim()
     const winData = winsByEmail.get(email) || { count: 0, totalPrize: 0, recentComp: '', recentDate: '' }
-    const yearDigit = email.includes('2024') ? '3' : email.includes('2025') ? '2' : yearToDigit(s.year || '1')
     return {
       rank: 0,
       studentName: s.name || '',
       email: s.email || '',
       department: s.department || '',
-      section: `${yearDigit}${s.section || ''}`,
+      // Stored as "3%A" for 3rd year and bare "A" for 1st; normalize to "A".
+      // The old code prepended a year digit guessed from the email batch, which
+      // produced "33%A" for 3rd years and a phantom "2A" for 1st years.
+      section: normalizeSection(s.section),
       points: winData.totalPrize,
       competitionsCount: winData.count,
       wins: winData.count,
@@ -139,12 +148,14 @@ async function fetchDepartmentsFromSupabase(): Promise<DepartmentLeaderboardEntr
 }
 
 export function useLeaderboardOverall() {
-  const useSupabase = isSupabaseEnabled()
-
   return useQuery({
-    queryKey: useSupabase ? ['supabase-leaderboard', 'overall'] : ['leaderboard', 'overall'],
+    queryKey: ['leaderboard', 'overall'],
+    // Resolved at fetch time, not render time: Providers registers the Supabase
+    // client in an effect, so reading isSupabaseEnabled() during the first
+    // render sent this down the apiClient path, which 404s because the
+    // catch-all API has no /leaderboard route.
     queryFn: () => {
-      if (useSupabase) return fetchLeaderboardOverallFromSupabase()
+      if (isSupabaseEnabled()) return fetchLeaderboardOverallFromSupabase()
       return apiClient.get<LeaderboardEntry[]>('/leaderboard/overall')
     },
     staleTime: 2 * 60 * 1000,
@@ -152,12 +163,10 @@ export function useLeaderboardOverall() {
 }
 
 export function useLeaderboardDepartment(params?: { department?: string }) {
-  const useSupabase = isSupabaseEnabled()
-
   return useQuery({
-    queryKey: useSupabase ? ['supabase-leaderboard', 'department', params] : ['leaderboard', 'department', params],
+    queryKey: ['leaderboard', 'department', params],
     queryFn: () => {
-      if (useSupabase) return fetchDepartmentLeaderboardFromSupabase(params?.department)
+      if (isSupabaseEnabled()) return fetchDepartmentLeaderboardFromSupabase(params?.department)
       return apiClient.get<LeaderboardEntry[]>('/leaderboard/department', params as Record<string, unknown>)
     },
     staleTime: 2 * 60 * 1000,
@@ -165,12 +174,10 @@ export function useLeaderboardDepartment(params?: { department?: string }) {
 }
 
 export function useLeaderboardDepartments() {
-  const useSupabase = isSupabaseEnabled()
-
   return useQuery({
-    queryKey: useSupabase ? ['supabase-leaderboard', 'departments'] : ['leaderboard', 'departments'],
+    queryKey: ['leaderboard', 'departments'],
     queryFn: () => {
-      if (useSupabase) return fetchDepartmentsFromSupabase()
+      if (isSupabaseEnabled()) return fetchDepartmentsFromSupabase()
       return apiClient.get<DepartmentLeaderboardEntry[]>('/leaderboard/departments')
     },
     staleTime: 2 * 60 * 1000,

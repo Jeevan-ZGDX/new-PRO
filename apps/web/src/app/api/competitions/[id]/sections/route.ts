@@ -1,94 +1,134 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { supabase } from '@/lib/supabase-client'
+import { apiOk, apiError } from '@/lib/api-response'
+import { createSupabaseAdminClient } from '@/lib/supabase/admin'
+import { supabase as anonClient } from '@/lib/supabase-client'
+import { activeEligibleYears, normalizeSection } from '@comp-dash/utils'
 import type { CompetitionSectionsResponse } from '@comp-dash/types'
+import { fetchAllRows } from '@/lib/fetch-all-rows'
 
-/** Normalize section labels (strip "3%" prefix). */
-function normalizeSection(section: string) {
-  return section.startsWith('3%') ? section.slice(2) : section
-}
+export const dynamic = 'force-dynamic'
+// `dynamic` only controls route rendering. supabase-js goes through `fetch`,
+// which Next caches separately, so without this a query's first result was
+// replayed forever and rows written later stayed invisible.
+export const fetchCache = 'force-no-store'
 
-/** Parse CSV of eligible years. */
-function parseEligibleYears(eligible: string | null | undefined) {
-  return eligible
-    ? eligible.split(',').map(x => x.trim()).filter(Boolean)
-    : []
-}
-
-export async function GET(request: NextRequest) {
-  const competitionId = request.nextUrl.pathname.split('/').pop()
-  if (!competitionId) return NextResponse.json({ error: 'Missing competition id' }, { status: 400 })
-  if (!supabase) return NextResponse.json({ error: 'Supabase not configured' }, { status: 500 })
-
-  const compRes = await supabase
-    .from('competition_dashboard')
-    .select('eligible_year, competition_name')
-    .eq('id', competitionId)
-    .single()
-  if (compRes.error || !compRes.data) {
-    return NextResponse.json({ error: 'Competition not found' }, { status: 404 })
+/**
+ * Section-wise registration breakdown for one competition.
+ *
+ * Registration status is joined through `student_competitions.student_email`
+ * → `students.email`; `student_competitions` has no section column of its own.
+ */
+export async function GET(
+  _request: Request,
+  { params }: { params: { id: string } }
+) {
+  // Read the id from the route params. Deriving it from the pathname breaks here
+  // because the last segment is "sections", not the competition id.
+  const competitionId = params.id
+  if (!competitionId) {
+    return apiError('BAD_REQUEST', 'Missing competition id', 400)
   }
-  const { eligible_year: eligibleYearCsv } = compRes.data
-  const eligibleYears = parseEligibleYears(eligibleYearCsv)
 
-  const studentsRes = await supabase
+  const db = createSupabaseAdminClient() ?? anonClient
+  if (!db) return apiError('NOT_CONFIGURED', 'Supabase not configured', 500)
+
+  const compRes = await db
+    .from('competition_dashboard')
+    .select('id, competition_name, eligible_year')
+    .eq('id', competitionId)
+    .maybeSingle()
+
+  if (compRes.error) {
+    return apiError('DB_ERROR', compRes.error.message, 500)
+  }
+  if (!compRes.data) {
+    return apiError('NOT_FOUND', 'Competition not found', 404)
+  }
+
+  // eligible_year holds Roman numerals ("I, II, III, IV") plus free text
+  // ("StartUp", "Startups, MSME") — it is never a students.year label, so it has
+  // to be translated before it can filter students.
+  //
+  // Then intersect with the cohorts we actually report on. Without that, a
+  // competition open to "I, II, III, IV" pulled in both stored section
+  // conventions — bare 1st-year "A" and prefixed 3rd-year "3%A" both normalize
+  // to "A" — so every section double-counted (A showed 127 instead of 65).
+  const eligible = activeEligibleYears(compRes.data.eligible_year)
+
+  if (eligible.excludesAllActive) {
+    return apiOk<CompetitionSectionsResponse>({
+      competitionId,
+      eligibleYears: [],
+      sections: [],
+      notEligible: true,
+    })
+  }
+
+  const studentQuery = db
     .from('students')
     .select('id,name,email,department,section,year')
-    .in('year', eligibleYears)
-  if (studentsRes.error || !studentsRes.data) {
-    return NextResponse.json({ error: 'Failed to fetch students' }, { status: 500 })
-  }
-  const students = studentsRes.data
+    .in('year', eligible.yearLabels)
 
-  const regRes = await supabase
-    .from('student_competitions')
-    .select('student_email,section')
-    .eq('competition_id', competitionId)
-  if (regRes.error) {
-    return NextResponse.json({ error: 'Failed to fetch registrations' }, { status: 500 })
+  // Paginated: PostgREST caps a plain select at 1000 rows and there are 2,200+ students.
+  const students = await fetchAllRows(studentQuery)
+  if (students.error) {
+    return apiError('DB_ERROR', students.error, 500)
   }
-  const registered = regRes.data || []
 
-  const sectionMap = new Map<string, { total: number; registered: number; details: any[] }>()
-  students.forEach(st => {
-    const sec = normalizeSection(st.section ?? 'A')
-    if (!sectionMap.has(sec)) {
-      sectionMap.set(sec, { total: 0, registered: 0, details: [] })
+  const registrations = await fetchAllRows(
+    db
+      .from('student_competitions')
+      .select('student_email, verification_status')
+      .eq('competition_id', competitionId)
+  )
+  if (registrations.error) {
+    return apiError('DB_ERROR', registrations.error, 500)
+  }
+
+  const statusByEmail = new Map<string, string>()
+  for (const reg of registrations.rows) {
+    const email = String(reg.student_email ?? '').trim().toLowerCase()
+    if (email) statusByEmail.set(email, reg.verification_status ?? 'pending')
+  }
+
+  const sectionMap = new Map<
+    string,
+    { total: number; registered: number; details: CompetitionSectionsResponse['sections'][number]['registered'] }
+  >()
+
+  for (const student of students.rows) {
+    const section = normalizeSection(student.section) || 'Unassigned'
+    let entry = sectionMap.get(section)
+    if (!entry) {
+      entry = { total: 0, registered: 0, details: [] }
+      sectionMap.set(section, entry)
     }
-    const entry = sectionMap.get(sec)!
     entry.total++
-  })
 
-  registered.forEach(reg => {
-    const sec = normalizeSection(reg.section ?? '')
-    const entry = sectionMap.get(sec)
-    if (entry) {
+    const status = statusByEmail.get(String(student.email ?? '').trim().toLowerCase())
+    if (status) {
       entry.registered++
-      // Find student for details
-      const st = students.find(s => s.email === reg.student_email)
-      if (st) {
-        entry.details.push({
-          id: st.email,
-          name: st.name,
-          email: st.email,
-          department: st.department,
-          section: sec,
-        })
-      }
+      entry.details!.push({
+        id: student.id,
+        name: student.name,
+        email: student.email,
+        department: student.department,
+        section,
+      })
     }
-  })
-
-  const sections = Array.from(sectionMap.entries()).map(([section, { total, registered, details }]) => ({
-    section,
-    totalCount: total,
-    registeredCount: registered,
-    registered: registered > 0 ? details : null,
-  }))
+  }
 
   const response: CompetitionSectionsResponse = {
     competitionId,
-    eligibleYears,
-    sections,
+    eligibleYears: eligible.yearLabels,
+    sections: Array.from(sectionMap.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([section, { total, registered, details }]) => ({
+        section,
+        totalCount: total,
+        registeredCount: registered,
+        registered: registered > 0 ? details : null,
+      })),
   }
 
-  return NextResponse.json(response)
+  return apiOk(response)
 }

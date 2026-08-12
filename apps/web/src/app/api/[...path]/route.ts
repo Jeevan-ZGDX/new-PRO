@@ -13,6 +13,8 @@ import { supabase, isSupabaseConfigured } from '@/lib/supabase-client'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { storeGmailTokens, getValidAccessToken as getValidGmailAccessToken, getGmailTokens, clearGmailTokens } from '@/lib/gmail-tokens'
 import type { UserRole } from '@/lib/auth'
+import { normalizeSection, sectionMatches } from '@comp-dash/utils'
+import { getSessionUser } from '@/lib/supabase/server'
 
 // ─── Types & Helper Functions ───────────────────────────────────────
 type RouteHandler = (req: NextRequest, segments: string[]) => Promise<NextResponse>
@@ -830,11 +832,23 @@ register('GET', '/hod/dashboard/stats', async (req) => {
 // ─── ADVISOR DASHBOARD ──────────────────────────────────────────────────
 register('GET', '/advisor/dashboard/stats', async (req) => {
   const qs = new URL(req.url).searchParams
-  const userId = qs.get('userId') || 'user-adv'
-  const advisor = advisors.find(a => a.id === userId) || { id: userId, name: 'Advisor', department: 'CSE', assignedSections: ['A'] }
+  const sessionUser = await getSessionUser()
+  const sessionEmail = sessionUser?.email?.trim().toLowerCase() || null
+  const userId = qs.get('userId') || ''
+  const advisor = advisors.find(a =>
+    (sessionEmail && a.email?.trim().toLowerCase() === sessionEmail) ||
+    (userId && (a.id === userId || a.email?.trim().toLowerCase() === userId.toLowerCase()))
+  )
+  if (!advisor) {
+    return error('ADVISOR_NOT_FOUND', `No advisor record for ${sessionEmail || userId || 'this session'}`, 404)
+  }
   const deptName = advisor.department || 'CSE'
-  const assignedSections = advisor.assignedSections || ['A']
-  const deptStudents = students.filter(s => s.department === deptName && assignedSections.includes(s.section))
+  // assigned_sections holds bare labels ("A"); students.section is year-prefixed
+  // ("3%A"), so a direct includes() never matches. Compare normalized values.
+  const assignedSections: string[] = (advisor.assignedSections || advisor.assigned_sections || []).map(normalizeSection)
+  const deptStudents = students.filter(
+    s => s.department === deptName && assignedSections.some(sec => sectionMatches(sec, s.section))
+  )
   const deptRegistrations = registrations.filter(r => deptStudents.some(s => s.id === r.userId))
   const verifiedCount = deptRegistrations.filter(r => r.status === 'verified' || r.status === 'completed').length
   const pendingCount = deptRegistrations.filter(r => r.status === 'pending_verification').length
@@ -907,8 +921,19 @@ register('GET', '/student/dashboard/stats', async (req) => {
 // ─── NOTIFICATIONS UNREAD COUNT ─────────────────────────────────────────
 register('GET', '/notifications/unread-count', async (req) => {
   const qs = new URL(req.url).searchParams
-  const userId = qs.get('userId')
-  if (!userId) return NextResponse.json({ success: false, error: { code: 'BAD_REQUEST', message: 'userId required' } }, { status: 400 })
+  // The header polls this without a userId, which used to 400 on every page.
+  // Fall back to the signed-in session, and report zero rather than an error
+  // when we still cannot identify a user.
+  let userId = qs.get('userId')
+  if (!userId) {
+    const sessionUser = await getSessionUser()
+    const email = sessionUser?.email?.trim().toLowerCase()
+    if (email) {
+      const student = students.find(s => s.email?.trim().toLowerCase() === email)
+      userId = student?.id || email
+    }
+  }
+  if (!userId) return ok({ count: 0 })
   const count = notifications.filter(n => n.userId === userId && !n.isRead).length
   return ok({ count })
 })
@@ -1051,7 +1076,7 @@ register('GET', '/auth/gmail', async (req) => {
   const qs = new URL(req.url).searchParams
   const url = new URL('https://accounts.google.com/o/oauth2/v2/auth')
   url.searchParams.set('client_id', process.env.GOOGLE_CLIENT_ID || '')
-  url.searchParams.set('redirect_uri', process.env.GOOGLE_REDIRECT_URI)
+  url.searchParams.set('redirect_uri', process.env.GOOGLE_REDIRECT_URI || '')
   url.searchParams.set('response_type', 'code')
   url.searchParams.set('scope', 'https://www.googleapis.com/auth/gmail.readonly openid email')
   url.searchParams.set('access_type', 'offline')
@@ -1073,7 +1098,7 @@ register('GET', '/auth/gmail/callback', async (req) => {
       client_id: process.env.GOOGLE_CLIENT_ID || '',
       client_secret: process.env.GOOGLE_CLIENT_SECRET || '',
       code,
-      redirect_uri: process.env.GOOGLE_REDIRECT_URI,
+      redirect_uri: process.env.GOOGLE_REDIRECT_URI || '',
       grant_type: 'authorization_code',
     }).toString(),
   })

@@ -3,13 +3,14 @@
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { useState, useEffect, Suspense } from 'react'
 import { Card, Badge, Button } from '@comp-dash/design-system'
-import { useCompetition, useAdvisorCompetitionStats } from '@comp-dash/api'
+import { useCompetition } from '@comp-dash/api'
 import { getCurrentUser } from '@/lib/auth'
+import { AdvisorRosterPanel } from '@/components/dashboard/AdvisorRosterPanel'
+import { HodSectionsPanel } from '@/components/dashboard/HodSectionsPanel'
 import { 
   Calendar, MapPin, Users, Clock, Trophy, ArrowLeft, ExternalLink, 
   Globe, Building2, Target, Pencil, Mail, CheckCircle, AlertCircle, 
   Loader2, MailCheck, Shield, Sparkles, ChevronDown, ChevronUp, Info,
-  Download, UserX
 } from 'lucide-react'
 
 const categoryGradients: Record<string, string> = {
@@ -48,7 +49,6 @@ function CompetitionDetailContent() {
   useEffect(() => { setUser(getCurrentUser()) }, [])
 
   const { data: comp, isLoading, error } = useCompetition(params.id as string)
-  const { data: advisorStats, isLoading: statsLoading } = useAdvisorCompetitionStats(comp?.id)
 
   useEffect(() => {
     if (searchParams.get('verified') === 'true') {
@@ -317,80 +317,21 @@ function CompetitionDetailContent() {
           </div>
         </div>
 
+        {/*
+          Advisors get their own sections, resolved from their `advisors` row.
+          HODs and admins have no advisors row, so they get the department-wide
+          section breakdown instead — showing them the advisor panel produced
+          "no advisor record is mapped to this account".
+        */}
+        {(user?.role === 'hod' || user?.role === 'super_admin') && (
+          <div className="mt-8 pt-6 p-6 md:p-8 border-t border-gray-200 dark:border-zinc-800 bg-gray-50/50 dark:bg-zinc-900/30">
+            <HodSectionsPanel competitionId={comp.id} competitionTitle={comp.title} />
+          </div>
+        )}
+
         {user?.role === 'advisor' && (
           <div className="mt-8 pt-6 p-6 md:p-8 border-t border-gray-200 dark:border-zinc-800 bg-gray-50/50 dark:bg-zinc-900/30">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
-                <Users className="w-5 h-5 text-accent" />
-                Student Applications Report
-              </h2>
-              <Button
-                onClick={() => router.push(`/competitions/${comp.id}/report`)}
-                variant="outline"
-                size="sm"
-                className="flex items-center gap-2 transition-transform duration-200 hover:scale-[1.02] active:scale-[0.98]"
-              >
-                <Download className="w-4 h-4" />
-                Download Report
-              </Button>
-            </div>
-            {statsLoading ? (
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                {Array.from({ length: 3 }).map((_, i) => (
-                  <Card key={i} className="p-5 bg-white dark:bg-[#18181b] border border-gray-200 dark:border-zinc-800">
-                    <div className="flex items-start gap-3">
-                      <div className="w-10 h-10 rounded-lg bg-gray-100 dark:bg-zinc-800 animate-pulse shrink-0" />
-                      <div className="flex-1">
-                        <div className="h-4 w-24 bg-gray-100 dark:bg-zinc-800 rounded animate-pulse mb-2" />
-                        <div className="h-6 w-12 bg-gray-100 dark:bg-zinc-800 rounded animate-pulse" />
-                      </div>
-                    </div>
-                  </Card>
-                ))}
-              </div>
-            ) : advisorStats ? (
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                <Card className="p-5 bg-white dark:bg-[#18181b] border border-gray-200 dark:border-zinc-800 shadow-sm transition-transform duration-200 hover:scale-[1.02]">
-                  <div className="flex items-start gap-3">
-                    <div className="w-10 h-10 rounded-lg bg-blue-50 dark:bg-blue-950/40 border border-blue-200/50 dark:border-blue-800/50 flex items-center justify-center shrink-0">
-                      <Users className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-                    </div>
-                    <div>
-                      <p className="text-sm text-gray-500 dark:text-zinc-400 mb-1">Total Students</p>
-                      <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                        {advisorStats.totalStudents || 0}
-                      </p>
-                    </div>
-                  </div>
-                </Card>
-                <Card className="p-5 bg-white dark:bg-[#18181b] border border-gray-200 dark:border-zinc-800 shadow-sm transition-transform duration-200 hover:scale-[1.02]">
-                  <div className="flex items-start gap-3">
-                    <div className="w-10 h-10 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200/50 dark:border-emerald-800/50 flex items-center justify-center shrink-0">
-                      <CheckCircle className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
-                    </div>
-                    <div>
-                      <p className="text-sm text-gray-500 dark:text-zinc-400 mb-1">Applied Students</p>
-                      <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                        {advisorStats.appliedStudents || 0}
-                      </p>
-                    </div>
-                  </div>
-                </Card>
-                <Card className="p-5 bg-white dark:bg-[#18181b] border border-gray-200 dark:border-zinc-800 shadow-sm transition-transform duration-200 hover:scale-[1.02]">
-                  <div className="flex items-start gap-3">
-                    <div className="w-10 h-10 rounded-lg bg-rose-50 dark:bg-rose-950/40 border border-rose-200/50 dark:border-rose-800/50 flex items-center justify-center shrink-0">
-                      <UserX className="w-5 h-5 text-rose-600 dark:text-rose-400" />
-                    </div>
-                    <div>
-                      <p className="text-sm text-gray-500 dark:text-zinc-400 mb-1">Not Applied</p>
-                      <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                        {advisorStats.unregisteredStudents || 0}
-                      </p>
-                    </div>
-                  </div>
-                </Card>
-              </div>
-            ) : null}
+            <AdvisorRosterPanel competitionId={comp.id} />
           </div>
         )}
       </div>
