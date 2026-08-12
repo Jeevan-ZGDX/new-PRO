@@ -1,19 +1,33 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
-import { Eye, EyeOff } from 'lucide-react'
-import { registerUser } from '@/lib/auth'
+import { Eye, EyeOff, CheckCircle } from 'lucide-react'
+import { getSupabaseBrowserClient, isSupabaseAuthConfigured } from '@/lib/supabase/browser'
+import { isAllowedEmail } from '@/lib/auth'
+import { GoogleSignInButton } from '@/components/common/GoogleSignInButton'
 import { ThemeToggle } from '@/components/common/ThemeToggle'
 
 export default function SignUpPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [email, setEmail] = useState('')
+  const [name, setName] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [checkEmail, setCheckEmail] = useState(false)
+
+  const configured = isSupabaseAuthConfigured()
+
+  const oauthError = searchParams.get('error')
+  const oauthMessage = searchParams.get('message')
+  const pendingGoogle = oauthError !== null
+
+  const emailDomain = email.trim().split('@')[1]
+  const isCollegeEmail = emailDomain && emailDomain.endsWith('citchennai.net')
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -26,14 +40,69 @@ export default function SignUpPage() {
       return
     }
 
-    const success = registerUser(email, password)
-    if (!success) {
-      setError('An account with this email already exists')
+    if (isCollegeEmail) {
+      const supabase = getSupabaseBrowserClient()
+      if (!supabase) {
+        setError('Supabase is not configured. Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY, then restart the app.')
+        setLoading(false)
+        return
+      }
+
+      const { error: authError } = await supabase.auth.signUp({
+        email: email.trim().toLowerCase(),
+        password,
+        options: {
+          data: {
+            name: name.trim() || email.split('@')[0],
+            role: 'student',
+            department: '',
+          },
+        },
+      })
       setLoading(false)
+
+      if (authError) {
+        setError(authError.message || 'Failed to create account')
+        return
+      }
+
+      setCheckEmail(true)
       return
     }
 
-    router.push('/sign-in')
+    if (!isCollegeEmail) {
+      setError('Only @citchennai.net emails are accepted for Google OAuth. Please use your college email or sign up with a valid @citchennai.net address.')
+      setLoading(false)
+      return
+    }
+  }
+
+  if (checkEmail) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-obsidian-canvas relative flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+        <div className="absolute top-4 right-4">
+          <ThemeToggle />
+        </div>
+        <div className="w-full max-w-md">
+          <div className="bg-white dark:bg-obsidian-surface rounded-2xl shadow-sm border border-gray-100 dark:border-obsidian-border p-8 text-center space-y-4">
+            <div className="w-16 h-16 rounded-full bg-green-50 border border-green-200 flex items-center justify-center mx-auto">
+              <CheckCircle className="w-8 h-8 text-green-600" />
+            </div>
+            <h1 className="text-xl font-bold text-gray-900 dark:text-ink-primary">Check your email</h1>
+            <p className="text-sm text-gray-500 dark:text-obsidian-faint">
+              We sent a confirmation link to <span className="font-medium text-gray-700 dark:text-ink-muted">{email}</span>.
+              Confirm your email, then sign in to get started.
+            </p>
+            <Link
+              href="/sign-in"
+              className="inline-block px-6 py-2.5 bg-accent text-white text-sm font-medium rounded-xl hover:bg-accent/90 transition-colors"
+            >
+              Go to Sign In
+            </Link>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -50,12 +119,49 @@ export default function SignUpPage() {
           <p className="text-gray-500 dark:text-obsidian-faint">Join Comp-Dash to get started</p>
         </div>
 
+        {pendingGoogle && (
+          <div className="mb-5 p-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-sm">
+            {oauthMessage || 'Google sign in could not be completed. Please try again.'}
+          </div>
+        )}
+
+        <GoogleSignInButton />
+
+        <div className="flex items-center gap-3 my-5">
+          <div className="h-px flex-1 bg-gray-200 dark:bg-obsidian-border" />
+          <span className="text-xs font-medium text-gray-400 dark:text-obsidian-faint">
+            or sign up with email
+          </span>
+          <div className="h-px flex-1 bg-gray-200 dark:bg-obsidian-border" />
+        </div>
+
         <form onSubmit={handleSubmit} className="bg-white dark:bg-obsidian-surface rounded-2xl shadow-sm border border-gray-100 dark:border-obsidian-border p-8 space-y-5">
           {error && (
             <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-red-600 text-sm">
               {error}
             </div>
           )}
+
+          {!configured && (
+            <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-700 text-sm">
+              Supabase Auth is not configured. Add NEXT_PUBLIC_SUPABASE_URL and
+              NEXT_PUBLIC_SUPABASE_ANON_KEY to your environment to enable sign up.
+            </div>
+          )}
+
+          <div>
+            <label htmlFor="name" className="block text-sm font-medium text-gray-700 dark:text-ink-muted mb-1.5">
+              Full Name
+            </label>
+            <input
+              id="name"
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Your name"
+              className="w-full h-11 px-4 rounded-xl border border-gray-200 dark:border-obsidian-border bg-white dark:bg-obsidian-hover text-gray-900 dark:text-ink-primary placeholder-gray-400 dark:placeholder-obsidian-faint font-medium text-sm focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent"
+            />
+          </div>
 
           <div>
             <label htmlFor="email" className="block text-sm font-medium text-gray-700 dark:text-ink-muted mb-1.5">
@@ -66,9 +172,14 @@ export default function SignUpPage() {
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="you@example.com"
+              placeholder="you@citchennai.net"
               className="w-full h-11 px-4 rounded-xl border border-gray-200 dark:border-obsidian-border bg-white dark:bg-obsidian-hover text-gray-900 dark:text-ink-primary placeholder-gray-400 dark:placeholder-obsidian-faint font-medium text-sm focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent"
             />
+            {email && !isAllowedEmail(email) && (
+              <p className="text-xs text-amber-600 mt-1.5">
+                Use your college email (@citchennai.net) — non-college accounts default to the student role.
+              </p>
+            )}
           </div>
 
           <div>
@@ -81,7 +192,7 @@ export default function SignUpPage() {
                 type={showPassword ? 'text' : 'password'}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="Create a password"
+                placeholder="Create a password (min. 6 characters)"
                 className="w-full h-11 px-4 pr-11 rounded-xl border border-gray-200 dark:border-obsidian-border bg-white dark:bg-obsidian-hover text-gray-900 dark:text-ink-primary placeholder-gray-400 dark:placeholder-obsidian-faint font-medium text-sm focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent"
               />
               <button
@@ -96,7 +207,7 @@ export default function SignUpPage() {
 
           <button
             type="submit"
-            disabled={loading}
+            disabled={loading || !configured}
             className="w-full h-11 bg-accent dark:bg-striver text-white rounded-xl font-medium text-sm hover:bg-accent/90 dark:hover:bg-striver-hover disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             {loading ? 'Creating account...' : 'Create Account'}

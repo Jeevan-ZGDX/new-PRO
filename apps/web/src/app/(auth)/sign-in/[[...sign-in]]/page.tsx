@@ -1,20 +1,27 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { Eye, EyeOff } from 'lucide-react'
-import { authenticateUser } from '@/lib/auth'
-import { apiClient } from '@comp-dash/api'
+import { getSupabaseBrowserClient, isSupabaseAuthConfigured } from '@/lib/supabase/browser'
+import { GoogleSignInButton } from '@/components/common/GoogleSignInButton'
 import { ThemeToggle } from '@/components/common/ThemeToggle'
 
 export default function SignInPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+
+  const configured = isSupabaseAuthConfigured()
+
+  const oauthError = searchParams.get('error')
+  const oauthMessage = searchParams.get('message')
+  const pendingGoogle = oauthError !== null
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -28,34 +35,31 @@ export default function SignInPage() {
       return
     }
 
-    const success = authenticateUser(cleanEmail, password)
-    if (!success) {
-      setError('Invalid email or password')
+    const supabase = getSupabaseBrowserClient()
+    if (!supabase) {
+      setError('Supabase is not configured. Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY, then restart the app.')
       setLoading(false)
       return
     }
 
-    const token = 'mock-jwt-' + cleanEmail + '-' + Date.now()
-    apiClient.setToken(token)
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('auth_token', token)
+    const { error: authError } = await supabase.auth.signInWithPassword({
+      email: cleanEmail,
+      password,
+    })
+    setLoading(false)
+
+    if (authError) {
+      setError(authError.message || 'Invalid email or password')
+      return
     }
 
-    router.push('/dashboard')
+    const next = searchParams.get('next') || '/dashboard'
+    router.push(next)
+    router.refresh()
   }
 
-  const fillCredentials = (em: string, pass: string) => {
-    setEmail(em)
-    setPassword(pass)
-    setError('')
-  }
-
-  const testUsers = [
-    { email: 'admin@citchennai.net', pass: 'admin123', label: 'Super Admin' },
-    { email: 'hod@citchennai.net', pass: 'hod123', label: 'HOD' },
-    { email: 'advisor@citchennai.net', pass: 'advisor123', label: 'Advisor' },
-    { email: 'student@citchennai.net', pass: 'student123', label: 'Student' },
-  ]
+  const emailDomain = email.trim().split('@')[1]
+  const isCollegeEmail = emailDomain && emailDomain.endsWith('citchennai.net')
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-obsidian-canvas relative flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
@@ -71,10 +75,42 @@ export default function SignInPage() {
           <p className="text-gray-500 dark:text-obsidian-faint">Sign in to your Comp-Dash account</p>
         </div>
 
+        {pendingGoogle && (
+          <div className="mb-5 p-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-sm">
+            {oauthMessage || 'Google sign in could not be completed. Please try again.'}
+          </div>
+        )}
+
+        <GoogleSignInButton />
+
+        <div className="flex items-center gap-3 my-5">
+          <div className="h-px flex-1 bg-gray-200 dark:bg-obsidian-border" />
+          <span className="text-xs font-medium text-gray-400 dark:text-obsidian-faint">
+            or sign in with email
+          </span>
+          <div className="h-px flex-1 bg-gray-200 dark:bg-obsidian-border" />
+        </div>
+
+        {isCollegeEmail || email.trim() === '' ? (
+          !isCollegeEmail && email.trim() !== '' && (
+            <div className="p-3 rounded-xl bg-orange-50 border border-orange-200 text-orange-700 text-sm">
+              <p>Google OAuth is only available for @citchennai.net email addresses.</p>
+              <p className="mt-1">Sign up or use your college email to connect Gmail.</p>
+            </div>
+          )
+        ) : null}
+
         <form onSubmit={handleSubmit} className="bg-white dark:bg-obsidian-surface rounded-2xl shadow-sm border border-gray-100 dark:border-obsidian-border p-8 space-y-5">
           {error && (
             <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-red-600 text-sm">
               {error}
+            </div>
+          )}
+
+          {!configured && (
+            <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-700 text-sm">
+              Supabase Auth is not configured. Add NEXT_PUBLIC_SUPABASE_URL and
+              NEXT_PUBLIC_SUPABASE_ANON_KEY to your environment to enable sign in.
             </div>
           )}
 
@@ -87,7 +123,7 @@ export default function SignInPage() {
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="admin@cit.in"
+              placeholder="you@citchennai.net"
               className="w-full h-11 px-4 rounded-xl border border-gray-300 dark:border-obsidian-border bg-white dark:bg-obsidian-hover text-gray-900 dark:text-ink-primary placeholder-gray-400 dark:placeholder-obsidian-faint font-medium text-sm focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent"
             />
           </div>
@@ -114,10 +150,21 @@ export default function SignInPage() {
               </button>
             </div>
           </div>
+          <div className="mt-4 space-y-2">
+            <p className="text-xs text-gray-500 dark:text-obsidian-faint font-medium">
+              Demo Accounts:
+            </p>
+            <div className="grid grid-cols-2 gap-2">
+              <button className="text-left text-xs p-1 rounded hover:bg-accent/10" onClick={()=>{setEmail('admin@citchennai.net');setPassword('CompDash@123')}}>Admin: admin@citchennai.net / CompDash@123</button>
+              <button className="text-left text-xs p-1 rounded hover:bg-accent/10" onClick={()=>{setEmail('hod@citchennai.net');setPassword('CompDash@123')}}>HOD: hod@citchennai.net / CompDash@123</button>
+              <button className="text-left text-xs p-1 rounded hover:bg-accent/10" onClick={()=>{setEmail('advisor@citchennai.net');setPassword('CompDash@123')}}>Advisor: advisor@citchennai.net / CompDash@123</button>
+              <button className="text-left text-xs p-1 rounded hover:bg-accent/10" onClick={()=>{setEmail('student@citchennai.net');setPassword('CompDash@123')}}>Student: student@citchennai.net / CompDash@123</button>
+            </div>
+          </div>
 
           <button
             type="submit"
-            disabled={loading}
+            disabled={loading || !configured}
             className="w-full h-11 bg-accent dark:bg-striver text-white rounded-xl font-medium text-sm hover:bg-accent/90 dark:hover:bg-striver-hover disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             {loading ? 'Signing in...' : 'Sign In'}
@@ -132,20 +179,15 @@ export default function SignInPage() {
         </form>
 
         <div className="mt-4 p-4 rounded-xl bg-blue-50 border border-blue-100 text-xs text-blue-700 space-y-2">
-          <p className="font-medium text-sm">Test Credentials (click to fill):</p>
-          <div className="space-y-1">
-            {testUsers.map((u) => (
-              <button
-                key={u.email}
-                type="button"
-                onClick={() => fillCredentials(u.email, u.pass)}
-                className="w-full text-left p-1.5 hover:bg-blue-100/60 rounded flex justify-between items-center transition-colors text-blue-800"
-              >
-                <span><strong className="font-semibold">{u.email}</strong> / {u.pass}</span>
-                <span className="font-medium text-[11px] bg-blue-200/70 text-blue-900 px-2 py-0.5 rounded-full">{u.label}</span>
-              </button>
-            ))}
-          </div>
+          <p className="font-medium text-sm">Demo Accounts</p>
+            <p>
+            Run <code className="font-mono bg-blue-100/70 px-1 rounded">npm run seed:auth</code> to
+            create the demo users (admin, hod, advisor, student). Otherwise sign up with your
+            college email.
+          </p>
+            <div className="mt-4 p-2 bg-white dark:bg-obsidian-surface rounded-xl text-xs text-gray-600 dark:text-obsidian-faint border border-gray-200 dark:border-obsidian-border">
+              <p className="text-center">By signing in you agree to our <a href="/terms" className="text-accent hover:underline">Terms of Use</a> and <a href="/policy" className="text-accent hover:underline">Privacy Policy</a>.</p>
+            </div>
         </div>
       </div>
     </div>

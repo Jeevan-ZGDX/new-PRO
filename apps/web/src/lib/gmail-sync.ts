@@ -1,5 +1,7 @@
+// Gmail tokens are stored server-side (gmail_tokens table). This module only keeps
+// a non-sensitive email cache + history cursor in localStorage and proxies to the API.
+
 const STORAGE_KEYS = {
-  tokens: (uid: string) => `comp_dash_gmail_tokens_${uid}`,
   historyId: (uid: string) => `comp_dash_gmail_history_${uid}`,
   syncedEmails: (uid: string) => `comp_dash_gmail_synced_${uid}`,
 }
@@ -31,11 +33,6 @@ interface GmailSearchResult {
   emails: StoredEmail[]
 }
 
-function getApiBase(): string {
-  if (typeof window === 'undefined') return ''
-  return ''
-}
-
 async function fetchApi(endpoint: string, params: Record<string, string> = {}, options: { method?: string; body?: any } = {}): Promise<any> {
   const url = new URL(`/api${endpoint}`, window.location.origin)
   Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v))
@@ -46,31 +43,52 @@ async function fetchApi(endpoint: string, params: Record<string, string> = {}, o
   })
   const json = await res.json()
   if (!res.ok || !json.success) {
-    throw new Error(json.error?.message || 'API request failed')
+    const err = new Error(json.error?.message || 'API request failed') as Error & { status?: number }
+    err.status = res.status
+    throw err
   }
   return json.data
 }
 
-export function getGmailTokens(userId: string): GmailTokens | null {
-  if (typeof window === 'undefined') return null
+// ─── Token helpers (server-backed) ─────────────────────────────────
+export async function getGmailTokens(userId: string): Promise<{ connected: boolean; historyId: string; email: string }> {
   try {
-    const raw = localStorage.getItem(STORAGE_KEYS.tokens(userId))
-    return raw ? JSON.parse(raw) : null
-  } catch { return null }
+    const data = await fetchApi('/gmail/tokens', { userId })
+    return {
+      connected: !!data?.connected,
+      historyId: data?.historyId || '',
+      email: data?.email || '',
+    }
+  } catch {
+    return { connected: false, historyId: '', email: '' }
+  }
 }
 
-export function setGmailTokens(userId: string, tokens: GmailTokens) {
-  if (typeof window === 'undefined') return
-  localStorage.setItem(STORAGE_KEYS.tokens(userId), JSON.stringify(tokens))
+export async function setGmailTokens(userId: string, tokens: GmailTokens) {
+  try {
+    await fetchApi('/gmail/tokens', { userId }, {
+      method: 'POST',
+      body: {
+        userId,
+        accessToken: tokens.access_token,
+        refreshToken: tokens.refresh_token || '',
+        expiresIn: String(Math.floor((tokens.expiry_date - Date.now()) / 1000)),
+      },
+    })
+  } catch { /* ignore */ }
 }
 
-export function clearGmailTokens(userId: string) {
-  if (typeof window === 'undefined') return
-  localStorage.removeItem(STORAGE_KEYS.tokens(userId))
-  localStorage.removeItem(STORAGE_KEYS.historyId(userId))
-  localStorage.removeItem(STORAGE_KEYS.syncedEmails(userId))
+export async function clearGmailTokens(userId: string) {
+  try {
+    await fetchApi('/gmail/tokens', { userId }, { method: 'DELETE' })
+  } catch { /* ignore */ }
+  if (typeof window !== 'undefined') {
+    localStorage.removeItem(STORAGE_KEYS.historyId(userId))
+    localStorage.removeItem(STORAGE_KEYS.syncedEmails(userId))
+  }
 }
 
+// ─── Non-sensitive client-side cache ───────────────────────────────
 export function getHistoryId(userId: string): string | null {
   if (typeof window === 'undefined') return null
   return localStorage.getItem(STORAGE_KEYS.historyId(userId))
@@ -101,101 +119,42 @@ export function appendSyncedEmails(userId: string, newEmails: StoredEmail[]) {
   setSyncedEmails(userId, deduped)
 }
 
-export function isTokenExpired(tokens: GmailTokens): boolean {
-  return Date.now() >= tokens.expiry_date - 60000
-}
-
-export async function refreshAccessToken(refreshToken: string): Promise<GmailTokens | null> {
-  try {
-    const res = await fetch('https://oauth2.googleapis.com/token', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({
-        client_id: process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || process.env.GOOGLE_CLIENT_ID || '',
-        client_secret: process.env.GOOGLE_CLIENT_SECRET || '',
-        refresh_token: refreshToken,
-        grant_type: 'refresh_token',
-      }).toString(),
-    })
-    if (!res.ok) return null
-    const data = await res.json()
-    return {
-      access_token: data.access_token,
-      refresh_token: refreshToken,
-      expiry_date: Date.now() + (data.expires_in || 3600) * 1000,
-    }
-  } catch { return null }
-}
-
-export async function fetchValidAccessToken(userId: string): Promise<string | null> {
-  const tokens = getGmailTokens(userId)
-  if (!tokens?.access_token) return null
-  if (isTokenExpired(tokens)) {
-    const refreshed = await refreshAccessToken(tokens.refresh_token)
-    if (!refreshed) { clearGmailTokens(userId); return null }
-    setGmailTokens(userId, refreshed)
-    return refreshed.access_token
-  }
-  return tokens.access_token
-}
-
-export async function storeTokensOnServer(userId: string, tokens: GmailTokens, historyId?: string): Promise<void> {
-  await fetchApi('/gmail/tokens', { userId }, {
-    method: 'POST',
-    body: {
-      userId,
-      accessToken: tokens.access_token,
-      refreshToken: tokens.refresh_token || '',
-      expiresIn: String(Math.floor((tokens.expiry_date - Date.now()) / 1000)),
-      historyId: historyId || '',
-    },
-  })
-}
-
-// --- Server-proxied Gmail API calls ---
+// ─── Server-proxied Gmail API calls ────────────────────────────────
+// The server resolves the OAuth token by userId; nothing sensitive leaves the server.
 
 export async function fetchInitialHistoryId(userId: string): Promise<string | null> {
-  const accessToken = await fetchValidAccessToken(userId)
-  if (!accessToken) return null
   try {
-    const data = await fetchApi('/gmail/sync/initial', { userId, accessToken })
+    const data = await fetchApi('/gmail/sync/initial', { userId })
     return data.historyId || null
   } catch { return null }
 }
 
 export async function fetchHistorySync(userId: string): Promise<GmailSyncResult | null> {
-  const accessToken = await fetchValidAccessToken(userId)
   const startHistoryId = getHistoryId(userId)
-  if (!accessToken || !startHistoryId) return null
+  if (!startHistoryId) return null
   try {
-    const data = await fetchApi('/gmail/sync', { userId, accessToken, startHistoryId })
+    const data = await fetchApi('/gmail/sync', { userId, startHistoryId })
     return { historyId: data.historyId, emails: data.emails }
   } catch { return null }
 }
 
 export async function searchGmailEmails(userId: string, keyword: string): Promise<StoredEmail[]> {
-  const accessToken = await fetchValidAccessToken(userId)
-  if (!accessToken) return []
   try {
-    const data = await fetchApi('/gmail/search', { userId, accessToken, keyword })
+    const data = await fetchApi('/gmail/search', { userId, keyword })
     return data.emails || []
   } catch { return [] }
 }
 
 export async function fetchEmailDetail(userId: string, emailId: string): Promise<StoredEmail | null> {
-  const accessToken = await fetchValidAccessToken(userId)
-  if (!accessToken) return null
   try {
-    const data = await fetchApi('/gmail/email-detail', { userId, accessToken, id: emailId })
+    const data = await fetchApi('/gmail/email-detail', { userId, id: emailId })
     return data.email || null
   } catch { return null }
 }
 
 export async function fetchRecentEmails(userId: string, maxResults = 30): Promise<StoredEmail[]> {
-  const accessToken = await fetchValidAccessToken(userId)
-  if (!accessToken) return []
   try {
-    const data = await fetchApi('/gmail/recent', { userId, accessToken, maxResults: String(maxResults) })
+    const data = await fetchApi('/gmail/recent', { userId, maxResults: String(maxResults) })
     return data.emails || []
   } catch { return [] }
 }

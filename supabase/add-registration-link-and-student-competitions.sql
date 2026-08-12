@@ -2,6 +2,10 @@
 ALTER TABLE competition_dashboard 
 ADD COLUMN IF NOT EXISTS registration_link TEXT;
 
+-- NOTE (2026-08): superseded by phase1-student-competitions.sql, which is the
+-- applied live migration. This file is kept as the historical incremental
+-- draft with corrected policies (Allow-all, matching every other live table).
+
 -- Create student_competitions table for tracking registrations and verifications
 CREATE TABLE IF NOT EXISTS student_competitions (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
@@ -17,7 +21,8 @@ CREATE TABLE IF NOT EXISTS student_competitions (
   gmail_thread_id TEXT,
   verified_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW()
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE (student_email, competition_id)
 );
 
 -- Create index for faster lookups
@@ -34,6 +39,7 @@ CREATE TABLE IF NOT EXISTS gmail_tokens (
   refresh_token TEXT,
   expires_at TIMESTAMPTZ,
   scope TEXT,
+  history_id TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -42,29 +48,12 @@ CREATE TABLE IF NOT EXISTS gmail_tokens (
 ALTER TABLE student_competitions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE gmail_tokens ENABLE ROW LEVEL SECURITY;
 
--- RLS policies for student_competitions
-CREATE POLICY "Students can view their own registrations" ON student_competitions
-  FOR SELECT USING (student_email = auth.jwt() ->> 'email');
-
-CREATE POLICY "Students can insert their own registrations" ON student_competitions
-  FOR INSERT WITH CHECK (student_email = auth.jwt() ->> 'email');
-
-CREATE POLICY "Admins can view all registrations" ON student_competitions
-  FOR SELECT USING (
-    EXISTS (
-      SELECT 1 FROM user_profiles 
-      WHERE user_id = auth.uid() AND role IN ('super_admin', 'advisor', 'hod')
-    )
-  );
-
-CREATE POLICY "Admins can update verification status" ON student_competitions
-  FOR UPDATE USING (
-    EXISTS (
-      SELECT 1 FROM user_profiles 
-      WHERE user_id = auth.uid() AND role IN ('super_admin', 'advisor', 'hod')
-    )
-  );
+-- RLS policies (Allow-all, matching every other live table). The earlier
+-- user_profiles-dependent "Admins can view/update" policies are dropped;
+-- the app writes/reads these tables via the service role.
+CREATE POLICY "Allow all on student_competitions" ON student_competitions
+  FOR ALL USING (true);
 
 -- RLS policies for gmail_tokens
-CREATE POLICY "Users can manage their own tokens" ON gmail_tokens
-  FOR ALL USING (user_email = auth.jwt() ->> 'email');
+CREATE POLICY "Allow all on gmail_tokens" ON gmail_tokens
+  FOR ALL USING (true);

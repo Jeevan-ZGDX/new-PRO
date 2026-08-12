@@ -15,6 +15,7 @@ import type {
   DepartmentLeaderboardEntry,
   CompetitionDashboardData,
   HistoryEntry,
+  AdvisorDashboardStats,
 } from '@comp-dash/types'
 
 const DASHBOARD_TABLE = 'competition_dashboard'
@@ -185,7 +186,7 @@ export function useAdvisorCompetitionStats(competitionId?: string) {
 export function useAdvisorDashboardStats() {
   return useQuery({
     queryKey: ['advisor', 'dashboard', 'stats'],
-    queryFn: () => apiClient.get<StudentDashboardStats>('/advisor/dashboard/stats'),
+    queryFn: () => apiClient.get<AdvisorDashboardStats>('/advisor/dashboard/stats'),
     staleTime: 5 * 60 * 1000,
   })
 }

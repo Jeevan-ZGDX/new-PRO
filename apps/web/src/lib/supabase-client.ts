@@ -16,10 +16,28 @@ export function isSupabaseConfigured(): boolean {
 export async function fetchStudentsFromSupabase() {
   if (!supabase) return []
 
-  const { data, error } = await supabase
-    .from('students')
-    .select('*')
-    .order('name', { ascending: true })
+  // PostgREST caps an unbounded select at 1,000 rows, but this table holds
+  // 2,200+. Without paging the in-memory cache silently loses ~half the
+  // students, so every count derived from it under-reports.
+  const PAGE = 1000
+  const collected: any[] = []
+  let offset = 0
+  let error: { message: string } | null = null
+
+  for (;;) {
+    const page = await supabase
+      .from('students')
+      .select('*')
+      .order('name', { ascending: true })
+      .range(offset, offset + PAGE - 1)
+    if (page.error) { error = page.error; break }
+    const batch = page.data ?? []
+    collected.push(...batch)
+    if (batch.length < PAGE) break
+    offset += PAGE
+  }
+
+  const data = collected
 
   if (error) {
     console.error('Supabase fetch students error:', error.message)

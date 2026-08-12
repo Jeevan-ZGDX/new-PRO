@@ -1,8 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 
-const SECRET_KEY = process.env.REAL_TIME_API_SECRET || 'your-secret-key-change-this'
+const SECRET_KEY = process.env.REAL_TIME_API_SECRET
 
 export async function POST(request: NextRequest) {
+  if (!SECRET_KEY) {
+    return NextResponse.json(
+      { success: false, error: 'Server not configured' },
+      { status: 503 }
+    )
+  }
+
   const body = await request.json()
   const { secret, event, data } = body
 
