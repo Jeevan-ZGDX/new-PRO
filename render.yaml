@@ -40,23 +40,25 @@ services:
         sync: false
       - key: NEXT_PUBLIC_API_URL
         value: https://comp-dash.onrender.com/api
+      - key: NEXT_PUBLIC_APP_URL
+        value: https://comp-dash.onrender.com
 
       # Google OAuth (private)
       - key: GOOGLE_CLIENT_ID
-        sync: false
-      - key: NEXT_PUBLIC_GOOGLE_CLIENT_ID
         sync: false
       - key: GOOGLE_CLIENT_SECRET
         sync: false
       - key: GOOGLE_REDIRECT_URI
         value: https://comp-dash.onrender.com/api/auth/gmail/callback
+      - key: GOOGLE_LOGIN_REDIRECT_URI
+        value: https://comp-dash.onrender.com/api/auth/google/callback
 
-      # Supabase server-side + database (private)
+      # Supabase server-side (private)
       - key: SUPABASE_SERVICE_ROLE_KEY
         sync: false
-      - key: DATABASE_URL
-        sync: false
-      - key: DIRECT_URL
+
+      # Webhook secret for /api/real-time/registration (private)
+      - key: REAL_TIME_API_SECRET
         sync: false
 
       # Firebase Admin service account (JSON string, private)
@@ -68,8 +70,8 @@ services:
     env: node
     region: singapore
     plan: free
-    buildCommand: npm ci --legacy-peer-deps && npm run db:generate
-    startCommand: npm run cron
+    buildCommand: npm ci --legacy-peer-deps && npm run db:generate -w apps/web
+    startCommand: npm run cron -w apps/web
     schedule: "0 8 * * *"
     envVars:
       - key: NODE_ENV
@@ -81,8 +83,4 @@ services:
       - key: NEXT_PUBLIC_SUPABASE_ANON_KEY
         sync: false
       - key: SUPABASE_SERVICE_ROLE_KEY
-        sync: false
-      - key: DATABASE_URL
-        sync: false
-      - key: DIRECT_URL
         sync: false

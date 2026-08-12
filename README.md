@@ -147,15 +147,85 @@ return <h1>{t('home.greeting', { name: 'John' })}</h1>
 ### Web App (`apps/web/.env.local`)
 
 ```env
-NEXT_PUBLIC_API_URL=http://localhost:3001/api
-NEXT_PUBLIC_GOOGLE_CLIENT_ID=your-google-client-id
+# Supabase (public)
+NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+
+# Supabase (server-only)
+SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
+
+# App API base URL
+NEXT_PUBLIC_API_URL=http://localhost:3000/api
+
+# Google OAuth (server-only, for Gmail verification)
+GOOGLE_CLIENT_ID=your-google-client-id
+GOOGLE_CLIENT_SECRET=your-google-client-secret
+GOOGLE_REDIRECT_URI=http://localhost:3000/api/auth/gmail/callback
+
+# Real-time webhook secret
+REAL_TIME_API_SECRET=change-me-to-a-long-random-string
+
+# Firebase Admin (server-only, JSON string)
+FIREBASE_SERVICE_ACCOUNT='{"type":"service_account",...}'
 ```
+
+See `apps/web/.env.example` for the full annotated list.
+
+## Auth & Database (Supabase)
+
+- Run `supabase/schema.sql` in the Supabase SQL editor to create every table,
+  RLS policies, and the `on_auth_user_created` trigger that auto-creates a
+  `profiles` row on signup.
+- Sign in / sign up use Supabase Auth (`/sign-in`, `/sign-up`).
+- Seed demo users:
+  ```bash
+  SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... npm run seed:auth
+  ```
+  Demo logins: `admin@citchennai.net`, `hod@citchennai.net`,
+  `advisor@citchennai.net`, `student@citchennai.net` (password `CompDash@123`).
+- Gmail OAuth tokens are stored **server-side** in the `gmail_tokens` table and
+  are only touched via the service role. The client never sees or stores them.
+  The OAuth dance runs through `/api/auth/gmail` and `/api/auth/gmail/callback`.
+
+### Google Sign-In (OAuth)
+
+The "Continue with Google" button on `/sign-in` and `/sign-up` runs through
+`/api/auth/google` → Google consent → `/api/auth/google/callback`. The flow:
+
+1. Redirects to Google with the `hd=citchennai.net` hosted-domain filter, so the
+   account picker only shows college accounts.
+2. Server-side, the callback **enforces that the signed-in Google account ends
+   in `@citchennai.net`** — anything else is rejected and redirected back to
+   `/sign-in` with an error.
+3. It then **verifies the user against the database** to grant the right
+   privileges:
+   - `role_access` (explicit allowlist `email → role/department`; `granted = false`
+     blocks the account),
+   - falling back to `profiles`, then `user_profiles`,
+   - otherwise the account defaults to the `student` role.
+4. The DB-resolved role/department is written into the Supabase auth user's
+   metadata, and a session is minted via `signInWithIdToken` so the role is
+   correct from the first request.
+
+**Required setup:**
+
+- `NEXT_PUBLIC_APP_URL` must point at the app origin (no trailing slash).
+- Add `{NEXT_PUBLIC_APP_URL}/api/auth/google/callback` as an **Authorized
+  redirect URI** on your OAuth client in the
+  [Google Cloud Console](https://console.cloud.google.com/apis/credentials).
+- Enable the **Google** provider in Supabase → Auth → Providers and paste the
+  same `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`.
+- For staff/admin access, insert rows into `role_access`, e.g.:
+  ```sql
+  insert into role_access (email, role, department, granted)
+  values ('hod@citchennai.net', 'hod', 'CSE', true);
+  ```
+
 
 ### Mobile App (`apps/mobile/.env`)
 
 ```env
 EXPO_PUBLIC_API_URL=http://localhost:3001/api
-EXPO_PUBLIC_GOOGLE_CLIENT_ID=your-google-client-id
 ```
 
 ## License

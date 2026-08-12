@@ -4,7 +4,7 @@ import { Suspense, useState, useEffect, useCallback, useRef } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { Card, CardHeader, CardTitle, Badge } from '@comp-dash/design-system'
 import { getCurrentUser } from '@/lib/auth'
-import { setGmailTokens, setHistoryId, getSyncedEmails, setSyncedEmails, appendSyncedEmails, clearGmailTokens, getHistoryId, fetchRecentEmails } from '@/lib/gmail-sync'
+import { getGmailTokens, setHistoryId, getSyncedEmails, setSyncedEmails, appendSyncedEmails, clearGmailTokens, getHistoryId, fetchRecentEmails, fetchHistorySync } from '@/lib/gmail-sync'
 import { Mail, Search, Send, CheckCircle, Inbox, Clock, Shield, RefreshCw } from 'lucide-react'
 
 type Step = 'signin' | 'permissions' | 'inbox'
@@ -45,28 +45,21 @@ function EmailVerificationContent() {
     }
   }, [searchParams])
 
-  // Handle OAuth redirect back from server
+  // Handle OAuth redirect back from server (tokens are stored server-side)
   useEffect(() => {
-    const auth = searchParams.get('auth')
-    const accessToken = searchParams.get('access_token')
-    const refreshToken = searchParams.get('refresh_token')
-    const expiresIn = searchParams.get('expires_in')
-    const historyId = searchParams.get('history_id')
-    const email = searchParams.get('email')
+    const connected = searchParams.get('gmail') === 'connected' || searchParams.get('auth') === 'success'
 
-    if (auth === 'success' && userId && accessToken) {
-      setGmailTokens(userId, {
-        access_token: accessToken,
-        refresh_token: refreshToken || '',
-        expiry_date: Date.now() + (Number(expiresIn) || 3600) * 1000,
-      })
-      if (historyId) setHistoryId(userId, historyId)
+    if (connected && userId) {
       setUseGmail(true)
       setStep('inbox')
       // Clean URL params but preserve organizerEmail in ref
       const orgEmail = organizerEmailRef.current || searchParams.get('organizerEmail') || ''
       if (!organizerEmailRef.current && orgEmail) organizerEmailRef.current = orgEmail
       router.replace('/email-verification')
+
+      getGmailTokens(userId).then(({ historyId }) => {
+        if (historyId) setHistoryId(userId, historyId)
+      }).catch(() => {})
 
       if (orgEmail) {
         const searchQuery = `from:${orgEmail}`
@@ -149,7 +142,9 @@ function EmailVerificationContent() {
     if (organizerEmailRef.current) {
       localStorage.setItem('pending_organizer_email', organizerEmailRef.current)
     }
-    window.location.href = '/api/auth/gmail'
+    const params = new URLSearchParams()
+    if (userId) params.set('userId', userId)
+    window.location.href = `/api/auth/gmail${params.toString() ? `?${params.toString()}` : ''}`
   }
   const handleDeny = () => setStep('signin')
 
@@ -198,17 +193,20 @@ function EmailVerificationContent() {
     if (!userId || syncing) return
     setSyncing(true)
     try {
-      const res = await fetch(`/api/gmail/sync?userId=${encodeURIComponent(userId)}`)
-      if (res.status === 401) { clearGmailTokens(userId); setStep('signin'); return }
-      const json = await res.json()
-      if (json.success && json.data?.emails?.length > 0) {
+      const result = await fetchHistorySync(userId)
+      if (result === null) return
+      if (result.historyId) setHistoryId(userId, result.historyId)
+      if (result.emails.length > 0) {
         setEmails(prev => {
           const ids = new Set(prev.map(e => e.id))
-          return [...json.data.emails.filter((e: any) => !ids.has(e.id)), ...prev]
+          return [...result.emails.filter((e: any) => !ids.has(e.id)), ...prev]
         })
       }
       setLastSync(new Date().toISOString())
-    } catch { /* ignore */ } finally { setSyncing(false) }
+    } catch {
+      clearGmailTokens(userId)
+      setStep('signin')
+    } finally { setSyncing(false) }
   }, [userId, syncing])
 
   const handleSearchInternal = () => {

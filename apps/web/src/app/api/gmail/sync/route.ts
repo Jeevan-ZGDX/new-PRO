@@ -1,60 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase-client'
+import { getValidAccessToken } from '@/lib/gmail-tokens'
 
 const GMAIL_API_BASE = 'https://www.googleapis.com/gmail/v1/users/me'
-
-async function getValidAccessToken(userEmail: string): Promise<string | null> {
-  if (!supabase) return null
-
-  const { data: tokenData } = await supabase
-    .from('gmail_tokens')
-    .select('*')
-    .eq('user_email', userEmail)
-    .single()
-
-  if (!tokenData) return null
-
-  const now = new Date()
-  const expiresAt = new Date(tokenData.expires_at)
-
-  if (expiresAt > now && tokenData.access_token) {
-    return tokenData.access_token
-  }
-
-  if (tokenData.refresh_token) {
-    const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID
-    const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET
-
-    if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET) return null
-
-    const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({
-        client_id: GOOGLE_CLIENT_ID,
-        client_secret: GOOGLE_CLIENT_SECRET,
-        refresh_token: tokenData.refresh_token,
-        grant_type: 'refresh_token',
-      }),
-    })
-
-    const newTokens = await tokenResponse.json()
-
-    if (tokenResponse.ok && newTokens.access_token) {
-      const newExpiresAt = new Date(Date.now() + (newTokens.expires_in || 3600) * 1000).toISOString()
-
-      await supabase.from('gmail_tokens').update({
-        access_token: newTokens.access_token,
-        expires_at: newExpiresAt,
-        updated_at: new Date().toISOString(),
-      }).eq('user_email', userEmail)
-
-      return newTokens.access_token
-    }
-  }
-
-  return null
-}
 
 async function searchEmails(accessToken: string, query: string, maxResults = 30) {
   const response = await fetch(
@@ -134,7 +82,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: 'Competition not found' }, { status: 404 })
     }
 
-    const accessToken = await getValidAccessToken(userEmail)
+    const token = await getValidAccessToken(userEmail)
+    const accessToken = token.accessToken
     if (!accessToken) {
       return NextResponse.json({ success: false, error: 'Gmail not connected' }, { status: 401 })
     }

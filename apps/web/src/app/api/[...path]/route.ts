@@ -9,23 +9,10 @@ import {
   pushCompetition, syncRegistration, syncVerificationRequests, syncNotifications,
 } from '@/lib/firebase-data'
 import { getAllRoleAccessData, setUserAccess, checkUserAccess } from '@/lib/firestore-service'
+import { supabase, isSupabaseConfigured } from '@/lib/supabase-client'
+import { createSupabaseServerClient } from '@/lib/supabase/server'
+import { storeGmailTokens, getValidAccessToken as getValidGmailAccessToken, getGmailTokens, clearGmailTokens } from '@/lib/gmail-tokens'
 import type { UserRole } from '@/lib/auth'
-
-const userProfile = {
-  id: 'user-1',
-  email: 'admin@citchennai.net',
-  name: 'Admin User',
-  avatarUrl: null as string | null,
-  department: 'CSE',
-  section: 'A',
-  academicYear: '2024-2025',
-  role: 'super_admin' as const,
-  organizationId: 'org-cit',
-  createdAt: '2023-06-01T09:00:00Z',
-  updatedAt: '2025-07-01T09:00:00Z',
-  notificationPreferences: { emailNotifications: true, pushNotifications: true, deadlineReminders: true, verificationUpdates: true, newCompetitions: false },
-  language: 'en' as const,
-}
 
 // ─── Types & Helper Functions ───────────────────────────────────────
 type RouteHandler = (req: NextRequest, segments: string[]) => Promise<NextResponse>
@@ -150,6 +137,50 @@ function filterComps(list: typeof competitions, qs: URLSearchParams) {
   return result
 }
 
+function safeParseJson<T>(value: unknown, fallback: T): T {
+  if (typeof value !== 'string') return fallback
+  try {
+    return JSON.parse(value) as T
+  } catch {
+    return fallback
+  }
+}
+
+function buildRegistrationsOverTime(): { date: string; count: number }[] {
+  const buckets = new Map<string, number>()
+  for (const reg of registrations) {
+    const ts = reg.registeredAt || reg.createdAt
+    if (!ts) continue
+    const d = new Date(ts)
+    if (isNaN(d.getTime())) continue
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+    buckets.set(key, (buckets.get(key) || 0) + 1)
+  }
+  const now = new Date()
+  const result: { date: string; count: number }[] = []
+  for (let i = 5; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+    result.push({ date: key, count: buckets.get(key) || 0 })
+  }
+  return result
+}
+
+function getCompetitionDepartments(comp: any): string[] {
+  const eligibility = safeParseJson<any>(comp?.eligibility, comp?.eligibility)
+  if (!eligibility) return []
+  if (Array.isArray(eligibility)) return eligibility
+  if (Array.isArray(eligibility.departments)) return eligibility.departments
+  return []
+}
+
+function countDepartmentRegistrations(deptName: string): number {
+  return registrations.filter(r => {
+    const comp = competitions.find(c => c.id === r.competitionId)
+    return getCompetitionDepartments(comp).includes(deptName)
+  }).length
+}
+
 const routes: Record<string, RouteHandler> = {}
 
 function register(method: string, pattern: string, handler: RouteHandler) {
@@ -185,59 +216,111 @@ async function handle(request: NextRequest, pathSegments: string[]) {
   return NextResponse.json({ success: false, error: { code: 'NOT_FOUND', message: `No handler for ${method} ${path}` } }, { status: 404 })
 }
 
-function getProfileByEmail(email: string) {
-  const roleMap: Record<string, { id: string; email: string; name: string; role: UserRole; department: string }> = {
-    'admin@cit.in': { id: 'user-admin', email: 'admin@cit.in', name: 'Super Admin', role: 'super_admin', department: 'Administration' },
-    'hod@cit.in': { id: 'user-hod', email: 'hod@cit.in', name: 'Dr. HOD Kumar', role: 'hod', department: 'CSE' },
-    'advisor@cit.in': { id: 'user-adv', email: 'advisor@cit.in', name: 'Dr. Priya Sharma', role: 'advisor', department: 'CSE' },
-    'student@cit.in': { id: 'user-stu', email: 'student@cit.in', name: 'Jeevan R', role: 'student', department: 'CSE' },
-  }
-  return roleMap[email.toLowerCase()] || { ...userProfile, email, id: 'user-' + email.split('@')[0] }
-}
+// ─── Auth identity ─────────────────────────────────────────────
+// In-memory profile cache keyed by email (demo-grade; not a security boundary).
+const profileMemory: Record<string, any> = {}
 
-function getEmailFromToken(req: NextRequest): string {
+async function getAuthenticatedEmail(req: NextRequest): Promise<string | null> {
+  if (process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+    try {
+      const supabaseServer = createSupabaseServerClient()
+      const {
+        data: { user },
+      } = await supabaseServer.auth.getUser()
+      if (user?.email) return user.email
+    } catch {
+      // fall through to bearer-token fallback
+    }
+  }
+
   const auth = req.headers.get('authorization') || ''
   const token = auth.replace('Bearer ', '')
   const parts = token.split('-')
-  return parts[2] || 'hod@cit.in'
+  return parts.length >= 3 ? parts[2] || null : null
+}
+
+async function getProfileByEmail(email: string): Promise<any> {
+  const base = {
+    id: 'user-' + email.split('@')[0],
+    email,
+    name: email.split('@')[0],
+    role: 'student' as UserRole,
+    department: '',
+    avatarUrl: null as string | null,
+    language: 'en' as const,
+  }
+
+  const cached = profileMemory[email]
+  if (cached) return { ...base, ...cached }
+
+  if (isSupabaseConfigured() && supabase) {
+    try {
+      const { data } = await supabase
+        .from('role_access')
+        .select('role, department, name, granted')
+        .eq('email', email.toLowerCase())
+        .maybeSingle()
+      if (data?.role) {
+        return {
+          ...base,
+          name: data.name || base.name,
+          role: data.role,
+          department: data.department || '',
+          granted: data.granted !== false,
+        }
+      }
+    } catch {
+      // ignore lookup errors; fall back to the student default
+    }
+  }
+
+  return base
 }
 
 // --- AUTH ---
 register('POST', '/auth/google', async (req) => {
   const body = await req.json()
-  const email = body.email || 'hod@cit.in'
-  const profile = getProfileByEmail(email)
-  const token = 'mock-jwt-' + email + '-' + Date.now()
-  return ok({ user: profile, token, refreshToken: 'mock-refresh-' + Date.now() })
+  const email = body.email || 'student@citchennai.net'
+  const profile = await getProfileByEmail(email)
+  const token = 'sb-' + email + '-' + Date.now()
+  return ok({ user: profile, token, refreshToken: 'sb-refresh-' + Date.now() })
 })
 
 register('GET', '/auth/check-access', async (req) => {
   const url = new URL(req.url)
-  const email = url.searchParams.get('email') || getEmailFromToken(req)
+  const email = url.searchParams.get('email') || (await getAuthenticatedEmail(req)) || ''
   const result = await checkUserAccess(email)
   return ok(result)
 })
 
 register('GET', '/auth/me', async (req) => {
-  const email = getEmailFromToken(req)
-  return ok({ ...getProfileByEmail(email), ...userProfile, email, role: getProfileByEmail(email).role })
+  const email = (await getAuthenticatedEmail(req)) || ''
+  const profile = await getProfileByEmail(email)
+  return ok({ ...profile, email, role: profile.role })
 })
 
 register('PUT', '/auth/profile', async (req) => {
+  const email = (await getAuthenticatedEmail(req)) || ''
   const body = await req.json()
-  Object.assign(userProfile, body)
-  return ok(userProfile)
+  if (!email) return error('UNAUTHORIZED', 'Not authenticated', 401)
+  profileMemory[email] = { ...profileMemory[email], ...body }
+  return ok({ ...(await getProfileByEmail(email)), ...body })
 })
 
 register('PUT', '/auth/notification-preferences', async (req) => {
+  const email = (await getAuthenticatedEmail(req)) || ''
   const body = await req.json()
-  if (userProfile.notificationPreferences) Object.assign(userProfile.notificationPreferences, body)
-  return ok(userProfile.notificationPreferences)
+  if (!email) return error('UNAUTHORIZED', 'Not authenticated', 401)
+  const current = profileMemory[email]?.notificationPreferences || {}
+  profileMemory[email] = { ...profileMemory[email], notificationPreferences: { ...current, ...body } }
+  return ok(profileMemory[email].notificationPreferences)
 })
 
 register('PUT', '/auth/language', async (req) => {
+  const email = (await getAuthenticatedEmail(req)) || ''
   const body = await req.json()
-  userProfile.language = body.language
+  if (!email) return error('UNAUTHORIZED', 'Not authenticated', 401)
+  profileMemory[email] = { ...profileMemory[email], language: body.language }
   return ok({ language: body.language })
 })
 
@@ -538,6 +621,22 @@ register('PUT', '/registrations/:id', async (req, seg) => {
   return ok(updated)
 })
 
+register('GET', '/registrations/lookup', async (req) => {
+  const qs = new URL(req.url).searchParams
+  const email = (qs.get('email') || '').toLowerCase()
+  if (!email) return error('BAD_REQUEST', 'email required')
+  const student = students.find(s => s.email.toLowerCase() === email)
+  if (!student) return ok({ registrations: [], student: null })
+  const userRegs = registrations
+    .filter(r => r.userId === student.id)
+    .map(r => ({
+      ...r,
+      competition: competitions.find(c => c.id === r.competitionId) || null,
+    }))
+    .sort((a, b) => new Date(b.registeredAt).getTime() - new Date(a.registeredAt).getTime())
+  return ok({ registrations: userRegs, student })
+})
+
 // ─── VERIFICATION REQUESTS ───────────────────────────────────────────
 register('POST', '/verification-requests', async (req) => {
   const body = await req.json()
@@ -549,13 +648,14 @@ register('POST', '/verification-requests', async (req) => {
   if (!reg) return NextResponse.json({ success: false, error: { code: 'NOT_FOUND', message: 'Registration not found' } }, { status: 404 })
   const existingVr = verificationRequests.find(v => v.registrationId === registrationId && v.studentId === student.id)
   if (existingVr) return ok({ ...existingVr, alreadyRequested: true })
+  const competitionTitle = competitions.find(c => c.id === reg.competitionId)?.title || 'Unknown'
   const newVr = {
     id: 'vr-' + (verificationRequests.length + 1),
     registrationId,
     studentId: student.id,
     studentName: student.name,
     department: student.department,
-    competitionTitle: reg.competition?.title || 'Unknown',
+    competitionTitle,
     advisorNotified: false,
     emailProof: null,
     status: 'pending' as const,
@@ -567,7 +667,7 @@ register('POST', '/verification-requests', async (req) => {
     userId: student.id,
     type: 'verification_update' as const,
     title: 'Verification Requested',
-    message: `${student.name} has requested verification for ${reg.competition?.title || 'a competition'}.`,
+    message: `${student.name} has requested verification for ${competitionTitle}.`,
     data: null,
     isRead: false,
     createdAt: new Date().toISOString(),
@@ -674,13 +774,8 @@ register('GET', '/admin/dashboard/stats', async () => {
   const totalRegistrations = registrations.length
   const verifiedRegistrations = registrations.filter(r => r.status === 'verified' || r.status === 'completed').length
   const verificationRate = totalRegistrations > 0 ? Math.round((verifiedRegistrations / totalRegistrations) * 100) : 0
-  const registrationsOverTime = [
-    { date: '2025-04-01', count: 2 }, { date: '2025-04-08', count: 4 }, { date: '2025-04-15', count: 1 },
-    { date: '2025-04-22', count: 4 }, { date: '2025-05-01', count: 5 }, { date: '2025-05-08', count: 3 },
-    { date: '2025-05-15', count: 7 }, { date: '2025-05-22', count: 4 }, { date: '2025-06-01', count: 6 },
-    { date: '2025-06-08', count: 8 }, { date: '2025-06-15', count: 5 }, { date: '2025-06-22', count: 3 },
-  ]
-  const topDepartments = departments.map(d => ({ name: d.name, count: students.filter(s => s.department === d.name).length * 3 })).sort((a, b) => b.count - a.count).slice(0, 5)
+  const registrationsOverTime = buildRegistrationsOverTime()
+  const topDepartments = departments.map(d => ({ name: d.name, count: countDepartmentRegistrations(d.name) })).sort((a, b) => b.count - a.count).slice(0, 5)
   const recentVerified = registrations.filter(r => r.verifiedAt).sort((a, b) => new Date(b.verifiedAt!).getTime() - new Date(a.verifiedAt!).getTime()).slice(0, 5)
   const pendingVerifications = registrations.filter(r => r.status === 'pending_verification').slice(0, 5)
   const selfVerificationRequests = verificationRequests.filter(v => v.status === 'pending').slice(0, 5)
@@ -771,13 +866,8 @@ register('GET', '/coe/dashboard/stats', async () => {
   const totalRegistrations = registrations.length
   const verifiedRegistrations = registrations.filter(r => r.status === 'verified' || r.status === 'completed').length
   const verificationRate = totalRegistrations > 0 ? Math.round((verifiedRegistrations / totalRegistrations) * 100) : 0
-  const registrationsOverTime = [
-    { date: '2025-04-01', count: 2 }, { date: '2025-04-08', count: 4 }, { date: '2025-04-15', count: 1 },
-    { date: '2025-04-22', count: 4 }, { date: '2025-05-01', count: 5 }, { date: '2025-05-08', count: 3 },
-    { date: '2025-05-15', count: 7 }, { date: '2025-05-22', count: 4 }, { date: '2025-06-01', count: 6 },
-    { date: '2025-06-08', count: 8 }, { date: '2025-06-15', count: 5 }, { date: '2025-06-22', count: 3 },
-  ]
-  const topDepartments = departments.map(d => ({ name: d.name, count: students.filter(s => s.department === d.name).length * 3 })).sort((a, b) => b.count - a.count).slice(0, 5)
+  const registrationsOverTime = buildRegistrationsOverTime()
+  const topDepartments = departments.map(d => ({ name: d.name, count: countDepartmentRegistrations(d.name) })).sort((a, b) => b.count - a.count).slice(0, 5)
   const recentVerified = registrations.filter(r => r.verifiedAt).sort((a, b) => new Date(b.verifiedAt!).getTime() - new Date(a.verifiedAt!).getTime()).slice(0, 5)
   const pendingVerifications = registrations.filter(r => r.status === 'pending_verification').slice(0, 5)
   const selfVerificationRequests = verificationRequests.filter(v => v.status === 'pending').slice(0, 5)
@@ -944,23 +1034,21 @@ register('GET', '/admin/analytics/stats', async () => {
   const winRate = registrations.length > 0 ? Math.round((winners.length / registrations.length) * 100) : 0
   const verifiedCount = registrations.filter(r => r.status === 'verified' || r.status === 'completed').length
   const verificationRate = registrations.length > 0 ? Math.round((verifiedCount / registrations.length) * 100) : 0
-  const competitionTrends = [
-    { date: 'Jan', count: 2 }, { date: 'Feb', count: 3 }, { date: 'Mar', count: 1 },
-    { date: 'Apr', count: 5 }, { date: 'May', count: 4 }, { date: 'Jun', count: 6 },
-  ]
+  const competitionTrends = buildRegistrationsOverTime()
   const departmentPerformance = departments.slice(0, 6).map(d => ({
     name: d.name,
-    count: registrations.filter(r => r.competition.eligibility.departments.includes(d.name)).length * 2 || Math.floor(Math.random() * 20) + 5,
+    count: countDepartmentRegistrations(d.name),
   }))
-  const verificationRateOverTime = [
-    { date: 'Jan', rate: 75 }, { date: 'Feb', rate: 78 }, { date: 'Mar', rate: 72 },
-    { date: 'Apr', rate: 80 }, { date: 'May', rate: 85 }, { date: 'Jun', rate: 82 },
-  ]
+  const verificationRateOverTime = buildRegistrationsOverTime().map(p => ({
+    date: p.date,
+    rate: p.count > 0 ? Math.min(100, Math.round((verifiedCount / Math.max(p.count, 1)) * 100)) : 0,
+  }))
   return ok({ totalCompetitions, totalParticipants, winRate, verificationRate, competitionTrends, departmentPerformance, verificationRateOverTime })
 })
 
 // ─── GMAIL OAUTH ---
 register('GET', '/auth/gmail', async (req) => {
+  const qs = new URL(req.url).searchParams
   const url = new URL('https://accounts.google.com/o/oauth2/v2/auth')
   url.searchParams.set('client_id', process.env.GOOGLE_CLIENT_ID || '')
   url.searchParams.set('redirect_uri', process.env.GOOGLE_REDIRECT_URI)
@@ -968,13 +1056,14 @@ register('GET', '/auth/gmail', async (req) => {
   url.searchParams.set('scope', 'https://www.googleapis.com/auth/gmail.readonly openid email')
   url.searchParams.set('access_type', 'offline')
   url.searchParams.set('prompt', 'consent')
+  if (qs.get('userId')) url.searchParams.set('state', qs.get('userId')!)
   return NextResponse.redirect(url.toString())
 })
 
 register('GET', '/auth/gmail/callback', async (req) => {
   const qs = new URL(req.url).searchParams
   const code = qs.get('code')
-  const state = qs.get('state') // optional: userId to associate tokens
+  const state = qs.get('state') // userId to associate tokens
   if (!code) return NextResponse.redirect(new URL('/email-verification?error=no_code', req.url))
 
   const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
@@ -1013,44 +1102,66 @@ register('GET', '/auth/gmail/callback', async (req) => {
     }
   } catch { /* ignore */ }
 
-  // Redirect back with tokens and historyId in hash (client stores them)
-  const params = new URLSearchParams({
-    auth: 'success',
+  // Store tokens server-side. Never expose them in the URL or to the client.
+  await storeGmailTokens({
+    user_id: userId,
+    user_email: user.email || userId,
     access_token,
-    refresh_token: refresh_token || '',
-    expires_in: String(expires_in || 3600),
+    refresh_token: refresh_token || null,
+    expires_at: new Date(Date.now() + (expires_in || 3600) * 1000).toISOString(),
     history_id: historyId,
+  })
+
+  const params = new URLSearchParams({
+    gmail: 'connected',
     email: user.email || '',
   })
   return NextResponse.redirect(new URL(`/email-verification?${params.toString()}`, req.url))
 })
 
 // ─── GMAIL SYNC & SEARCH ────────────────────────────────────────────
-// Tokens are managed client-side in localStorage. Server endpoints accept accessToken.
+// OAuth tokens are stored server-side (gmail_tokens table via the service role).
 register('GET', '/gmail/tokens', async (req) => {
   const qs = new URL(req.url).searchParams
   const userId = qs.get('userId')
   if (!userId) return error('BAD_REQUEST', 'userId required')
-  // Client manages tokens in localStorage. Return success if userId provided.
-  return ok({ hasTokens: true, note: 'Tokens stored client-side' })
+  const tokens = await getGmailTokens(userId)
+  return ok({ connected: !!tokens, hasTokens: !!tokens, historyId: tokens?.history_id || '', email: tokens?.user_email || '' })
 })
 
 register('POST', '/gmail/tokens', async (req) => {
   const body = await req.json()
-  const { userId, accessToken, refreshToken, expiresIn, historyId } = body
+  const { userId, accessToken, refreshToken, expiresIn, historyId, userEmail } = body
   if (!userId || !accessToken) return error('BAD_REQUEST', 'userId and accessToken required')
-  // Client stores tokens in localStorage. Server acknowledges.
+  const result = await storeGmailTokens({
+    user_id: userId,
+    user_email: userEmail || userId,
+    access_token: accessToken,
+    refresh_token: refreshToken || null,
+    expires_at: expiresIn ? new Date(Date.now() + Number(expiresIn) * 1000).toISOString() : null,
+    history_id: historyId || null,
+  })
+  if (!result.success) return error('INTERNAL', 'Failed to store tokens')
   return ok({ stored: true, historyId: historyId || '' })
+})
+
+register('DELETE', '/gmail/tokens', async (req) => {
+  const qs = new URL(req.url).searchParams
+  const userId = qs.get('userId')
+  if (!userId) return error('BAD_REQUEST', 'userId required')
+  await clearGmailTokens(userId)
+  return ok({ cleared: true })
 })
 
 register('GET', '/gmail/sync', async (req) => {
   const qs = new URL(req.url).searchParams
-  const userId = qs.get('userId')
-  const accessToken = qs.get('accessToken')
+  const userId = qs.get('userId') || ''
   const startHistoryId = qs.get('startHistoryId')
-  if (!userId || !accessToken || !startHistoryId) {
-    return error('BAD_REQUEST', 'userId, accessToken, and startHistoryId required')
+  if (!userId || !startHistoryId) {
+    return error('BAD_REQUEST', 'userId and startHistoryId required')
   }
+  const { accessToken, hasTokens } = await getValidGmailAccessToken(userId)
+  if (!accessToken) return error('UNAUTHORIZED', hasTokens ? 'Gmail token expired or refresh failed' : 'Gmail not connected', 401)
   try {
     console.log('[Gmail Sync] Starting incremental sync for user:', userId)
     const history = await gmailGetHistory(accessToken, startHistoryId)
@@ -1081,9 +1192,10 @@ register('GET', '/gmail/sync', async (req) => {
 
 register('GET', '/gmail/sync/initial', async (req) => {
   const qs = new URL(req.url).searchParams
-  const userId = qs.get('userId')
-  const accessToken = qs.get('accessToken')
-  if (!userId || !accessToken) return error('BAD_REQUEST', 'userId and accessToken required')
+  const userId = qs.get('userId') || ''
+  if (!userId) return error('BAD_REQUEST', 'userId required')
+  const { accessToken, hasTokens } = await getValidGmailAccessToken(userId)
+  if (!accessToken) return error('UNAUTHORIZED', hasTokens ? 'Gmail token expired or refresh failed' : 'Gmail not connected', 401)
   try {
     console.log('[Gmail Initial Sync] Fetching profile for user:', userId)
     const profile = await gmailGetProfile(accessToken)
@@ -1098,13 +1210,14 @@ register('GET', '/gmail/sync/initial', async (req) => {
 
 register('GET', '/gmail/search', async (req) => {
   const qs = new URL(req.url).searchParams
-  const userId = qs.get('userId')
-  const accessToken = qs.get('accessToken')
+  const userId = qs.get('userId') || ''
   const keyword = qs.get('keyword')
   const maxResults = parseInt(qs.get('maxResults') || '20')
-  if (!userId || !accessToken || !keyword) {
-    return error('BAD_REQUEST', 'userId, accessToken, and keyword required')
+  if (!userId || !keyword) {
+    return error('BAD_REQUEST', 'userId and keyword required')
   }
+  const { accessToken, hasTokens } = await getValidGmailAccessToken(userId)
+  if (!accessToken) return error('UNAUTHORIZED', hasTokens ? 'Gmail token expired or refresh failed' : 'Gmail not connected', 401)
   try {
     console.log('[Gmail Search] Searching for:', keyword)
     const messages = await gmailSearchMessages(accessToken, keyword, maxResults)
@@ -1128,10 +1241,11 @@ register('GET', '/gmail/search', async (req) => {
 
 register('GET', '/gmail/email-detail', async (req) => {
   const qs = new URL(req.url).searchParams
-  const userId = qs.get('userId')
-  const accessToken = qs.get('accessToken')
+  const userId = qs.get('userId') || ''
   const id = qs.get('id')
-  if (!userId || !accessToken || !id) return error('BAD_REQUEST', 'userId, accessToken, and id required')
+  if (!userId || !id) return error('BAD_REQUEST', 'userId and id required')
+  const { accessToken, hasTokens } = await getValidGmailAccessToken(userId)
+  if (!accessToken) return error('UNAUTHORIZED', hasTokens ? 'Gmail token expired or refresh failed' : 'Gmail not connected', 401)
   try {
     console.log('[Gmail Detail] Fetching message:', id)
     const message = await gmailGetMessage(accessToken, id)
@@ -1144,12 +1258,13 @@ register('GET', '/gmail/email-detail', async (req) => {
 
 register('GET', '/gmail/recent', async (req) => {
   const qs = new URL(req.url).searchParams
-  const userId = qs.get('userId')
-  const accessToken = qs.get('accessToken')
+  const userId = qs.get('userId') || ''
   const maxResults = parseInt(qs.get('maxResults') || '30')
-  if (!userId || !accessToken) {
-    return error('BAD_REQUEST', 'userId and accessToken required')
+  if (!userId) {
+    return error('BAD_REQUEST', 'userId required')
   }
+  const { accessToken, hasTokens } = await getValidGmailAccessToken(userId)
+  if (!accessToken) return error('UNAUTHORIZED', hasTokens ? 'Gmail token expired or refresh failed' : 'Gmail not connected', 401)
   try {
     console.log('[Gmail Recent] Fetching recent messages for user:', userId)
     const data = await gmailApiRequest(accessToken, `/messages?maxResults=${maxResults}`)
