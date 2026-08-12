@@ -235,6 +235,7 @@ export function useCreateCompetition() {
         const sb = getSupabaseClient()
         if (sb) {
           const { error } = await sb.from(DASHBOARD_TABLE).insert({
+            id: crypto.randomUUID(),
             competition_name: (data.title as string) || '',
             category: (data.category as string) || 'competition',
             organizer: (data.organizer as string) || '',
