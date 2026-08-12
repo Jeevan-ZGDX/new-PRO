@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@comp-dash/types": "*",
+    "@comp-dash/utils": "*",
     "@tanstack/react-query": "^5.17.0",
     "axios": "^1.6.0"
   },

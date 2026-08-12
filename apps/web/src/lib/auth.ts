@@ -85,10 +85,11 @@ export function getCurrentUser(): CurrentUser | null {
       const claims = accessToken ? decodeJwtPayload(accessToken) : null
       const metadata = (claims?.user_metadata || {}) as Record<string, unknown>
       if (claims?.email) {
+        const claimEmail = String(claims.email)
         return {
-          email: String(claims.email),
+          email: claimEmail,
           role: normalizeRole(metadata.role),
-          name: String(metadata.name || claims.email.split('@')[0]),
+          name: String(metadata.name || claimEmail.split('@')[0]),
           department: String(metadata.department || ''),
         }
       }

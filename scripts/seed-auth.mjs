@@ -32,12 +32,19 @@ const DEMO_USERS = [
   { email: 'hod@citchennai.net', password: 'CompDash@123', name: 'Head of Department', role: 'hod', department: 'CSE' },
   { email: 'advisor@citchennai.net', password: 'CompDash@123', name: 'Faculty Advisor', role: 'advisor', department: 'CSE' },
   { email: 'student@citchennai.net', password: 'CompDash@123', name: 'Demo Student', role: 'student', department: 'CSE' },
+  // Has the advisor role but is deliberately never given a row in
+  // public.advisors, so the E2E suite can assert the "account not mapped to an
+  // advisor record" path. Do not map this one.
+  { email: 'unmapped.advisor@citchennai.net', password: 'CompDash@123', name: 'Unmapped Advisor', role: 'advisor', department: 'CSE' },
 ]
 
 async function main() {
+  // Listed once up front — doing this inside the loop re-fetched every user per iteration.
+  const existing = await admin.auth.admin.listUsers({ page: 1, perPage: 1000 })
+  const byEmail = new Map((existing.data?.users ?? []).map((u) => [u.email, u]))
+
   for (const user of DEMO_USERS) {
-    const existing = await admin.auth.admin.listUsers({ page: 1, perPage: 1000 })
-    const already = existing.data?.users?.find((u) => u.email === user.email)
+    const already = byEmail.get(user.email)
 
     if (already) {
       const { error: metaErr } = await admin.auth.admin.updateUserById(already.id, {
@@ -65,15 +72,17 @@ async function main() {
 
     const userId = data.user?.id
     if (userId) {
+      // Live schema is `user_profiles` keyed by user_id/full_name — there is no
+      // `profiles` table and no on_auth_user_created trigger, so write it here.
       const { error: profileErr } = await admin
-        .from('profiles')
+        .from('user_profiles')
         .upsert({
-          id: userId,
+          user_id: userId,
           email: user.email,
-          name: user.name,
+          full_name: user.name,
           role: user.role,
           department: user.department,
-        }, { onConflict: 'id' })
+        }, { onConflict: 'user_id' })
       if (profileErr) {
         console.error(`  ! ${user.email}: user created but profile upsert failed — ${profileErr.message}`)
       }
@@ -89,6 +98,11 @@ Done. Sign in on /sign-in with:
   hod@citchennai.net     / CompDash@123   (hod)
   advisor@citchennai.net / CompDash@123   (advisor)
   student@citchennai.net / CompDash@123   (student)
+
+  unmapped.advisor@citchennai.net / CompDash@123   (advisor, intentionally unmapped — E2E fixture)
+
+The advisor account needs a row in public.advisors before its dashboard shows
+students. Map the demo one with:  npm run seed:demo-advisor
 `)
 }
 

@@ -46,7 +46,7 @@ async function fetchFromSupabase<T>(table: string, filters?: Record<string, unkn
   if (error) throw new Error(error.message)
 
   let mapped = (data || []).map(mapDashboardRow)
-  mapped.sort((a, b) => {
+  mapped.sort((a: Competition, b: Competition) => {
     const aOpen = isCompetitionActive(a)
     const bOpen = isCompetitionActive(b)
     if (aOpen && !bOpen) return -1

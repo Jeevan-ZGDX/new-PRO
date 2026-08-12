@@ -12,12 +12,19 @@
     "start": "npm run start -w apps/web",
     "build:web": "next build apps/web",
     "seed:auth": "node scripts/seed-auth.mjs",
+    "seed:advisors": "node scripts/seed-advisor-auth.mjs",
     "lint": "eslint . --ext .tsx,.ts",
     "format": "prettier --write .",
     "typecheck": "tsc --noEmit",
-    "test": "jest"
+    "test": "jest",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "seed:demo": "node scripts/seed-demo-registrations.mjs",
+    "seed:demo-advisor": "node scripts/setup-demo-advisor.mjs",
+    "seed:demo-verifications": "node scripts/seed-demo-verifications.mjs"
   },
   "devDependencies": {
+    "@playwright/test": "^1.62.1",
     "@types/react": "^18.2.0",
     "@types/react-dom": "^18.2.0",
     "eslint": "^8.56.0",

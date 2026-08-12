@@ -399,7 +399,7 @@ function EmailVerificationContent() {
                       className="w-full pl-10 pr-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm text-gray-700 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent dark:bg-obsidian-hover dark:border-obsidian-border dark:text-ink-primary dark:placeholder:text-obsidian-faint"
                     />
                   </div>
-                  <button onClick={useGmail ? handleSearchGmail : handleSearchInternal}
+                  <button onClick={() => { if (useGmail) handleSearchGmail(); else handleSearchInternal() }}
                     disabled={gmailSearching || loading || !keyword.trim()}
                     className="px-4 py-2.5 bg-accent text-white text-sm font-medium rounded-xl hover:bg-accent/90 disabled:opacity-50 transition-colors flex items-center gap-2"
                   >
