@@ -35,15 +35,27 @@ export function GoogleSignInButton({ next }: { next?: string }) {
   const searchParams = useSearchParams()
   const [loading, setLoading] = useState(false)
 
-  const handleClick = () => {
+  const handleClick = async () => {
     const requested = next || searchParams.get('next') || '/dashboard'
+
     const target =
       requested.startsWith('/') && !requested.startsWith('//')
         ? requested
         : '/dashboard'
+
     setLoading(true)
-    // Hard navigation so the 302 → Google consent redirect is followed natively.
-    window.location.href = `/api/auth/google?next=${encodeURIComponent(target)}`
+
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: `https://comp-dash.onrender.com${target}`,
+      },
+    })
+
+    if (error) {
+      console.error('Google OAuth error:', error)
+      setLoading(false)
+    }
   }
 
   return (
