@@ -4,7 +4,7 @@ import { Suspense, useState, useEffect, useCallback, useRef } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { Card, CardHeader, CardTitle, Badge } from '@comp-dash/design-system'
 import { getCurrentUser } from '@/lib/auth'
-import { setGmailTokens, setHistoryId, getSyncedEmails, setSyncedEmails, appendSyncedEmails, clearGmailTokens, getHistoryId, fetchRecentEmails } from '@/lib/gmail-sync'
+import { getGmailTokens, setHistoryId, getSyncedEmails, setSyncedEmails, appendSyncedEmails, clearGmailTokens, getHistoryId, fetchRecentEmails, fetchHistorySync } from '@/lib/gmail-sync'
 import { Mail, Search, Send, CheckCircle, Inbox, Clock, Shield, RefreshCw } from 'lucide-react'
 
 type Step = 'signin' | 'permissions' | 'inbox'
@@ -45,28 +45,21 @@ function EmailVerificationContent() {
     }
   }, [searchParams])
 
-  // Handle OAuth redirect back from server
+  // Handle OAuth redirect back from server (tokens are stored server-side)
   useEffect(() => {
-    const auth = searchParams.get('auth')
-    const accessToken = searchParams.get('access_token')
-    const refreshToken = searchParams.get('refresh_token')
-    const expiresIn = searchParams.get('expires_in')
-    const historyId = searchParams.get('history_id')
-    const email = searchParams.get('email')
+    const connected = searchParams.get('gmail') === 'connected' || searchParams.get('auth') === 'success'
 
-    if (auth === 'success' && userId && accessToken) {
-      setGmailTokens(userId, {
-        access_token: accessToken,
-        refresh_token: refreshToken || '',
-        expiry_date: Date.now() + (Number(expiresIn) || 3600) * 1000,
-      })
-      if (historyId) setHistoryId(userId, historyId)
+    if (connected && userId) {
       setUseGmail(true)
       setStep('inbox')
       // Clean URL params but preserve organizerEmail in ref
       const orgEmail = organizerEmailRef.current || searchParams.get('organizerEmail') || ''
       if (!organizerEmailRef.current && orgEmail) organizerEmailRef.current = orgEmail
       router.replace('/email-verification')
+
+      getGmailTokens(userId).then(({ historyId }) => {
+        if (historyId) setHistoryId(userId, historyId)
+      }).catch(() => {})
 
       if (orgEmail) {
         const searchQuery = `from:${orgEmail}`
@@ -149,7 +142,9 @@ function EmailVerificationContent() {
     if (organizerEmailRef.current) {
       localStorage.setItem('pending_organizer_email', organizerEmailRef.current)
     }
-    window.location.href = '/api/auth/gmail'
+    const params = new URLSearchParams()
+    if (userId) params.set('userId', userId)
+    window.location.href = `/api/auth/gmail${params.toString() ? `?${params.toString()}` : ''}`
   }
   const handleDeny = () => setStep('signin')
 
@@ -198,17 +193,20 @@ function EmailVerificationContent() {
     if (!userId || syncing) return
     setSyncing(true)
     try {
-      const res = await fetch(`/api/gmail/sync?userId=${encodeURIComponent(userId)}`)
-      if (res.status === 401) { clearGmailTokens(userId); setStep('signin'); return }
-      const json = await res.json()
-      if (json.success && json.data?.emails?.length > 0) {
+      const result = await fetchHistorySync(userId)
+      if (result === null) return
+      if (result.historyId) setHistoryId(userId, result.historyId)
+      if (result.emails.length > 0) {
         setEmails(prev => {
           const ids = new Set(prev.map(e => e.id))
-          return [...json.data.emails.filter((e: any) => !ids.has(e.id)), ...prev]
+          return [...result.emails.filter((e: any) => !ids.has(e.id)), ...prev]
         })
       }
       setLastSync(new Date().toISOString())
-    } catch { /* ignore */ } finally { setSyncing(false) }
+    } catch {
+      clearGmailTokens(userId)
+      setStep('signin')
+    } finally { setSyncing(false) }
   }, [userId, syncing])
 
   const handleSearchInternal = () => {
@@ -276,8 +274,8 @@ function EmailVerificationContent() {
   return (
     <div className="space-y-6 max-w-3xl mx-auto">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-[#F0F6FC]">Email Verification</h1>
-        <p className="text-gray-500 mt-1">Fetch email proof from your inbox — advisors can view submitted proofs</p>
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-ink-primary">Email Verification</h1>
+        <p className="text-gray-500 mt-1 dark:text-obsidian-faint">Fetch email proof from your inbox — advisors can view submitted proofs</p>
       </div>
 
       {step === 'signin' && (
@@ -287,13 +285,13 @@ function EmailVerificationContent() {
           </CardHeader>
           <div className="mt-4 px-4 pb-8">
             <div className="flex flex-col items-center justify-center py-10">
-              <div className="w-20 h-20 rounded-full bg-white border-2 border-gray-200 flex items-center justify-center mb-6 shadow-sm">
-                <span className="text-3xl font-bold text-gray-400">G</span>
+              <div className="w-20 h-20 rounded-full bg-white border-2 border-gray-200 flex items-center justify-center mb-6 shadow-sm dark:bg-obsidian-surface dark:border-obsidian-border">
+                <span className="text-3xl font-bold text-gray-400 dark:text-obsidian-faint">G</span>
               </div>
-              <p className="text-base text-gray-700 mb-1">Connect your Google account</p>
-              <p className="text-sm text-gray-400 mb-8">to fetch and submit email metadata to your advisor</p>
+              <p className="text-base text-gray-700 mb-1 dark:text-ink-muted">Connect your Google account</p>
+              <p className="text-sm text-gray-400 mb-8 dark:text-obsidian-faint">to fetch and submit email metadata to your advisor</p>
               <button onClick={handleGoogleSignIn}
-                className="flex items-center gap-3 px-8 py-3 bg-white border-2 border-gray-200 rounded-xl hover:border-gray-300 hover:shadow-md transition-all text-sm font-medium text-gray-700"
+                className="flex items-center gap-3 px-8 py-3 bg-white border-2 border-gray-200 rounded-xl hover:border-gray-300 hover:shadow-md transition-all text-sm font-medium text-gray-700 dark:bg-obsidian-surface dark:border-obsidian-border dark:text-ink-primary"
               >
                 <svg className="w-5 h-5" viewBox="0 0 24 24">
                   <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z"/>
@@ -303,7 +301,7 @@ function EmailVerificationContent() {
                 </svg>
                 Sign in with Google
               </button>
-              <p className="text-xs text-gray-400 mt-6">Signed in as <span className="font-medium text-gray-600">{userEmail}</span></p>
+              <p className="text-xs text-gray-400 mt-6 dark:text-obsidian-faint">Signed in as <span className="font-medium text-gray-600 dark:text-ink-muted">{userEmail}</span></p>
             </div>
           </div>
         </Card>
@@ -315,13 +313,13 @@ function EmailVerificationContent() {
             <CardTitle>Google Account Permissions</CardTitle>
           </CardHeader>
           <div className="mt-4 px-4 pb-6">
-            <div className="flex items-center gap-3 p-4 bg-gray-50 rounded-xl mb-6">
-              <div className="w-10 h-10 rounded-full bg-white border border-gray-200 flex items-center justify-center">
-                <span className="text-lg font-bold text-gray-400">G</span>
+            <div className="flex items-center gap-3 p-4 bg-gray-50 rounded-xl mb-6 dark:bg-obsidian-hover">
+              <div className="w-10 h-10 rounded-full bg-white border border-gray-200 flex items-center justify-center dark:bg-obsidian-surface dark:border-obsidian-border">
+                <span className="text-lg font-bold text-gray-400 dark:text-obsidian-faint">G</span>
               </div>
               <div>
-                <p className="text-sm font-medium text-gray-900">{userEmail}</p>
-                <p className="text-xs text-gray-500">Comp-Dash wants to access your Google Account</p>
+                <p className="text-sm font-medium text-gray-900 dark:text-ink-primary">{userEmail}</p>
+                <p className="text-xs text-gray-500 dark:text-obsidian-faint">Comp-Dash wants to access your Google Account</p>
               </div>
             </div>
             <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-6">
@@ -334,23 +332,23 @@ function EmailVerificationContent() {
               </div>
             </div>
             <div className="space-y-3 mb-6">
-              <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Permissions requested</p>
+              <p className="text-xs font-medium text-gray-500 uppercase tracking-wider dark:text-obsidian-faint">Permissions requested</p>
               {[
                 { scope: 'Read email metadata (From, To, Subject, Date)', detail: 'gmail.readonly' },
                 { scope: 'View your email address', detail: 'userinfo.email' },
               ].map((p, i) => (
-                <div key={i} className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl">
+                <div key={i} className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl dark:bg-obsidian-hover">
                   <CheckCircle className="w-4 h-4 text-green-500 flex-shrink-0" />
-                  <div><p className="text-sm text-gray-700">{p.scope}</p><p className="text-xs text-gray-400 font-mono">{p.detail}</p></div>
+                  <div><p className="text-sm text-gray-700 dark:text-ink-muted">{p.scope}</p><p className="text-xs text-gray-400 font-mono dark:text-obsidian-faint">{p.detail}</p></div>
                 </div>
               ))}
             </div>
             <div className="flex items-center gap-3">
               <button onClick={handleAllowAccess} className="flex-1 px-4 py-2.5 bg-accent text-white text-sm font-medium rounded-xl hover:bg-accent/90 transition-colors">Allow</button>
-              <button onClick={handleDeny} className="px-6 py-2.5 bg-white border border-gray-200 text-gray-700 text-sm font-medium rounded-xl hover:bg-gray-50 transition-colors">Deny</button>
+              <button onClick={handleDeny} className="px-6 py-2.5 bg-white border border-gray-200 text-gray-700 text-sm font-medium rounded-xl hover:bg-gray-50 transition-colors dark:bg-obsidian-surface dark:border-obsidian-border dark:text-ink-primary dark:hover:bg-obsidian-hover">Deny</button>
             </div>
             <div className="mt-4 text-center">
-              <button onClick={handleSkipGmail} className="text-xs text-gray-400 hover:text-gray-600 underline">Skip — use in-app email instead</button>
+              <button onClick={handleSkipGmail} className="text-xs text-gray-400 hover:text-gray-600 underline dark:text-obsidian-faint dark:hover:text-ink-muted">Skip — use in-app email instead</button>
             </div>
           </div>
         </Card>
@@ -369,8 +367,8 @@ function EmailVerificationContent() {
 
            <div className="grid grid-cols-1 gap-6">
             {useGmail && (
-              <div className="flex items-center justify-between px-4 py-2 bg-gray-50 rounded-xl border border-gray-200">
-                <div className="flex items-center gap-2 text-xs text-gray-500">
+              <div className="flex items-center justify-between px-4 py-2 bg-gray-50 rounded-xl border border-gray-200 dark:bg-obsidian-hover dark:border-obsidian-border">
+                <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-obsidian-faint">
                   <RefreshCw className={`w-3.5 h-3.5 ${syncing ? 'animate-spin text-accent' : ''}`} />
                   {syncing ? 'Syncing...' : loading ? 'Fetching inbox...' : lastSync ? `Last sync: ${new Date(lastSync).toLocaleTimeString()}` : 'Auto-sync every 30s'}
                 </div>
@@ -394,14 +392,14 @@ function EmailVerificationContent() {
               <div className="mt-4 space-y-4">
                 <div className="flex items-center gap-2 px-4">
                   <div className="relative flex-1">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-obsidian-faint" />
                     <input type="text" placeholder={useGmail ? 'Search your Gmail inbox...' : 'Search...'}
                       value={keyword} onChange={e => setKeyword(e.target.value)}
                       onKeyDown={e => { if (e.key === 'Enter') { if (useGmail) handleSearchGmail(); else handleSearchInternal() } }}
-                      className="w-full pl-10 pr-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm text-gray-700 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent"
+                      className="w-full pl-10 pr-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm text-gray-700 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent dark:bg-obsidian-hover dark:border-obsidian-border dark:text-ink-primary dark:placeholder:text-obsidian-faint"
                     />
                   </div>
-                  <button onClick={useGmail ? handleSearchGmail : handleSearchInternal}
+                  <button onClick={() => { if (useGmail) handleSearchGmail(); else handleSearchInternal() }}
                     disabled={gmailSearching || loading || !keyword.trim()}
                     className="px-4 py-2.5 bg-accent text-white text-sm font-medium rounded-xl hover:bg-accent/90 disabled:opacity-50 transition-colors flex items-center gap-2"
                   >
@@ -421,17 +419,17 @@ function EmailVerificationContent() {
 
                 {loading && !gmailSearching && (
                   <div className="px-4 pb-4 space-y-3">
-                    {[1, 2, 3].map(i => <div key={i} className="h-24 bg-gray-100 rounded-xl animate-pulse" />)}
+                    {[1, 2, 3].map(i => <div key={i} className="h-24 bg-gray-100 rounded-xl animate-pulse dark:bg-obsidian-hover" />)}
                   </div>
                 )}
 
                 {!loading && !gmailSearching && displayEmails.length > 0 && (
                   <div className="px-4 pb-4">
-                    {filteredEmails !== null && <p className="text-xs text-gray-500 mb-3">{filteredEmails.length} result{filteredEmails.length !== 1 ? 's' : ''}</p>}
+                    {filteredEmails !== null && <p className="text-xs text-gray-500 mb-3 dark:text-obsidian-faint">{filteredEmails.length} result{filteredEmails.length !== 1 ? 's' : ''}</p>}
                     <div className="space-y-2">
                       {displayEmails.map(email => (
                         <div key={email.id}
-                          className={`p-4 bg-white border rounded-xl cursor-pointer transition-all ${selectedEmail?.id === email.id ? 'border-accent ring-2 ring-accent/10' : 'border-gray-100 hover:border-gray-200 hover:shadow-sm'}`}
+                          className={`p-4 bg-white border rounded-xl cursor-pointer transition-all dark:bg-obsidian-surface ${selectedEmail?.id === email.id ? 'border-accent ring-2 ring-accent/10' : 'border-gray-100 hover:border-gray-200 hover:shadow-sm dark:border-obsidian-border'}`}
                           onClick={() => handleSelectEmail(email)}
                         >
                           <div className="flex items-start justify-between mb-2">
@@ -439,15 +437,15 @@ function EmailVerificationContent() {
                               <div className="w-7 h-7 rounded-full bg-accent/10 flex items-center justify-center flex-shrink-0">
                                 <Mail className="w-3.5 h-3.5 text-accent" />
                               </div>
-                              <span className="text-xs text-gray-500 truncate">{email.from}</span>
+                              <span className="text-xs text-gray-500 truncate dark:text-obsidian-faint">{email.from}</span>
                             </div>
                             <div className="flex items-center gap-2 flex-shrink-0">
                               {email.status && <Badge size="sm" variant={statusVariant(email.status)}>{email.status.replace('_', ' ')}</Badge>}
-                              <span className="text-xs text-gray-400">{email.date ? new Date(email.date).toLocaleDateString() : ''}</span>
+                              <span className="text-xs text-gray-400 dark:text-obsidian-faint">{email.date ? new Date(email.date).toLocaleDateString() : ''}</span>
                             </div>
                           </div>
-                          <p className="text-sm font-medium text-gray-900 mb-1">{email.subject}</p>
-                          <p className="text-xs text-gray-500 line-clamp-2">{email.snippet}</p>
+                          <p className="text-sm font-medium text-gray-900 mb-1 dark:text-ink-primary">{email.subject}</p>
+                          <p className="text-xs text-gray-500 line-clamp-2 dark:text-obsidian-faint">{email.snippet}</p>
                         </div>
                       ))}
                     </div>
@@ -456,7 +454,7 @@ function EmailVerificationContent() {
 
                 {!loading && !gmailSearching && displayEmails.length === 0 && (
                   <div className="px-4 pb-4">
-                    <div className="flex flex-col items-center justify-center py-10 text-gray-400">
+                    <div className="flex flex-col items-center justify-center py-10 text-gray-400 dark:text-obsidian-faint">
                       {keyword ? <Search className="w-10 h-10 mb-2" /> : <Inbox className="w-10 h-10 mb-2" />}
                       <p className="text-sm">{keyword ? 'No matching emails' : 'No emails'}</p>
                       <p className="text-xs mt-1">{keyword ? 'Try a different keyword' : useGmail ? 'Click "Fetch Inbox" to load your recent emails' : 'Register for a competition first'}</p>
@@ -473,32 +471,32 @@ function EmailVerificationContent() {
                 </CardHeader>
                 <div className="mt-4 px-4 pb-6 space-y-4">
                   <div className="space-y-3">
-                    <div className="flex items-start gap-3 p-3 bg-gray-50 rounded-xl">
-                      <Mail className="w-4 h-4 text-gray-400 mt-0.5" />
+                    <div className="flex items-start gap-3 p-3 bg-gray-50 rounded-xl dark:bg-obsidian-hover">
+                      <Mail className="w-4 h-4 text-gray-400 mt-0.5 dark:text-obsidian-faint" />
                       <div>
-                        <p className="text-xs text-gray-400 uppercase tracking-wider">From</p>
-                        <p className="text-sm font-medium text-gray-900">{emailMeta?.from || selectedEmail.from}</p>
+                        <p className="text-xs text-gray-400 uppercase tracking-wider dark:text-obsidian-faint">From</p>
+                        <p className="text-sm font-medium text-gray-900 dark:text-ink-primary">{emailMeta?.from || selectedEmail.from}</p>
                       </div>
                     </div>
-                    <div className="flex items-start gap-3 p-3 bg-gray-50 rounded-xl">
-                      <Mail className="w-4 h-4 text-gray-400 mt-0.5" />
+                    <div className="flex items-start gap-3 p-3 bg-gray-50 rounded-xl dark:bg-obsidian-hover">
+                      <Mail className="w-4 h-4 text-gray-400 mt-0.5 dark:text-obsidian-faint" />
                       <div>
-                        <p className="text-xs text-gray-400 uppercase tracking-wider">To</p>
-                        <p className="text-sm font-medium text-gray-900">{emailMeta?.to || userEmail}</p>
+                        <p className="text-xs text-gray-400 uppercase tracking-wider dark:text-obsidian-faint">To</p>
+                        <p className="text-sm font-medium text-gray-900 dark:text-ink-primary">{emailMeta?.to || userEmail}</p>
                       </div>
                     </div>
-                    <div className="flex items-start gap-3 p-3 bg-gray-50 rounded-xl">
-                      <Shield className="w-4 h-4 text-gray-400 mt-0.5" />
+                    <div className="flex items-start gap-3 p-3 bg-gray-50 rounded-xl dark:bg-obsidian-hover">
+                      <Shield className="w-4 h-4 text-gray-400 mt-0.5 dark:text-obsidian-faint" />
                       <div>
-                        <p className="text-xs text-gray-400 uppercase tracking-wider">Subject</p>
-                        <p className="text-sm font-medium text-gray-900">{emailMeta?.subject || selectedEmail.subject}</p>
+                        <p className="text-xs text-gray-400 uppercase tracking-wider dark:text-obsidian-faint">Subject</p>
+                        <p className="text-sm font-medium text-gray-900 dark:text-ink-primary">{emailMeta?.subject || selectedEmail.subject}</p>
                       </div>
                     </div>
-                    <div className="flex items-start gap-3 p-3 bg-gray-50 rounded-xl">
-                      <Clock className="w-4 h-4 text-gray-400 mt-0.5" />
+                    <div className="flex items-start gap-3 p-3 bg-gray-50 rounded-xl dark:bg-obsidian-hover">
+                      <Clock className="w-4 h-4 text-gray-400 mt-0.5 dark:text-obsidian-faint" />
                       <div>
-                        <p className="text-xs text-gray-400 uppercase tracking-wider">Date & Time Received</p>
-                        <p className="text-sm font-medium text-gray-900">
+                        <p className="text-xs text-gray-400 uppercase tracking-wider dark:text-obsidian-faint">Date & Time Received</p>
+                        <p className="text-sm font-medium text-gray-900 dark:text-ink-primary">
                           {emailMeta?.date ? new Date(emailMeta.date).toLocaleString() : selectedEmail.date ? new Date(selectedEmail.date).toLocaleString() : 'N/A'}
                         </p>
                       </div>
@@ -529,7 +527,7 @@ function EmailVerificationContent() {
                 </CardHeader>
                 <div className="px-4 pb-6">
                   <div className="space-y-3">
-                    {[1,2,3,4].map(i => <div key={i} className="h-14 bg-gray-100 rounded-xl animate-pulse" />)}
+                    {[1,2,3,4].map(i => <div key={i} className="h-14 bg-gray-100 rounded-xl animate-pulse dark:bg-obsidian-hover" />)}
                   </div>
                 </div>
               </Card>

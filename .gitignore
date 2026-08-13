@@ -1,4 +1,7 @@
 # Dependencies
+test-results/
+playwright-report/
+
 node_modules/
 .pnp
 .pnp.js
@@ -28,7 +31,7 @@ web-build/
 # Environment variables
 .env
 .env.*
-.env.example
+!.env.example
 .env.local.template
 .env.local
 .env.development.local
@@ -74,3 +77,11 @@ pnpm-debug.log*
 *.tsbuildinfo
 
 /generated/prisma
+
+# SVG Files & Generated Schema Diagrams
+*.svg
+schema.svg
+**/schema.svg
+
+
+e2e/.auth/

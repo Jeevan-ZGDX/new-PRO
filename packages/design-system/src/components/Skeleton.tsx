@@ -1,7 +1,7 @@
 import { cva, type VariantProps } from 'class-variance-authority'
 import { cn } from '../utils/cn'
 
-const skeletonVariants = cva('animate-pulse bg-gray-200 rounded-xl', {
+const skeletonVariants = cva('animate-pulse bg-gray-200 dark:bg-obsidian-hover rounded-xl', {
   variants: {
     variant: {
       text: 'h-4',
@@ -64,7 +64,7 @@ export function Skeleton({ className, variant, width, count = 1, height }: Skele
 
 export function CompetitionCardSkeleton() {
   return (
-    <div className="bg-white rounded-2xl border border-gray-100 shadow-card overflow-hidden">
+    <div className="bg-white rounded-2xl border border-gray-100 shadow-card overflow-hidden dark:bg-obsidian-surface dark:border-obsidian-border">
       <Skeleton variant="thumbnail" height={180} width="full" className="!rounded-none" />
       <div className="p-4 space-y-3">
         <Skeleton variant="heading" width="threequarters" />
@@ -81,7 +81,7 @@ export function CompetitionCardSkeleton() {
 
 export function StatCardSkeleton() {
   return (
-    <div className="bg-white rounded-2xl border border-gray-100 shadow-card p-6">
+    <div className="bg-white rounded-2xl border border-gray-100 shadow-card p-6 dark:bg-obsidian-surface dark:border-obsidian-border">
       <Skeleton variant="text" width="half" />
       <Skeleton variant="title" width="third" className="mt-2" />
       <Skeleton variant="text" width="twothirds" className="mt-2" />
@@ -93,7 +93,7 @@ export function ListSkeleton({ count = 5 }: { count?: number }) {
   return (
     <div className="space-y-3">
       {Array.from({ length: count }).map((_, i) => (
-        <div key={i} className="flex items-center gap-3 p-4 bg-white rounded-2xl border border-gray-100">
+        <div key={i} className="flex items-center gap-3 p-4 bg-white rounded-2xl border border-gray-100 dark:bg-obsidian-surface dark:border-obsidian-border">
           <Skeleton variant="avatar" width="lg" height={48} />
           <div className="flex-1 space-y-2">
             <Skeleton variant="heading" width="threequarters" />

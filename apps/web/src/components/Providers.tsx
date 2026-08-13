@@ -1,12 +1,20 @@
 'use client'
 
-import { type ReactNode, useState, useEffect } from 'react'
+import { type ReactNode, useState } from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { ToastProvider } from '@/contexts/ToastContext'
-import { ThemeProvider } from '@/contexts/ThemeContext'
 import { setSupabaseClient } from '@comp-dash/api'
 import { supabase } from '@/lib/supabase-client'
 import '@comp-dash/i18n'
+
+// Registered at module scope, not in an effect. Effects run after children have
+// mounted and after React Query has already fired its first fetch, so hooks
+// that branch on isSupabaseEnabled() took the apiClient fallback on first load
+// and hit /api/leaderboard/overall — a route the catch-all does not define,
+// producing a 404 on every fresh page load.
+if (supabase) {
+  setSupabaseClient(supabase)
+}
 
 export function Providers({ children }: { children: ReactNode }) {
   const [queryClient] = useState(
@@ -22,17 +30,9 @@ export function Providers({ children }: { children: ReactNode }) {
       })
   )
 
-  useEffect(() => {
-    if (supabase) {
-      setSupabaseClient(supabase)
-    }
-  }, [])
-
   return (
     <QueryClientProvider client={queryClient}>
-      <ThemeProvider>
-        <ToastProvider>{children}</ToastProvider>
-      </ThemeProvider>
+      <ToastProvider>{children}</ToastProvider>
     </QueryClientProvider>
   )
 }

@@ -1,6 +1,6 @@
 import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
-import { ThemeProvider } from '@/components/providers/ThemeProvider'
+import { ThemeProvider } from '@/contexts/ThemeContext'
 import './globals.css'
 
 const inter = Inter({ subsets: ['latin'] })
@@ -14,8 +14,11 @@ const themeScript = `
   (function() {
     try {
       var saved = localStorage.getItem('theme');
-      var isDark = saved === 'dark' || (!saved && window.matchMedia('(prefers-color-scheme: dark)').matches);
-      if (isDark) {
+      var theme = saved === 'dark' || saved === 'light' ? saved : 'system';
+      if (theme === 'system') {
+        theme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+      }
+      if (theme === 'dark') {
         document.documentElement.classList.add('dark');
       } else {
         document.documentElement.classList.remove('dark');
@@ -34,10 +37,9 @@ export default function RootLayout({
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
       </head>
-      <body className={`${inter.className} bg-gray-50 text-gray-900 dark:bg-[#0D1117] dark:text-[#F0F6FC] min-h-screen transition-colors duration-200`}>
+      <body className={`${inter.className} bg-gray-50 text-gray-900 min-h-screen transition-colors duration-200`}>
         <ThemeProvider>{children}</ThemeProvider>
       </body>
     </html>
   )
 }
-

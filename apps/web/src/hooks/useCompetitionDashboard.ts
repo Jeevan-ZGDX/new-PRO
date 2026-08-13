@@ -107,7 +107,9 @@ export function useCompetitionDashboard(filters?: CompetitionDashboardFilters) {
       })
 
     return () => {
-      supabase.removeChannel(channel)
+      if (supabase) {
+        supabase.removeChannel(channel)
+      }
     }
   }, [queryClient])
 

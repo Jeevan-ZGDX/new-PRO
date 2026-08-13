@@ -10,7 +10,6 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from 'recharts'
-import { useTheme } from '@/components/providers/ThemeProvider'
 
 interface RegistrationsChartProps {
   data: { date: string; count: number }[]
@@ -18,17 +17,16 @@ interface RegistrationsChartProps {
 
 export function RegistrationsChart({ data }: RegistrationsChartProps) {
   const { t } = useTranslation()
-  const { isDark } = useTheme()
 
-  const gridStroke = isDark ? '#374151' : '#E5E7EB'
-  const axisColor = isDark ? '#9CA3AF' : '#6B7280'
-  const tooltipBg = isDark ? '#1F2937' : '#FFFFFF'
-  const tooltipBorder = isDark ? '#374151' : '#E5E7EB'
-  const tooltipText = isDark ? '#F3F4F6' : '#111827'
+  const gridStroke = '#E5E7EB'
+  const axisColor = '#6B7280'
+  const tooltipBg = '#FFFFFF'
+  const tooltipBorder = '#E5E7EB'
+  const tooltipText = '#111827'
 
   if (data.length === 0) {
     return (
-      <div className="h-[300px] flex items-center justify-center text-gray-500 dark:text-gray-400">
+      <div className="h-[300px] flex items-center justify-center text-gray-500">
         {t('common.noData')}
       </div>
     )

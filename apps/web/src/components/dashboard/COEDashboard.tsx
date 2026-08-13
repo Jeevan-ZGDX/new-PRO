@@ -38,8 +38,8 @@ export default function COEDashboard() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-[#F0F6FC]">Admin Dashboard</h1>
-          <p className="text-gray-500 dark:text-[#8B949E] mt-1">College-wide overview and management</p>
+          <h1 className="text-2xl font-bold text-white-900">Admin Dashboard</h1>
+          <p className="text-gray-500 mt-1">College-wide overview and management</p>
         </div>
         <div className="flex items-center gap-3">
           <Button variant="primary" size="sm" onClick={() => router.push('/create-competition')}>
@@ -132,7 +132,7 @@ export default function COEDashboard() {
               competitions.map((comp) => (
                 <div
                   key={comp.id}
-                  className="flex items-center justify-between px-4 py-3 rounded-xl hover:bg-gray-50 transition-colors cursor-pointer"
+                  className="flex items-center justify-between px-4 py-3 rounded-xl hover:cursor-pointer transition-colors"
                   onClick={() => router.push(`/competitions/${comp.id}`)}
                 >
                   <div className="flex items-center gap-3">
@@ -140,7 +140,7 @@ export default function COEDashboard() {
                       <Trophy className="w-4 h-4 text-accent" />
                     </div>
                     <div>
-                      <p className="text-sm font-medium text-gray-900">{comp.title}</p>
+                      <p className="text-sm font-medium text-white-900">{comp.title}</p>
                       <div className="flex items-center gap-2 mt-0.5">
                         <Badge variant="primary" size="xs">{comp.category}</Badge>
                         <span className="text-xs text-gray-400">{comp.mode}</span>

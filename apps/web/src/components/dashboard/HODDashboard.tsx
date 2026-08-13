@@ -6,7 +6,7 @@ import { useHodDashboardStats } from '@comp-dash/api'
 import { Users, UserCheck, BookOpen, GraduationCap, Mail, Trophy, CheckCircle, Clock } from 'lucide-react'
 import { getCurrentUser } from '@/lib/auth'
 
-const YEARS = ['2nd Year', '2nd Year', '3rd Year', '4th Year']
+const YEARS = ['1st Year', '2nd Year', '3rd Year', '4th Year']
 
 export default function HODDashboard() {
   const { data: stats, isLoading } = useHodDashboardStats()
@@ -42,8 +42,8 @@ export default function HODDashboard() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-[#F0F6FC]">{departmentName} Dashboard</h1>
-        <p className="text-gray-500 dark:text-[#8B949E] mt-1">Departmental competition overview and verification management</p>
+        <h1 className="text-2xl font-bold text-white-900">{departmentName} Dashboard</h1>
+        <p className="text-gray-500 mt-1">Departmental competition overview and verification management</p>
       </div>
 
       <div className="flex items-center gap-2 flex-wrap">

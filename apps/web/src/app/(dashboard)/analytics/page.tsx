@@ -10,7 +10,7 @@ import { exportToCSV } from '@/lib/export-csv'
 import {
   LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts'
-import { useTheme } from '@/components/providers/ThemeProvider'
+import { useTheme } from '@/contexts/ThemeContext'
 
 export default function AnalyticsPage() {
   const { t } = useTranslation()
@@ -18,11 +18,12 @@ export default function AnalyticsPage() {
   const { data: stats, isLoading } = useAdminAnalytics()
   const { data: leaderboard } = useLeaderboardOverall()
 
-  const gridStroke = isDark ? '#374151' : '#E5E7EB'
-  const axisColor = isDark ? '#9CA3AF' : '#6B7280'
-  const tooltipBg = isDark ? '#1F2937' : '#FFFFFF'
-  const tooltipBorder = isDark ? '#374151' : '#E5E7EB'
-  const tooltipText = isDark ? '#F3F4F6' : '#111827'
+  const gridStroke = isDark ? '#333537' : '#E5E7EB'
+  const axisColor = isDark ? '#9AA0A6' : '#6B7280'
+  const tooltipBg = isDark ? '#1E1F20' : '#FFFFFF'
+  const tooltipBorder = isDark ? '#333537' : '#E5E7EB'
+  const tooltipText = isDark ? '#E3E3E3' : '#111827'
+  const trendColor = isDark ? '#F97316' : '#6C4CF1'
 
   const classData = (leaderboard || []).reduce<Record<string, { section: string; points: number; wins: number; students: Set<string> }>>((acc, e) => {
     const section = e.section || 'Unknown'
@@ -43,11 +44,11 @@ export default function AnalyticsPage() {
       'analytics',
       ['Metric', 'Value'],
       [
-        ['Total Competitions', String(stats.totalCompetitions)],
-        ['Total Participants', String(stats.totalParticipants)],
-        ['Win Rate', `${stats.winRate}%`],
-        ['Verification Rate', `${stats.verificationRate}%`],
-        ['Trend Data Points', String(stats.competitionTrends.length)],
+        ['Total Competitions', String(stats.totalCompetitions ?? 0)],
+        ['Total Participants', String(stats.totalParticipants ?? 0)],
+        ['Win Rate', `${stats.winRate ?? 0}%`],
+        ['Verification Rate', `${stats.verificationRate ?? 0}%`],
+        ['Trend Data Points', String(stats.competitionTrends?.length ?? 0)],
         ['Classes Tracked', String(classChartData.length)],
       ]
     )
@@ -56,7 +57,7 @@ export default function AnalyticsPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">{t('sidebar.analytics')}</h1>
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-ink-primary">{t('sidebar.analytics')}</h1>
         <Button variant="outline" size="sm" onClick={handleExport}>
           <Download className="w-4 h-4 mr-2" />
           Export
@@ -124,14 +125,14 @@ export default function AnalyticsPage() {
                     }}
                     itemStyle={{ color: tooltipText }}
                   />
-                  <Line type="monotone" dataKey="count" stroke="#6C4CF1" strokeWidth={2} dot={{ fill: '#6C4CF1', strokeWidth: 2, r: 4 }} activeDot={{ r: 6 }} />
+                  <Line type="monotone" dataKey="count" stroke={trendColor} strokeWidth={2} dot={{ fill: trendColor, strokeWidth: 2, r: 4 }} activeDot={{ r: 6 }} />
                 </LineChart>
               </ResponsiveContainer>
             ) : (
-              <div className="h-full flex items-center justify-center bg-gray-50 dark:bg-gray-800/50 rounded-xl">
+              <div className="h-full flex items-center justify-center bg-gray-50 dark:bg-obsidian-hover rounded-xl">
                 <div className="text-center">
-                  <BarChart3 className="w-12 h-12 text-gray-300 dark:text-gray-600 mx-auto mb-2" />
-                  <p className="text-sm text-gray-500 dark:text-gray-400">No data available</p>
+                  <BarChart3 className="w-12 h-12 text-gray-300 dark:text-obsidian-faint mx-auto mb-2" />
+                  <p className="text-sm text-gray-500 dark:text-ink-muted">No data available</p>
                 </div>
               </div>
             )}
@@ -159,14 +160,14 @@ export default function AnalyticsPage() {
                     }}
                     itemStyle={{ color: tooltipText }}
                   />
-                  <Bar dataKey="points" name="Total Points" fill="#6C4CF1" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="points" name="Total Points" fill={trendColor} radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             ) : (
-              <div className="h-full flex items-center justify-center bg-gray-50 dark:bg-gray-800/50 rounded-xl">
+              <div className="h-full flex items-center justify-center bg-gray-50 dark:bg-obsidian-hover rounded-xl">
                 <div className="text-center">
-                  <BarChart3 className="w-12 h-12 text-gray-300 dark:text-gray-600 mx-auto mb-2" />
-                  <p className="text-sm text-gray-500 dark:text-gray-400">No data available</p>
+                  <BarChart3 className="w-12 h-12 text-gray-300 dark:text-obsidian-faint mx-auto mb-2" />
+                  <p className="text-sm text-gray-500 dark:text-ink-muted">No data available</p>
                 </div>
               </div>
             )}
@@ -200,10 +201,10 @@ export default function AnalyticsPage() {
               </LineChart>
             </ResponsiveContainer>
           ) : (
-            <div className="h-full flex items-center justify-center bg-gray-50 dark:bg-gray-800/50 rounded-xl">
+            <div className="h-full flex items-center justify-center bg-gray-50 rounded-xl">
               <div className="text-center">
-                <BarChart3 className="w-12 h-12 text-gray-300 dark:text-gray-600 mx-auto mb-2" />
-                <p className="text-sm text-gray-500 dark:text-gray-400">No data available</p>
+                <BarChart3 className="w-12 h-12 text-gray-300 mx-auto mb-2" />
+                <p className="text-sm text-gray-500">No data available</p>
               </div>
             </div>
           )}

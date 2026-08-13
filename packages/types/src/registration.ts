@@ -34,6 +34,15 @@ export interface RegistrationCreate {
   verificationMethod: 'screenshot' | 'email'
   confirmationScreenshot?: string
   confirmationEmail?: string
+  /**
+   * Student identity, mirrored into `student_competitions` (which is keyed by
+   * email, not by a students FK) when a registration is created.
+   */
+  userId?: string
+  userEmail?: string
+  userName?: string
+  /** Denormalized onto `student_competitions.competition_name`. */
+  competitionTitle?: string
 }
 
 export interface RegistrationStats {
@@ -97,4 +106,33 @@ export interface HistoryEntry {
   verifiedAt: string | null
   position?: string
   prize?: string
+}
+
+/**
+ * Shape returned by `GET /advisor/dashboard/stats` — scoped to the signed-in
+ * advisor's assigned sections. Distinct from the admin/COE dashboard payload,
+ * which is department-wide.
+ */
+export interface AdvisorDashboardStats {
+  totalStudents: number
+  registeredCount: number
+  verifiedCount: number
+  pendingCount: number
+  rejectedCount: number
+  verificationRequests: Array<{
+    id: string
+    studentId?: string
+    studentName: string
+    department?: string
+    competitionTitle?: string
+    status: string
+    emailProof?: {
+      from?: string
+      to?: string
+      subject?: string
+      date?: string
+    } | null
+    requestedAt?: string
+  }>
+  registrations: Array<Record<string, unknown>>
 }

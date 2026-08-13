@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { supabase } from '@/lib/supabase-client'
+import { storeGmailTokens } from '@/lib/gmail-tokens'
 
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID
 const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET
@@ -63,19 +63,13 @@ export async function GET(request: NextRequest) {
       throw new Error('Email mismatch')
     }
 
-    if (supabase) {
-      const expiresAt = new Date(Date.now() + (tokens.expires_in || 3600) * 1000).toISOString()
-
-      await supabase.from('gmail_tokens').upsert({
-        user_id: userEmail,
-        user_email: userEmail,
-        access_token: tokens.access_token,
-        refresh_token: tokens.refresh_token,
-        expires_at: expiresAt,
-        scope: tokens.scope,
-        updated_at: new Date().toISOString(),
-      }, { onConflict: 'user_email' })
-    }
+    await storeGmailTokens({
+      user_id: userEmail,
+      user_email: userEmail,
+      access_token: tokens.access_token,
+      refresh_token: tokens.refresh_token,
+      expires_at: new Date(Date.now() + (tokens.expires_in || 3600) * 1000).toISOString(),
+    })
 
     const verifyUrl = new URL('/api/gmail/verify', request.url)
     verifyUrl.searchParams.set('competitionId', competitionId)

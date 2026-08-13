@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useEffect } from 'react'
 import { apiClient } from '../client'
 import { getSupabaseClient, isSupabaseEnabled } from '../supabase-manager'
 import type {
@@ -14,6 +15,7 @@ import type {
   DepartmentLeaderboardEntry,
   CompetitionDashboardData,
   HistoryEntry,
+  AdvisorDashboardStats,
 } from '@comp-dash/types'
 
 const DASHBOARD_TABLE = 'competition_dashboard'
@@ -162,10 +164,29 @@ export function useCompetitionDashboard(id: string) {
   })
 }
 
+export function useAdvisorCompetitionStats(competitionId?: string) {
+  return useQuery({
+    queryKey: ['advisor', 'competition', competitionId, 'stats'],
+    queryFn: async () => {
+      if (!competitionId) return null
+      const response = await apiClient.get<any>(`/advisor/competitions/${competitionId}/stats`)
+      return {
+        totalStudents: response.totalStudents || 0,
+        appliedStudents: response.appliedStudents || 0,
+        unregisteredStudents: response.unregisteredStudents || 0,
+        registrationsByDepartment: response.registrationsByDepartment || [],
+        studentsWithDetails: response.studentsWithDetails || [],
+      }
+    },
+    enabled: !!competitionId,
+    staleTime: 5 * 60 * 1000,
+  })
+}
+
 export function useAdvisorDashboardStats() {
   return useQuery({
     queryKey: ['advisor', 'dashboard', 'stats'],
-    queryFn: () => apiClient.get<StudentDashboardStats>('/advisor/dashboard/stats'),
+    queryFn: () => apiClient.get<AdvisorDashboardStats>('/advisor/dashboard/stats'),
     staleTime: 5 * 60 * 1000,
   })
 }
@@ -214,6 +235,7 @@ export function useCreateCompetition() {
         const sb = getSupabaseClient()
         if (sb) {
           const { error } = await sb.from(DASHBOARD_TABLE).insert({
+            id: crypto.randomUUID(),
             competition_name: (data.title as string) || '',
             category: (data.category as string) || 'competition',
             organizer: (data.organizer as string) || '',
@@ -303,4 +325,49 @@ export function useDeleteCompetition() {
       queryClient.invalidateQueries({ queryKey: ['supabase-competitions'], refetchType: 'all' })
     },
   })
+}
+
+export function useCompetitionDashboardRealtime(id: string) {
+  const queryClient = useQueryClient()
+  const useSupabase = isSupabaseEnabled()
+
+  useEffect(() => {
+    if (!useSupabase || !id) return
+
+    const sb = getSupabaseClient()
+    if (!sb) return
+
+    const channel = sb
+      .channel(`competition-dashboard-${id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: DASHBOARD_TABLE,
+          filter: `id=eq.${id}`,
+        },
+        (payload: any) => {
+          queryClient.invalidateQueries({ queryKey: ['competition', id, 'dashboard'] })
+          queryClient.invalidateQueries({ queryKey: ['supabase-competitions'] })
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'student_competitions',
+          filter: `competition_id=eq.${id}`,
+        },
+        (payload: any) => {
+          queryClient.invalidateQueries({ queryKey: ['competition', id, 'dashboard'] })
+        }
+      )
+      .subscribe()
+
+    return () => {
+      sb.removeChannel(channel)
+    }
+  }, [id, useSupabase, queryClient])
 }

@@ -147,15 +147,114 @@ return <h1>{t('home.greeting', { name: 'John' })}</h1>
 ### Web App (`apps/web/.env.local`)
 
 ```env
-NEXT_PUBLIC_API_URL=http://localhost:3001/api
-NEXT_PUBLIC_GOOGLE_CLIENT_ID=your-google-client-id
+# Supabase (public)
+NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+
+# Supabase (server-only)
+SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
+
+# App API base URL
+NEXT_PUBLIC_API_URL=http://localhost:3000/api
+
+# Google OAuth (server-only, for Gmail verification)
+GOOGLE_CLIENT_ID=your-google-client-id
+GOOGLE_CLIENT_SECRET=your-google-client-secret
+GOOGLE_REDIRECT_URI=http://localhost:3000/api/auth/gmail/callback
+
+# Real-time webhook secret
+REAL_TIME_API_SECRET=change-me-to-a-long-random-string
+
+# Firebase Admin (server-only, JSON string)
+FIREBASE_SERVICE_ACCOUNT='{"type":"service_account",...}'
 ```
+
+See `apps/web/.env.example` for the full annotated list.
+
+## Auth & Database (Supabase)
+
+- Run `supabase/schema.sql` in the Supabase SQL editor to create every table,
+  RLS policies, and the `on_auth_user_created` trigger that auto-creates a
+  `profiles` row on signup.
+- Sign in / sign up use Supabase Auth (`/sign-in`, `/sign-up`).
+- Seed demo users:
+  ```bash
+  SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... npm run seed:auth
+  ```
+  Demo logins: `admin@citchennai.net`, `hod@citchennai.net`,
+  `advisor@citchennai.net`, `student@citchennai.net` (password `CompDash@123`).
+- Gmail OAuth tokens are stored **server-side** in the `gmail_tokens` table and
+  are only touched via the service role. The client never sees or stores them.
+  The OAuth dance runs through `/api/auth/gmail` and `/api/auth/gmail/callback`.
+
+### Google Sign-In (OAuth)
+
+The "Continue with Google" button on `/sign-in` and `/sign-up` uses the
+**Supabase-hosted** OAuth flow — Supabase, not this app, is Google's redirect
+target, so the only URI Google needs to know about is Supabase's:
+
+```
+browser → supabase.auth.signInWithOAuth({ provider: 'google' })
+        → accounts.google.com  (hd=citchennai.net narrows the account picker)
+        → https://<project-ref>.supabase.co/auth/v1/callback
+        → {NEXT_PUBLIC_APP_URL}/auth/callback?code=…&next=/dashboard
+        → /dashboard
+```
+
+`/auth/callback` is the important half. `@supabase/ssr` uses **PKCE**, so the
+`?code=` Supabase returns is inert until it is exchanged — the route:
+
+1. Calls `exchangeCodeForSession(code)`, which writes the `sb-…-auth-token`
+   session cookies. Skipping this step is why a login can appear to succeed and
+   still bounce straight back to `/sign-in`.
+2. **Enforces that the account ends in `@citchennai.net`** — anything else is
+   signed back out and redirected to `/sign-in` with an error. The `hd`
+   parameter is only a UX filter; this is the real gate.
+3. **Verifies the user against the database** to grant the right privileges:
+   - `role_access` (explicit allowlist `email → role/department`; `granted = false`
+     blocks the account),
+   - falling back to `profiles`, then `user_profiles`,
+   - otherwise the account defaults to the `student` role.
+4. Writes the resolved role/department into the auth user's metadata, refreshes
+   the session so the JWT claims match, and sets the `comp_dash_user` cookie —
+   so the role is correct from the very first request.
+
+**Required setup:**
+
+- `NEXT_PUBLIC_APP_URL` must point at the app origin, no trailing slash
+  (`http://localhost:3000` locally, `https://comp-dash.onrender.com` in prod).
+- In the [Google Cloud Console](https://console.cloud.google.com/apis/credentials),
+  on the OAuth client:
+  - **Authorized JavaScript origin** → `https://comp-dash.onrender.com`
+  - **Authorized redirect URI** → `https://<project-ref>.supabase.co/auth/v1/callback`
+
+  Note this is Supabase's URL, *not* one of ours. Adding an app-hosted callback
+  here is not required and does nothing for this flow.
+- In **Supabase → Auth → Providers → Google**: enable it and paste the same
+  `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`.
+- In **Supabase → Auth → URL Configuration**:
+  - Site URL → `https://comp-dash.onrender.com`
+  - Redirect URLs → `https://comp-dash.onrender.com/auth/callback` **and**
+    `http://localhost:3000/auth/callback`
+
+  An origin missing from this allowlist is silently rewritten to the Site URL,
+  which looks like the app ignoring `redirectTo`.
+- For staff/admin access, insert rows into `role_access`, e.g.:
+  ```sql
+  insert into role_access (email, role, department, granted)
+  values ('hod@citchennai.net', 'hod', 'CSE', true);
+  ```
+
+> The older self-hosted routes (`/api/auth/google` + `/api/auth/google/callback`,
+> driven by `GOOGLE_LOGIN_REDIRECT_URI`) are no longer wired to any button. They
+> require `{NEXT_PUBLIC_APP_URL}/api/auth/google/callback` to be an authorized
+> redirect URI in Google Cloud; without it they fail with `redirect_uri_mismatch`.
+
 
 ### Mobile App (`apps/mobile/.env`)
 
 ```env
 EXPO_PUBLIC_API_URL=http://localhost:3001/api
-EXPO_PUBLIC_GOOGLE_CLIENT_ID=your-google-client-id
 ```
 
 ## License

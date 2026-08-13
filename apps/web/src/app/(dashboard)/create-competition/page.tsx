@@ -36,9 +36,10 @@ const departmentOptions = [
   'CSE',
 ]
 
-const inputClass = 'w-full px-4 py-2.5 bg-white dark:bg-[#161B22] border border-gray-200 dark:border-[#30363D] rounded-xl text-sm text-gray-900 dark:text-[#F0F6FC] placeholder-gray-400 dark:placeholder-[#8B949E] focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent transition-colors'
-const labelClass = 'block text-sm font-medium text-gray-700 dark:text-[#F0F6FC] mb-1.5'
-const selectClass = inputClass
+// Updated for seamless light/dark mode contrast and hover transitions
+const inputClass = 'w-full px-4 py-2.5 bg-white dark:bg-zinc-900/80 border border-gray-200 dark:border-zinc-700/60 rounded-xl text-sm text-gray-900 dark:text-zinc-100 placeholder-gray-400 dark:placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent transition-all duration-200 hover:border-gray-300 dark:hover:border-zinc-600'
+const labelClass = 'block text-sm font-medium text-gray-700 dark:text-zinc-300 mb-1.5'
+const selectClass = `${inputClass} cursor-pointer`
 
 function CreateCompetitionContent() {
   const router = useRouter()
@@ -52,7 +53,6 @@ function CreateCompetitionContent() {
   const { data: existingComp } = useCompetition(editId || '')
 
   const [tagsInput, setTagsInput] = useState('')
-  const [loadingExisting, setLoadingExisting] = useState(false)
 
   const defaultForm = {
     title: '',
@@ -65,6 +65,7 @@ function CreateCompetitionContent() {
     organizerEmail: '',
     websiteUrl: '',
     registrationUrl: '',
+    registrationLink: '',
     teamSizeMin: 1,
     teamSizeMax: 1,
     prizePool: '',
@@ -90,6 +91,7 @@ function CreateCompetitionContent() {
         organizerEmail: (existingComp as any).organizerEmail || '',
         websiteUrl: existingComp.websiteUrl || '',
         registrationUrl: existingComp.registrationUrl || '',
+        registrationLink: existingComp.registrationLink || '',
         teamSizeMin: existingComp.teamSizeMin || 1,
         teamSizeMax: existingComp.teamSizeMax || 1,
         prizePool: existingComp.prizePool || '',
@@ -160,18 +162,18 @@ function CreateCompetitionContent() {
   return (
     <div className="max-w-3xl mx-auto space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-[#F0F6FC]">{isEdit ? 'Edit Competition' : 'Create Competition'}</h1>
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{isEdit ? 'Edit Competition' : 'Create Competition'}</h1>
         {isEdit && (
-          <span className="px-3 py-1 bg-blue-50 border border-blue-200 rounded-full text-xs text-blue-700 font-medium">
+          <span className="px-3 py-1 bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800/60 rounded-full text-xs text-blue-700 dark:text-blue-300 font-medium shadow-sm transition-transform duration-200 hover:scale-105">
             Editing: {form.title || editId}
           </span>
         )}
       </div>
 
-      <form onSubmit={handleSubmit}>
-        <Card>
+      <form onSubmit={handleSubmit} className="space-y-6">
+        <Card className="bg-white dark:bg-[#18181b] border border-gray-200 dark:border-zinc-800 shadow-sm transition-all duration-200">
           <CardHeader>
-            <CardTitle>Basic Information</CardTitle>
+            <CardTitle className="text-gray-900 dark:text-white font-semibold text-lg">Basic Information</CardTitle>
           </CardHeader>
           <div className="mt-4 space-y-5">
             <div>
@@ -214,9 +216,9 @@ function CreateCompetitionContent() {
                   className={selectClass}
                   required
                 >
-                  <option value="">Select category</option>
+                  <option value="" className="bg-white dark:bg-zinc-900 text-gray-900 dark:text-zinc-100">Select category</option>
                   {categoryOptions.map((opt) => (
-                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    <option key={opt.value} value={opt.value} className="bg-white dark:bg-zinc-900 text-gray-900 dark:text-zinc-100">{opt.label}</option>
                   ))}
                 </select>
               </div>
@@ -228,9 +230,9 @@ function CreateCompetitionContent() {
                   className={selectClass}
                   required
                 >
-                  <option value="">Select scope</option>
+                  <option value="" className="bg-white dark:bg-zinc-900 text-gray-900 dark:text-zinc-100">Select scope</option>
                   {scopeOptions.map((opt) => (
-                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    <option key={opt.value} value={opt.value} className="bg-white dark:bg-zinc-900 text-gray-900 dark:text-zinc-100">{opt.label}</option>
                   ))}
                 </select>
               </div>
@@ -242,9 +244,9 @@ function CreateCompetitionContent() {
                   className={selectClass}
                   required
                 >
-                  <option value="">Select mode</option>
+                  <option value="" className="bg-white dark:bg-zinc-900 text-gray-900 dark:text-zinc-100">Select mode</option>
                   {modeOptions.map((opt) => (
-                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    <option key={opt.value} value={opt.value} className="bg-white dark:bg-zinc-900 text-gray-900 dark:text-zinc-100">{opt.label}</option>
                   ))}
                 </select>
               </div>
@@ -252,9 +254,9 @@ function CreateCompetitionContent() {
           </div>
         </Card>
 
-        <Card className="mt-6">
+        <Card className="bg-white dark:bg-[#18181b] border border-gray-200 dark:border-zinc-800 shadow-sm transition-all duration-200">
           <CardHeader>
-            <CardTitle>Organizer & Links</CardTitle>
+            <CardTitle className="text-gray-900 dark:text-white font-semibold text-lg">Organizer & Links</CardTitle>
           </CardHeader>
           <div className="mt-4 space-y-5">
             <div>
@@ -269,7 +271,7 @@ function CreateCompetitionContent() {
               />
             </div>
             <div>
-              <label className={labelClass}>Organizer Sender Email <span className="text-gray-400 font-normal">(optional)</span></label>
+              <label className={labelClass}>Organizer Sender Email <span className="text-gray-400 dark:text-zinc-500 font-normal">(optional)</span></label>
               <input
                 type="email"
                 value={form.organizerEmail}
@@ -277,7 +279,7 @@ function CreateCompetitionContent() {
                 className={inputClass}
                 placeholder="organizer@example.com"
               />
-              <p className="text-xs text-gray-400 mt-1">Email address that sends competition confirmations — used for student email verification matching</p>
+              <p className="text-xs text-gray-500 dark:text-zinc-400 mt-1.5">Email address that sends competition confirmations — used for student email verification matching</p>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
@@ -300,13 +302,24 @@ function CreateCompetitionContent() {
                   placeholder="https://"
                 />
               </div>
+              <div>
+                <label className={labelClass}>Registration Link <span className="text-gray-400 dark:text-zinc-500 font-normal">(optional)</span></label>
+                <input
+                  type="url"
+                  value={form.registrationLink}
+                  onChange={(e) => update('registrationLink', e.target.value)}
+                  className={inputClass}
+                  placeholder="https://"
+                />
+                <p className="text-xs text-gray-500 dark:text-zinc-400 mt-1.5">Direct registration link (used for Supabase dashboard sync)</p>
+              </div>
             </div>
           </div>
         </Card>
 
-        <Card className="mt-6">
+        <Card className="bg-white dark:bg-[#18181b] border border-gray-200 dark:border-zinc-800 shadow-sm transition-all duration-200">
           <CardHeader>
-            <CardTitle>Team & Prize</CardTitle>
+            <CardTitle className="text-gray-900 dark:text-white font-semibold text-lg">Team & Prize</CardTitle>
           </CardHeader>
           <div className="mt-4 space-y-5">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -344,9 +357,9 @@ function CreateCompetitionContent() {
           </div>
         </Card>
 
-        <Card className="mt-6">
+        <Card className="bg-white dark:bg-[#18181b] border border-gray-200 dark:border-zinc-800 shadow-sm transition-all duration-200">
           <CardHeader>
-            <CardTitle>Dates</CardTitle>
+            <CardTitle className="text-gray-900 dark:text-white font-semibold text-lg">Dates</CardTitle>
           </CardHeader>
           <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
@@ -379,9 +392,9 @@ function CreateCompetitionContent() {
           </div>
         </Card>
 
-        <Card className="mt-6">
+        <Card className="bg-white dark:bg-[#18181b] border border-gray-200 dark:border-zinc-800 shadow-sm transition-all duration-200">
           <CardHeader>
-            <CardTitle>Eligibility & Tags</CardTitle>
+            <CardTitle className="text-gray-900 dark:text-white font-semibold text-lg">Eligibility & Tags</CardTitle>
           </CardHeader>
           <div className="mt-4 space-y-5">
             <div>
@@ -392,10 +405,10 @@ function CreateCompetitionContent() {
                     key={dept}
                     type="button"
                     onClick={() => toggleDepartment(dept)}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 hover:scale-105 active:scale-95 ${
                       form.eligibilityDepartments.includes(dept)
-                        ? 'bg-accent text-white'
-                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                        ? 'bg-accent text-white shadow-sm'
+                        : 'bg-gray-100 dark:bg-zinc-800/80 text-gray-600 dark:text-zinc-400 hover:bg-gray-200 dark:hover:bg-zinc-700 hover:text-gray-900 dark:hover:text-zinc-200'
                     }`}
                   >
                     {dept}
@@ -414,7 +427,13 @@ function CreateCompetitionContent() {
                   className={inputClass}
                   placeholder="Type a tag and press Enter"
                 />
-                <Button type="button" variant="outline" size="sm" onClick={addTag}>
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={addTag} 
+                  className="transition-transform duration-200 hover:scale-105 shrink-0"
+                >
                   <Plus className="w-4 h-4" />
                 </Button>
               </div>
@@ -423,10 +442,10 @@ function CreateCompetitionContent() {
                   {form.tags.map((tag) => (
                     <span
                       key={tag}
-                      className="inline-flex items-center gap-1 px-3 py-1 bg-accent/10 text-accent text-xs font-medium rounded-full"
+                      className="inline-flex items-center gap-1 px-3 py-1 bg-accent/10 dark:bg-accent/20 border border-accent/20 text-accent dark:text-accent text-xs font-medium rounded-full transition-transform duration-200 hover:scale-105"
                     >
                       {tag}
-                      <button type="button" onClick={() => removeTag(tag)} className="hover:text-accentDark">
+                      <button type="button" onClick={() => removeTag(tag)} className="hover:opacity-75 transition-opacity ml-1">
                         <X className="w-3 h-3" />
                       </button>
                     </span>
@@ -437,9 +456,21 @@ function CreateCompetitionContent() {
           </div>
         </Card>
 
-        <div className="flex items-center justify-end gap-3 mt-6">
-          <Button type="button" variant="outline" onClick={() => router.back()}>Cancel</Button>
-          <Button type="submit" disabled={!isValid || isSaving} isLoading={isSaving}>
+        <div className="flex items-center justify-end gap-3 mt-6 pt-2">
+          <Button 
+            type="button" 
+            variant="outline" 
+            onClick={() => router.back()}
+            className="transition-transform duration-200 hover:scale-[1.02] active:scale-[0.98]"
+          >
+            Cancel
+          </Button>
+          <Button 
+            type="submit" 
+            disabled={!isValid || isSaving} 
+            isLoading={isSaving}
+            className="transition-transform duration-200 hover:scale-[1.02] active:scale-[0.98] gap-2"
+          >
             {isEdit ? <Save className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
             {isEdit ? 'Save Changes' : 'Create Competition'}
           </Button>
@@ -451,7 +482,7 @@ function CreateCompetitionContent() {
 
 export default function CreateCompetitionPage() {
   return (
-    <Suspense fallback={<div className="p-6 text-center text-gray-500">Loading...</div>}>
+    <Suspense fallback={<div className="p-6 text-center text-gray-500 dark:text-zinc-400">Loading...</div>}>
       <CreateCompetitionContent />
     </Suspense>
   )

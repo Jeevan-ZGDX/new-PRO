@@ -7,14 +7,14 @@ const badgeVariants = cva(
   {
     variants: {
       variant: {
-        default: 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300',
-        primary: 'bg-primary-100 dark:bg-primary-950/60 text-primary-700 dark:text-primary-300',
-        accent: 'bg-accentLight dark:bg-accent/20 text-accentDark dark:text-accent-light',
-        success: 'bg-successLight dark:bg-emerald-950/50 text-successDark dark:text-emerald-400',
-        warning: 'bg-warningLight dark:bg-amber-950/50 text-warningDark dark:text-amber-400',
-        danger: 'bg-errorLight dark:bg-red-950/50 text-errorDark dark:text-red-400',
-        info: 'bg-infoLight dark:bg-blue-950/50 text-infoDark dark:text-blue-400',
-        outline: 'border border-gray-200 dark:border-gray-700 bg-transparent text-gray-600 dark:text-gray-300',
+        default: 'bg-gray-100 text-gray-700 dark:bg-obsidian-hover dark:text-ink-muted',
+        primary: 'bg-primary-100 text-primary-700 dark:bg-uv/15 dark:text-uv',
+        accent: 'bg-accentLight text-accentDark dark:bg-striver/15 dark:text-striver',
+        success: 'bg-successLight text-successDark dark:bg-emerald-500/15 dark:text-emerald-300',
+        warning: 'bg-warningLight text-warningDark dark:bg-amber-500/15 dark:text-amber-300',
+        danger: 'bg-errorLight text-errorDark dark:bg-red-500/15 dark:text-red-300',
+        info: 'bg-infoLight text-infoDark dark:bg-blue-500/15 dark:text-blue-300',
+        outline: 'border border-gray-200 bg-transparent text-gray-600 dark:border-obsidian-border dark:text-ink-muted',
       },
       size: {
         xs: 'px-2 py-0.5 text-[10px]',

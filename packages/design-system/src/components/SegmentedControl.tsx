@@ -9,7 +9,7 @@ interface SegmentedControlProps {
 
 export function SegmentedControl({ options, selected, onSelect, className }: SegmentedControlProps) {
   return (
-    <div className={cn('flex gap-1 p-1 bg-gray-100 dark:bg-gray-800 rounded-xl', className)}>
+    <div className={cn('flex gap-1 p-1 bg-gray-100 dark:bg-obsidian-hover rounded-xl', className)}>
       {options.map((option) => (
         <button
           key={option.value}
@@ -17,8 +17,8 @@ export function SegmentedControl({ options, selected, onSelect, className }: Seg
           className={cn(
             'flex-1 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200',
             selected === option.value
-              ? 'bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 shadow-sm'
-              : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
+              ? 'bg-white text-gray-900 shadow-sm dark:bg-obsidian-elevated dark:text-ink-primary dark:border dark:border-obsidian-border'
+              : 'text-gray-500 hover:text-gray-700 dark:text-ink-muted dark:hover:text-ink-primary'
           )}
         >
           {option.label}

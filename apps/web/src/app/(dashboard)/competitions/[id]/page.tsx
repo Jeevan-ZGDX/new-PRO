@@ -5,10 +5,12 @@ import { useState, useEffect, Suspense } from 'react'
 import { Card, Badge, Button } from '@comp-dash/design-system'
 import { useCompetition } from '@comp-dash/api'
 import { getCurrentUser } from '@/lib/auth'
+import { AdvisorRosterPanel } from '@/components/dashboard/AdvisorRosterPanel'
+import { HodSectionsPanel } from '@/components/dashboard/HodSectionsPanel'
 import { 
   Calendar, MapPin, Users, Clock, Trophy, ArrowLeft, ExternalLink, 
   Globe, Building2, Target, Pencil, Mail, CheckCircle, AlertCircle, 
-  Loader2, MailCheck, Shield, Sparkles, ChevronDown, ChevronUp, Info
+  Loader2, MailCheck, Shield, Sparkles, ChevronDown, ChevronUp, Info,
 } from 'lucide-react'
 
 const categoryGradients: Record<string, string> = {
@@ -58,19 +60,19 @@ function CompetitionDetailContent() {
 
   if (isLoading) {
     return (
-      <div className="space-y-6">
-        <div className="h-6 w-24 bg-gray-200 dark:bg-[#161B22] rounded animate-pulse" />
-        <div className="h-64 bg-gray-100 dark:bg-[#161B22] rounded-2xl animate-pulse" />
+      <div className="space-y-6 max-w-4xl mx-auto">
+        <div className="h-6 w-32 bg-gray-200 dark:bg-zinc-800 rounded animate-pulse" />
+        <div className="h-64 bg-gray-100 dark:bg-zinc-800/60 rounded-2xl animate-pulse" />
       </div>
     )
   }
 
   if (!comp || error) {
     return (
-      <div className="flex flex-col items-center justify-center py-20 text-gray-400 dark:text-[#8B949E]">
-        <Info className="w-12 h-12 mb-3" />
+      <div className="flex flex-col items-center justify-center py-20 text-gray-400 dark:text-zinc-500">
+        <Info className="w-12 h-12 mb-3 text-gray-300 dark:text-zinc-600" />
         <p className="text-sm font-medium">Competition not found</p>
-        <button onClick={() => router.back()} className="text-sm text-accent dark:text-[#38BDF8] mt-2 hover:underline">Go back</button>
+        <button onClick={() => router.back()} className="text-sm text-accent mt-2 hover:underline transition-all">Go back</button>
       </div>
     )
   }
@@ -113,34 +115,40 @@ function CompetitionDetailContent() {
 
   return (
     <div className="space-y-6 max-w-4xl mx-auto">
-      <button onClick={() => router.back()} className="flex items-center gap-1.5 text-sm text-gray-500 dark:text-[#8B949E] hover:text-gray-700 dark:hover:text-[#F0F6FC] transition-colors">
+      <button 
+        onClick={() => router.back()} 
+        className="flex items-center gap-1.5 text-sm text-gray-500 dark:text-zinc-400 hover:text-gray-900 dark:hover:text-white transition-all duration-200 hover:scale-105 origin-left"
+      >
         <ArrowLeft className="w-4 h-4" /> Back to Competitions
       </button>
 
-      <div className="bg-white dark:bg-[#161B22] border border-gray-200 dark:border-[#30363D] rounded-2xl overflow-hidden">
+      <div className="bg-white dark:bg-[#18181b] border border-gray-200 dark:border-zinc-800 rounded-2xl overflow-hidden shadow-sm transition-all duration-200">
         <div className={`h-2 bg-gradient-to-r ${categoryGradients[comp.category?.toLowerCase()] || 'from-gray-400 to-gray-500'}`} />
         
         <div className="p-6 md:p-8">
-          <div className="flex items-start justify-between mb-4">
+          <div className="flex flex-col md:flex-row md:items-start justify-between gap-4 mb-6">
             <div>
               <div className="flex items-center gap-2 mb-2">
                 <Badge variant="primary" size="sm">{comp.category || 'Competition'}</Badge>
                 {daysLeft !== null && (
-                  <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
-                    isOpen ? 'bg-green-50 dark:bg-green-950/50 text-green-700 dark:text-green-400 border dark:border-green-800/50' : 'bg-red-50 dark:bg-red-950/50 text-red-600 dark:text-red-400 border dark:border-red-800/50'
+                  <span className={`text-xs font-medium px-2.5 py-0.5 rounded-full border ${
+                    isOpen 
+                      ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800/60' 
+                      : 'bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 border-rose-200 dark:border-rose-800/60'
                   }`}>
                     {isOpen ? (daysLeft > 0 ? `${daysLeft} days left` : 'Closing soon') : 'Registration closed'}
                   </span>
                 )}
               </div>
-              <h1 className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-[#F0F6FC]">{comp.title}</h1>
-              <p className="text-sm text-gray-500 dark:text-[#8B949E] mt-1">by {comp.organizer}</p>
+              <h1 className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-white">{comp.title}</h1>
+              <p className="text-sm text-gray-500 dark:text-zinc-400 mt-1">by <span className="font-medium text-gray-700 dark:text-zinc-300">{comp.organizer}</span></p>
             </div>
-            <div className="flex items-center gap-2 flex-shrink-0">
+            
+            <div className="flex items-center gap-2 shrink-0">
               {hasRegistrationLink && (
                 <Button 
                   onClick={handleRegisterNow}
-                  className="flex items-center gap-2 px-5 py-2.5 bg-accent text-white text-sm font-medium rounded-xl hover:bg-accent/90 transition-colors"
+                  className="flex items-center gap-2 px-5 py-2.5 bg-accent text-white text-sm font-medium rounded-xl hover:bg-accent/90 transition-transform duration-200 hover:scale-105 active:scale-95 shadow-sm"
                   size="md"
                 >
                   <ExternalLink className="w-4 h-4" />
@@ -151,7 +159,7 @@ function CompetitionDetailContent() {
                 <Button 
                   onClick={() => router.push(`/create-competition?edit=${comp.id}`)}
                   variant="outline"
-                  className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-[#161B22] border border-gray-200 dark:border-[#30363D] rounded-xl text-sm font-medium text-gray-600 dark:text-[#8B949E] hover:bg-gray-50 dark:hover:bg-[#21262D] transition-colors"
+                  className="flex items-center gap-2 px-4 py-2.5 bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-700 rounded-xl text-sm font-medium text-gray-700 dark:text-zinc-200 hover:bg-gray-50 dark:hover:bg-zinc-800 transition-transform duration-200 hover:scale-105 active:scale-95"
                 >
                   <Pencil className="w-4 h-4" />
                   Edit
@@ -161,70 +169,70 @@ function CompetitionDetailContent() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-            <div className="p-4 bg-gray-50 dark:bg-[#0D1117] border border-transparent dark:border-[#30363D] rounded-xl">
-              <div className="flex items-center gap-2 text-xs text-gray-400 dark:text-[#8B949E] mb-1">
-                <Calendar className="w-3.5 h-3.5" />
+            <div className="p-4 bg-gray-50 dark:bg-zinc-900/70 border border-gray-200/60 dark:border-zinc-800 rounded-xl transition-transform duration-200 hover:scale-[1.02]">
+              <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-zinc-400 mb-1">
+                <Calendar className="w-3.5 h-3.5 text-accent" />
                 Dates
               </div>
-              <p className="text-sm font-medium text-gray-900 dark:text-[#F0F6FC]">
+              <p className="text-sm font-semibold text-gray-900 dark:text-white">
                 {formatDate(comp.startDate)}{comp.endDate ? ` - ${formatDate(comp.endDate)}` : ''}
               </p>
             </div>
-            <div className="p-4 bg-gray-50 dark:bg-[#0D1117] border border-transparent dark:border-[#30363D] rounded-xl">
-              <div className="flex items-center gap-2 text-xs text-gray-400 dark:text-[#8B949E] mb-1">
-                <Clock className="w-3.5 h-3.5" />
+            <div className="p-4 bg-gray-50 dark:bg-zinc-900/70 border border-gray-200/60 dark:border-zinc-800 rounded-xl transition-transform duration-200 hover:scale-[1.02]">
+              <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-zinc-400 mb-1">
+                <Clock className="w-3.5 h-3.5 text-amber-500" />
                 Deadline
               </div>
-              <p className="text-sm font-medium text-gray-900 dark:text-[#F0F6FC]">
+              <p className="text-sm font-semibold text-gray-900 dark:text-white">
                 {formatDate(comp.registrationDeadline)}
-                {deadline && !isOpen && <span className="text-red-500 dark:text-red-400 ml-1">(Closed)</span>}
+                {deadline && !isOpen && <span className="text-rose-500 dark:text-rose-400 ml-1.5">(Closed)</span>}
               </p>
             </div>
-            <div className="p-4 bg-gray-50 dark:bg-[#0D1117] border border-transparent dark:border-[#30363D] rounded-xl">
-              <div className="flex items-center gap-2 text-xs text-gray-400 dark:text-[#8B949E] mb-1">
-                <Trophy className="w-3.5 h-3.5" />
+            <div className="p-4 bg-gray-50 dark:bg-zinc-900/70 border border-gray-200/60 dark:border-zinc-800 rounded-xl transition-transform duration-200 hover:scale-[1.02]">
+              <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-zinc-400 mb-1">
+                <Trophy className="w-3.5 h-3.5 text-yellow-500" />
                 Prize Pool
               </div>
-              <p className="text-sm font-bold text-accent dark:text-[#38BDF8]">{comp.prizePool || 'N/A'}</p>
+              <p className="text-sm font-bold text-accent">{comp.prizePool || 'N/A'}</p>
             </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-            <div className="p-4 bg-gray-50 dark:bg-[#0D1117] border border-transparent dark:border-[#30363D] rounded-xl">
-              <div className="flex items-center gap-2 text-xs text-gray-400 dark:text-[#8B949E] mb-1">
-                <Building2 className="w-3.5 h-3.5" />
+            <div className="p-4 bg-gray-50 dark:bg-zinc-900/70 border border-gray-200/60 dark:border-zinc-800 rounded-xl">
+              <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-zinc-400 mb-1">
+                <Building2 className="w-3.5 h-3.5 text-accent" />
                 Organizer
               </div>
-              <p className="text-sm font-medium text-gray-900 dark:text-[#F0F6FC]">{comp.organizer}</p>
+              <p className="text-sm font-semibold text-gray-900 dark:text-white">{comp.organizer}</p>
               {comp.organizerEmail && (
-                <p className="text-xs text-gray-400 dark:text-[#8B949E] mt-0.5">{comp.organizerEmail}</p>
+                <p className="text-xs text-gray-500 dark:text-zinc-400 mt-0.5">{comp.organizerEmail}</p>
               )}
             </div>
-            <div className="p-4 bg-gray-50 dark:bg-[#0D1117] border border-transparent dark:border-[#30363D] rounded-xl">
-              <div className="flex items-center gap-2 text-xs text-gray-400 dark:text-[#8B949E] mb-1">
-                <Globe className="w-3.5 h-3.5" />
+            <div className="p-4 bg-gray-50 dark:bg-zinc-900/70 border border-gray-200/60 dark:border-zinc-800 rounded-xl">
+              <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-zinc-400 mb-1">
+                <Globe className="w-3.5 h-3.5 text-blue-500" />
                 Category
               </div>
-              <p className="text-sm font-medium text-gray-900 dark:text-[#F0F6FC] capitalize">{comp.category || 'Competition'}</p>
+              <p className="text-sm font-semibold text-gray-900 dark:text-white capitalize">{comp.category || 'Competition'}</p>
             </div>
           </div>
 
           {comp.description && (
-            <div className="p-4 bg-gray-50 dark:bg-[#0D1117] border border-gray-200 dark:border-[#30363D] rounded-xl mb-6">
-              <p className="text-xs text-gray-400 dark:text-[#8B949E] uppercase tracking-wider mb-2">Description</p>
-              <p className="text-sm text-gray-700 dark:text-[#F0F6FC] whitespace-pre-line">{comp.description}</p>
+            <div className="p-5 bg-gray-50 dark:bg-zinc-900/50 border border-gray-200 dark:border-zinc-800 rounded-xl mb-6">
+              <p className="text-xs text-gray-400 dark:text-zinc-500 uppercase tracking-wider font-medium mb-2">Description</p>
+              <p className="text-sm text-gray-700 dark:text-zinc-300 leading-relaxed whitespace-pre-line">{comp.description}</p>
             </div>
           )}
 
           {comp.eligibility?.yearOfStudy?.filter(Boolean).length > 0 && (
-            <div className="p-4 bg-blue-50 dark:bg-blue-950/30 border border-blue-100 dark:border-blue-800/40 rounded-xl mb-6">
+            <div className="p-4 bg-blue-50/80 dark:bg-blue-950/30 border border-blue-100 dark:border-blue-900/40 rounded-xl mb-6">
               <div className="flex items-start gap-3">
-                <Target className="w-5 h-5 text-blue-600 dark:text-blue-400 mt-0.5" />
+                <Target className="w-5 h-5 text-blue-600 dark:text-blue-400 mt-0.5 shrink-0" />
                 <div>
-                  <p className="text-sm font-medium text-blue-900 dark:text-blue-300">Eligibility</p>
+                  <p className="text-sm font-semibold text-blue-900 dark:text-blue-200">Eligibility</p>
                   <div className="flex flex-wrap gap-1.5 mt-2">
                     {comp.eligibility.yearOfStudy.filter(Boolean).map((y: string) => (
-                      <span key={y} className="px-2 py-0.5 bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 rounded-md text-xs font-medium">{y}</span>
+                      <span key={y} className="px-2.5 py-0.5 bg-blue-100 dark:bg-blue-900/60 text-blue-700 dark:text-blue-300 rounded-md text-xs font-medium">{y}</span>
                     ))}
                   </div>
                 </div>
@@ -232,33 +240,33 @@ function CompetitionDetailContent() {
             </div>
           )}
 
-          <div className="mt-8 pt-6 border-t border-gray-100 dark:border-[#30363D]">
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-[#F0F6FC] mb-4 flex items-center gap-2">
-              <Shield className="w-5 h-5 text-accent dark:text-[#38BDF8]" />
+          <div className="mt-8 pt-6 border-t border-gray-200 dark:border-zinc-800">
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+              <Shield className="w-5 h-5 text-accent" />
               Registration Verification
             </h2>
             
-            <div className="bg-gradient-to-r from-purple-50 to-blue-50 dark:from-[#161B22] dark:to-[#0D1117] border border-purple-100 dark:border-[#30363D] rounded-2xl p-6">
+            <div className="bg-gradient-to-r from-purple-50/80 to-blue-50/80 dark:from-purple-950/20 dark:to-blue-950/20 border border-purple-100 dark:border-purple-900/40 rounded-2xl p-6">
               <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                 <div className="flex-1">
                   <div className="flex items-start gap-3">
-                    <div className="w-12 h-12 rounded-xl bg-purple-100 dark:bg-purple-950/50 flex items-center justify-center flex-shrink-0">
+                    <div className="w-12 h-12 rounded-xl bg-purple-100 dark:bg-purple-900/50 border border-purple-200/50 dark:border-purple-800/50 flex items-center justify-center shrink-0">
                       <Mail className="w-6 h-6 text-purple-600 dark:text-purple-400" />
                     </div>
                     <div>
-                      <h3 className="text-base font-semibold text-gray-900 dark:text-[#F0F6FC]">Verify Your Registration</h3>
-                      <p className="text-sm text-gray-600 dark:text-[#8B949E] mt-1">
+                      <h3 className="text-base font-semibold text-gray-900 dark:text-white">Verify Your Registration</h3>
+                      <p className="text-sm text-gray-600 dark:text-zinc-300 mt-1">
                         Connect your Gmail to automatically verify your registration by finding 
-                        confirmation emails from <strong>{comp.organizerEmail || 'the organizer'}</strong>.
+                        confirmation emails from <strong className="text-purple-700 dark:text-purple-300">{comp.organizerEmail || 'the organizer'}</strong>.
                       </p>
                     </div>
                   </div>
                 </div>
-                <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
+                <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto shrink-0">
                   <Button
                     onClick={handleVerifyEmail}
                     disabled={isVerifying || verificationStatus === 'loading'}
-                    className="flex-1 flex items-center justify-center gap-2 px-5 py-2.5 bg-purple-600 text-white text-sm font-medium rounded-xl hover:bg-purple-700 transition-colors disabled:opacity-50"
+                    className="flex-1 flex items-center justify-center gap-2 px-5 py-2.5 bg-purple-600 hover:bg-purple-700 dark:bg-purple-600 dark:hover:bg-purple-500 text-white text-sm font-medium rounded-xl transition-transform duration-200 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50"
                     size="md"
                   >
                     {isVerifying || verificationStatus === 'loading' ? (
@@ -276,7 +284,7 @@ function CompetitionDetailContent() {
                   <Button
                     onClick={handleManualVerify}
                     variant="outline"
-                    className="flex-1 flex items-center justify-center gap-2 px-5 py-2.5 bg-white dark:bg-[#161B22] border border-purple-200 dark:border-[#30363D] text-purple-700 dark:text-purple-300 text-sm font-medium rounded-xl hover:bg-purple-50 dark:hover:bg-[#21262D] transition-colors"
+                    className="flex-1 flex items-center justify-center gap-2 px-5 py-2.5 bg-white dark:bg-zinc-900 border border-purple-200 dark:border-purple-800 text-purple-700 dark:text-purple-300 text-sm font-medium rounded-xl hover:bg-purple-50 dark:hover:bg-purple-950/40 transition-transform duration-200 hover:scale-[1.02] active:scale-[0.98]"
                     size="md"
                   >
                     <MailCheck className="w-4 h-4" />
@@ -286,13 +294,13 @@ function CompetitionDetailContent() {
               </div>
 
               {(verificationStatus === 'success' || verificationStatus === 'error') && (
-                <div className={`mt-4 p-4 rounded-xl flex items-start gap-3 ${
+                <div className={`mt-4 p-4 rounded-xl flex items-start gap-3 border ${
                   verificationStatus === 'success' 
-                    ? 'bg-green-50 dark:bg-green-950/50 border border-green-100 dark:border-green-800' 
-                    : 'bg-red-50 dark:bg-red-950/50 border border-red-100 dark:border-red-800'
+                    ? 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-800' 
+                    : 'bg-rose-50 dark:bg-rose-950/40 border-rose-200 dark:border-rose-800'
                 }`}>
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
-                    verificationStatus === 'success' ? 'bg-green-100 dark:bg-green-900 text-green-600 dark:text-green-400' : 'bg-red-100 dark:bg-red-900 text-red-600 dark:text-red-400'
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${
+                    verificationStatus === 'success' ? 'bg-emerald-100 dark:bg-emerald-900/60 text-emerald-600 dark:text-emerald-400' : 'bg-rose-100 dark:bg-rose-900/60 text-rose-600 dark:text-rose-400'
                   }`}>
                     {verificationStatus === 'success' ? (
                       <CheckCircle className="w-5 h-5" />
@@ -300,7 +308,7 @@ function CompetitionDetailContent() {
                       <AlertCircle className="w-5 h-5" />
                     )}
                   </div>
-                  <p className={`text-sm ${verificationStatus === 'success' ? 'text-green-800 dark:text-green-300' : 'text-red-800 dark:text-red-300'}`}>
+                  <p className={`text-sm font-medium ${verificationStatus === 'success' ? 'text-emerald-800 dark:text-emerald-200' : 'text-rose-800 dark:text-rose-200'}`}>
                     {verificationMessage}
                   </p>
                 </div>
@@ -308,6 +316,24 @@ function CompetitionDetailContent() {
             </div>
           </div>
         </div>
+
+        {/*
+          Advisors get their own sections, resolved from their `advisors` row.
+          HODs and admins have no advisors row, so they get the department-wide
+          section breakdown instead — showing them the advisor panel produced
+          "no advisor record is mapped to this account".
+        */}
+        {(user?.role === 'hod' || user?.role === 'super_admin') && (
+          <div className="mt-8 pt-6 p-6 md:p-8 border-t border-gray-200 dark:border-zinc-800 bg-gray-50/50 dark:bg-zinc-900/30">
+            <HodSectionsPanel competitionId={comp.id} competitionTitle={comp.title} />
+          </div>
+        )}
+
+        {user?.role === 'advisor' && (
+          <div className="mt-8 pt-6 p-6 md:p-8 border-t border-gray-200 dark:border-zinc-800 bg-gray-50/50 dark:bg-zinc-900/30">
+            <AdvisorRosterPanel competitionId={comp.id} />
+          </div>
+        )}
       </div>
     </div>
   )
@@ -315,7 +341,7 @@ function CompetitionDetailContent() {
 
 export default function CompetitionDetailPage() {
   return (
-    <Suspense fallback={<div className="p-6 text-center text-gray-500">Loading...</div>}>
+    <Suspense fallback={<div className="p-6 text-center text-gray-500 dark:text-zinc-400">Loading...</div>}>
       <CompetitionDetailContent />
     </Suspense>
   )

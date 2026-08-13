@@ -1,21 +1,86 @@
+# Render Blueprint — defines the production web service.
+# Deployments are triggered automatically on every push to `main`
+# (either via Render's GitHub integration or the GitHub Actions
+# workflow in .github/workflows/deploy.yml).
+#
+# Setup:
+#   1. Push this file to `main`.
+#   2. In Render, create the service via "Blueprint" (it reads render.yaml).
+#   3. Fill in the `sync: false` secrets in the Render dashboard.
+#   4. (Optional) Set the deploy hook secret in GitHub:
+#      repo Settings -> Secrets and variables -> Actions -> RENDER_DEPLOY_HOOK_URL
+#      (Render -> your service -> Deploy -> Deploy Hook)
+
 services:
   - type: web
-    name: comp-dash-web
-    env: node
+    # Must match the live Render service name — it drives the
+    # <name>.onrender.com hostname. The live service is "comp-dash"
+    # (comp-dash.onrender.com); "comp-dash-web" was a separate,
+    # now-suspended service and must not be reused here.
+    name: comp-dash
+    runtime: node
     region: singapore
     plan: free
-    buildCommand: npm install --include=dev && npm run build
+    buildCommand: npm ci --legacy-peer-deps && npm run build
     startCommand: npm run start
+    # Cheap, DB-free endpoint. Using `/` here means a slow or failing page
+    # render can fail an otherwise healthy deploy.
+    healthCheckPath: /api/ping
+    autoDeploy: true
     envVars:
       - key: NODE_ENV
         value: production
       - key: NODE_VERSION
         value: 20.18.0
-      - key: DATABASE_URL
-        sync: false
-      - key: DIRECT_URL
-        sync: false
+
+      # Public, baked in at build time
       - key: NEXT_PUBLIC_SUPABASE_URL
         sync: false
       - key: NEXT_PUBLIC_SUPABASE_ANON_KEY
+        sync: false
+      - key: NEXT_PUBLIC_API_URL
+        value: https://comp-dash.onrender.com/api
+      - key: NEXT_PUBLIC_APP_URL
+        value: https://comp-dash.onrender.com
+
+      # Google OAuth (private)
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: GOOGLE_REDIRECT_URI
+        value: https://comp-dash.onrender.com/api/auth/gmail/callback
+      - key: GOOGLE_LOGIN_REDIRECT_URI
+        value: https://comp-dash.onrender.com/api/auth/google/callback
+
+      # Supabase server-side (private)
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+
+      # Webhook secret for /api/real-time/registration (private)
+      - key: REAL_TIME_API_SECRET
+        sync: false
+
+      # Firebase Admin service account (JSON string, private)
+      - key: FIREBASE_SERVICE_ACCOUNT
+        sync: false
+
+  - type: cron
+    name: comp-dash-cron
+    env: node
+    region: singapore
+    plan: free
+    buildCommand: npm ci --legacy-peer-deps && npm run db:generate -w apps/web
+    startCommand: npm run cron -w apps/web
+    schedule: "0 8 * * *"
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NODE_VERSION
+        value: 20.18.0
+      - key: NEXT_PUBLIC_SUPABASE_URL
+        sync: false
+      - key: NEXT_PUBLIC_SUPABASE_ANON_KEY
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
         sync: false
