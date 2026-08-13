@@ -10,6 +10,7 @@ const PUBLIC_ROUTES = [
   '/',
   '/sign-in',
   '/sign-up',
+  '/forgot-password',
   '/login',
   '/policy',
   '/terms',
