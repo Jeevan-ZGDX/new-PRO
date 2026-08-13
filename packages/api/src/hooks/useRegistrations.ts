@@ -231,6 +231,7 @@ export function useCreateCompetition() {
     mutationFn: async (data: Record<string, unknown>) => {
       if (isSupabaseEnabled()) {
         const sb = getSupabaseClient()
+<<<<<<< HEAD
         if (!sb) throw new Error('Supabase client not configured')
 
         const newId = `dash-${Date.now()}`
@@ -259,6 +260,34 @@ export function useCreateCompetition() {
         })
         if (error) throw new Error(error.message)
         return { id: newId, ...data } as Record<string, unknown>
+=======
+        if (sb) {
+          const { error } = await sb.from(DASHBOARD_TABLE).insert({
+            id: crypto.randomUUID(),
+            competition_name: (data.title as string) || '',
+            category: (data.category as string) || 'competition',
+            organizer: (data.organizer as string) || '',
+            total_prize_amount: (data.prizePool as string) || '',
+            website_url: (data.registrationUrl as string) || (data.websiteUrl as string) || '',
+            registration_link: (data.registrationLink as string) || '',
+            description: (data.description as string) || '',
+            short_description: (data.shortDescription as string) || '',
+            scope: (data.scope as string) || 'national',
+            mode: (data.mode as string) || 'online',
+            organizer_email: (data.organizerEmail as string) || '',
+            team_size_min: (data.teamSizeMin as number) ?? 1,
+            team_size_max: (data.teamSizeMax as number) ?? 1,
+            tags: data.tags ? JSON.stringify(data.tags) : '[]',
+            reg_deadline: (data.registrationDeadline as string) || null,
+            r1_date: (data.startDate as string) || null,
+            r2_date: (data.endDate as string) || null,
+            eligible_year: ((data.eligibility as Record<string, unknown>)?.yearOfStudy as string[])?.[0] || '',
+            competition_status: 'On Going',
+            serial_no: Math.floor(Date.now() / 1000),
+          })
+          if (error) throw new Error(error.message)
+        }
+>>>>>>> 8675f16d5a934c9c25a27062469b97e4e3643889
       }
 
       const result = await apiClient.post('/competitions', data)
