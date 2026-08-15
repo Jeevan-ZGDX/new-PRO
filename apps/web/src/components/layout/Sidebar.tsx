@@ -33,7 +33,7 @@ const navItems: NavItem[] = [
   { label: 'Verified Students', icon: CheckCircle, href: '/verified-students', roles: ['advisor', 'super_admin'] },
   { label: 'Leaderboard', icon: Award, href: '/leaderboard', roles: ['student', 'advisor', 'hod', 'super_admin'] },
   { label: 'History', icon: History, href: '/history', roles: ['student'] },
-  { label: 'Verification Requests', icon: Mail, href: '/verification-requests', roles: ['advisor', 'hod', 'super_admin'] },
+  { label: 'Verification Requests', icon: Mail, href: '/verification-requests', roles: ['advisor'] },
   { label: 'Create Competition', icon: PlusCircle, href: '/create-competition', roles: ['super_admin'] },
   { label: 'Registrations', icon: ClipboardList, href: '/registrations', roles: ['super_admin'] },
   { label: 'Students', icon: Users, href: '/students', roles: ['super_admin'] },

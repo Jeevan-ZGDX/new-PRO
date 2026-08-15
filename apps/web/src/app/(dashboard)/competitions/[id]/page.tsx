@@ -240,81 +240,84 @@ function CompetitionDetailContent() {
             </div>
           )}
 
-          <div className="mt-8 pt-6 border-t border-gray-200 dark:border-zinc-800">
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
-              <Shield className="w-5 h-5 text-accent" />
-              Registration Verification
-            </h2>
-            
-            <div className="bg-gradient-to-r from-purple-50/80 to-blue-50/80 dark:from-purple-950/20 dark:to-blue-950/20 border border-purple-100 dark:border-purple-900/40 rounded-2xl p-6">
-              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                <div className="flex-1">
-                  <div className="flex items-start gap-3">
-                    <div className="w-12 h-12 rounded-xl bg-purple-100 dark:bg-purple-900/50 border border-purple-200/50 dark:border-purple-800/50 flex items-center justify-center shrink-0">
-                      <Mail className="w-6 h-6 text-purple-600 dark:text-purple-400" />
-                    </div>
-                    <div>
-                      <h3 className="text-base font-semibold text-gray-900 dark:text-white">Verify Your Registration</h3>
-                      <p className="text-sm text-gray-600 dark:text-zinc-300 mt-1">
-                        Connect your Gmail to automatically verify your registration by finding 
-                        confirmation emails from <strong className="text-purple-700 dark:text-purple-300">{comp.organizerEmail || 'the organizer'}</strong>.
-                      </p>
+          {/* Registration Verification - only shown for Students, hidden for HOD & Admin */}
+          {user && user.role !== 'hod' && user.role !== 'super_admin' && (
+            <div className="mt-8 pt-6 border-t border-gray-200 dark:border-zinc-800">
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+                <Shield className="w-5 h-5 text-accent" />
+                Registration Verification
+              </h2>
+              
+              <div className="bg-gradient-to-r from-purple-50/80 to-blue-50/80 dark:from-purple-950/20 dark:to-blue-950/20 border border-purple-100 dark:border-purple-900/40 rounded-2xl p-6">
+                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                  <div className="flex-1">
+                    <div className="flex items-start gap-3">
+                      <div className="w-12 h-12 rounded-xl bg-purple-100 dark:bg-purple-900/50 border border-purple-200/50 dark:border-purple-800/50 flex items-center justify-center shrink-0">
+                        <Mail className="w-6 h-6 text-purple-600 dark:text-purple-400" />
+                      </div>
+                      <div>
+                        <h3 className="text-base font-semibold text-gray-900 dark:text-white">Verify Your Registration</h3>
+                        <p className="text-sm text-gray-600 dark:text-zinc-300 mt-1">
+                          Connect your Gmail to automatically verify your registration by finding 
+                          confirmation emails from <strong className="text-purple-700 dark:text-purple-300">{comp.organizerEmail || 'the organizer'}</strong>.
+                        </p>
+                      </div>
                     </div>
                   </div>
+                  <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto shrink-0">
+                    <Button
+                      onClick={handleVerifyEmail}
+                      disabled={isVerifying || verificationStatus === 'loading'}
+                      className="flex-1 flex items-center justify-center gap-2 px-5 py-2.5 bg-purple-600 hover:bg-purple-700 dark:bg-purple-600 dark:hover:bg-purple-500 text-white text-sm font-medium rounded-xl transition-transform duration-200 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50"
+                      size="md"
+                    >
+                      {isVerifying || verificationStatus === 'loading' ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          Connecting to Gmail...
+                        </>
+                      ) : (
+                        <>
+                          <Mail className="w-4 h-4" />
+                          Verify Email Access
+                        </>
+                      )}
+                    </Button>
+                    <Button
+                      onClick={handleManualVerify}
+                      variant="outline"
+                      className="flex-1 flex items-center justify-center gap-2 px-5 py-2.5 bg-white dark:bg-zinc-900 border border-purple-200 dark:border-purple-800 text-purple-700 dark:text-purple-300 text-sm font-medium rounded-xl hover:bg-purple-50 dark:hover:bg-purple-950/40 transition-transform duration-200 hover:scale-[1.02] active:scale-[0.98]"
+                      size="md"
+                    >
+                      <MailCheck className="w-4 h-4" />
+                      Manual Verify
+                    </Button>
+                  </div>
                 </div>
-                <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto shrink-0">
-                  <Button
-                    onClick={handleVerifyEmail}
-                    disabled={isVerifying || verificationStatus === 'loading'}
-                    className="flex-1 flex items-center justify-center gap-2 px-5 py-2.5 bg-purple-600 hover:bg-purple-700 dark:bg-purple-600 dark:hover:bg-purple-500 text-white text-sm font-medium rounded-xl transition-transform duration-200 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50"
-                    size="md"
-                  >
-                    {isVerifying || verificationStatus === 'loading' ? (
-                      <>
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                        Connecting to Gmail...
-                      </>
-                    ) : (
-                      <>
-                        <Mail className="w-4 h-4" />
-                        Verify Email Access
-                      </>
-                    )}
-                  </Button>
-                  <Button
-                    onClick={handleManualVerify}
-                    variant="outline"
-                    className="flex-1 flex items-center justify-center gap-2 px-5 py-2.5 bg-white dark:bg-zinc-900 border border-purple-200 dark:border-purple-800 text-purple-700 dark:text-purple-300 text-sm font-medium rounded-xl hover:bg-purple-50 dark:hover:bg-purple-950/40 transition-transform duration-200 hover:scale-[1.02] active:scale-[0.98]"
-                    size="md"
-                  >
-                    <MailCheck className="w-4 h-4" />
-                    Manual Verify
-                  </Button>
-                </div>
-              </div>
 
-              {(verificationStatus === 'success' || verificationStatus === 'error') && (
-                <div className={`mt-4 p-4 rounded-xl flex items-start gap-3 border ${
-                  verificationStatus === 'success' 
-                    ? 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-800' 
-                    : 'bg-rose-50 dark:bg-rose-950/40 border-rose-200 dark:border-rose-800'
-                }`}>
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${
-                    verificationStatus === 'success' ? 'bg-emerald-100 dark:bg-emerald-900/60 text-emerald-600 dark:text-emerald-400' : 'bg-rose-100 dark:bg-rose-900/60 text-rose-600 dark:text-rose-400'
+                {(verificationStatus === 'success' || verificationStatus === 'error') && (
+                  <div className={`mt-4 p-4 rounded-xl flex items-start gap-3 border ${
+                    verificationStatus === 'success' 
+                      ? 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-800' 
+                      : 'bg-rose-50 dark:bg-rose-950/40 border-rose-200 dark:border-rose-800'
                   }`}>
-                    {verificationStatus === 'success' ? (
-                      <CheckCircle className="w-5 h-5" />
-                    ) : (
-                      <AlertCircle className="w-5 h-5" />
-                    )}
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${
+                      verificationStatus === 'success' ? 'bg-emerald-100 dark:bg-emerald-900/60 text-emerald-600 dark:text-emerald-400' : 'bg-rose-100 dark:bg-rose-900/60 text-rose-600 dark:text-rose-400'
+                    }`}>
+                      {verificationStatus === 'success' ? (
+                        <CheckCircle className="w-5 h-5" />
+                      ) : (
+                        <AlertCircle className="w-5 h-5" />
+                      )}
+                    </div>
+                    <p className={`text-sm font-medium ${verificationStatus === 'success' ? 'text-emerald-800 dark:text-emerald-200' : 'text-rose-800 dark:text-rose-200'}`}>
+                      {verificationMessage}
+                    </p>
                   </div>
-                  <p className={`text-sm font-medium ${verificationStatus === 'success' ? 'text-emerald-800 dark:text-emerald-200' : 'text-rose-800 dark:text-rose-200'}`}>
-                    {verificationMessage}
-                  </p>
-                </div>
-              )}
+                )}
+              </div>
             </div>
-          </div>
+          )}
         </div>
 
         {/*

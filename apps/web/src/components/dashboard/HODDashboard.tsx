@@ -6,19 +6,19 @@ import { useHodDashboardStats } from '@comp-dash/api'
 import { Users, UserCheck, BookOpen, GraduationCap, Mail, Trophy, CheckCircle, Clock } from 'lucide-react'
 import { getCurrentUser } from '@/lib/auth'
 
-const YEARS = ['1st Year', '2nd Year', '3rd Year', '4th Year']
+const YEARS = ['2nd Year', '3rd Year']
 
 export default function HODDashboard() {
   const { data: stats, isLoading } = useHodDashboardStats()
   const [user] = useState(() => getCurrentUser())
-  const [selectedYear, setSelectedYear] = useState<string>('all')
+  const [selectedYear, setSelectedYear] = useState<string>('3rd Year')
 
   if (isLoading) {
     return (
       <div className="space-y-6">
         <div className="h-8 w-48 bg-gray-200 rounded animate-pulse" />
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {[1, 2, 3].map((i) => (
+          {[2, 3].map((i) => (
             <div key={i} className="h-28 bg-gray-100 rounded-xl animate-pulse" />
           ))}
         </div>
@@ -47,11 +47,6 @@ export default function HODDashboard() {
       </div>
 
       <div className="flex items-center gap-2 flex-wrap">
-        <button onClick={() => setSelectedYear('all')}
-          className={`px-4 py-2 text-sm font-medium rounded-xl transition-colors ${selectedYear === 'all' ? 'bg-accent text-white' : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50'}`}
-        >
-          All Classes
-        </button>
         {YEARS.map(year => {
           const yw = stats?.yearWise?.find((y: any) => y.year === year)
           const isActive = selectedYear === year
@@ -133,7 +128,7 @@ export default function HODDashboard() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Verification Requests</CardTitle>
+            <CardTitle>OD Approval Requests</CardTitle>
           </CardHeader>
           <div className="mt-4 space-y-2">
             {(stats?.selfVerificationRequests?.length ?? 0) > 0 ? (
