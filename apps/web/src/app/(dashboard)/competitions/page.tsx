@@ -6,7 +6,7 @@ import { useTranslation } from 'react-i18next'
 import { Card, Badge, Button } from '@comp-dash/design-system'
 import { useCompetitions, isSupabaseEnabled } from '@comp-dash/api'
 import { getCurrentUser } from '@/lib/auth'
-import { HodYearSectionBreakdown } from '@/components/dashboard/HodYearSectionBreakdown'
+
 import {
   Calendar,
   MapPin,
@@ -26,11 +26,11 @@ import type { CompetitionCategory } from '@comp-dash/types'
 
 const categoryOptions = [
   { label: 'All', value: 'all' },
-  { label: 'Competition', value: 'competition' },
-  { label: 'C + P', value: 'c + p' },
-  { label: 'C + I', value: 'c + i' },
+  { label: 'Hackathons', value: 'competition' },
   { label: 'Start-up', value: 'start-up' },
-  { label: 'Hackathons', value: 'hackathon' },
+  { label: 'Hiring', value: 'c + p' },
+  { label: 'Internship', value: 'c + i' },
+  ,
 ]
 
 const categoryGradients: Record<string, string> = {
@@ -78,21 +78,20 @@ export default function CompetitionsPage() {
   }, [competitions])
 
   const isHodOrAdmin = user?.role === 'hod' || user?.role === 'super_admin'
+  const showRegistrationDetails = ['competition', 'c + i', 'c + p'].includes(selectedCategory)
 
   return (
     <div className="space-y-8 max-w-7xl mx-auto pb-12">
       {/* ─── Top Layer: Competitions Overview & Directory ─────────────────── */}
       <div className="space-y-6">
-        {/* Page Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <div className="flex items-center gap-2">
               <h1 className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-ink-primary">
                 {t('sidebar.competitions') || 'Competitions Hub'}
+        {/* Page Header */}
               </h1>
-              <Badge variant="primary" size="sm">
-                Directory
-              </Badge>
+              
             </div>
             <p className="text-sm text-gray-500 dark:text-obsidian-faint mt-1">
               Explore national and global tech hackathons, coding challenges, and innovation competitions
@@ -264,6 +263,19 @@ export default function CompetitionsPage() {
                       </div>
 
                       <div className="flex items-center gap-2">
+                        {showRegistrationDetails && isHodOrAdmin && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              router.push(`/competitions/${comp.id}/dashboard`)
+                            }}
+                            className="flex items-center gap-1 px-3 py-1.5 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/60 rounded-lg text-xs font-semibold hover:bg-emerald-100 dark:hover:bg-emerald-950/60 transition-colors"
+                          >
+                            <Users className="w-3 h-3" />
+                            Registrations
+                          </button>
+                        )}
+
                         {(comp.registrationLink || comp.registrationUrl) && (
                           <a
                             href={comp.registrationLink || comp.registrationUrl}
@@ -303,12 +315,6 @@ export default function CompetitionsPage() {
         )}
       </div>
 
-      {/* ─── Bottom Layer: HOD Departmental Year & Section Breakdown ─────── */}
-      {isHodOrAdmin && (
-        <div className="pt-4">
-          <HodYearSectionBreakdown />
-        </div>
-      )}
     </div>
   )
 }

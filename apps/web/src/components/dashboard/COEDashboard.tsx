@@ -13,10 +13,10 @@ export default function COEDashboard() {
   if (isLoading) {
     return (
       <div className="space-y-6">
-        <div className="h-8 w-48 bg-gray-200 rounded animate-pulse" />
+        <div className="h-8 w-48 bg-gray-200 dark:bg-zinc-700 rounded animate-pulse" />
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="h-28 bg-gray-100 rounded-xl animate-pulse" />
+            <div key={i} className="h-28 bg-gray-100 dark:bg-zinc-800 rounded-xl animate-pulse" />
           ))}
         </div>
       </div>
@@ -38,8 +38,8 @@ export default function COEDashboard() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-white-900">Admin Dashboard</h1>
-          <p className="text-gray-500 mt-1">College-wide overview and management</p>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Admin Dashboard</h1>
+          <p className="text-gray-500 dark:text-zinc-400 mt-1">College-wide overview and management</p>
         </div>
         <div className="flex items-center gap-3">
           <Button variant="primary" size="sm" onClick={() => router.push('/create-competition')}>
@@ -75,23 +75,23 @@ export default function COEDashboard() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <Card>
           <CardHeader>
-            <CardTitle>Verification Requests</CardTitle>
+            <CardTitle>OD Requests</CardTitle>
           </CardHeader>
           <div className="mt-4 space-y-2">
             {(stats?.selfVerificationRequests?.length ?? 0) > 0 ? (
               stats!.selfVerificationRequests.map((vr: any) => (
-                <div key={vr.id} className="px-4 py-3 bg-blue-50 border border-blue-100 rounded-xl">
+                <div key={vr.id} className="px-4 py-3 bg-blue-50 dark:bg-blue-500/10 border border-blue-100 dark:border-blue-500/20 rounded-xl">
                   <div className="flex items-center justify-between mb-1">
-                    <span className="text-sm font-medium text-gray-900">{vr.studentName}</span>
+                    <span className="text-sm font-medium text-gray-900 dark:text-white">{vr.studentName}</span>
                     <Badge variant="info" size="sm">Pending</Badge>
                   </div>
-                  <p className="text-xs text-gray-500">{vr.department} · {vr.competitionTitle}</p>
+                  <p className="text-xs text-gray-500 dark:text-zinc-400">{vr.department} · {vr.competitionTitle}</p>
                 </div>
               ))
             ) : (
               <div className="px-4 py-6 text-center">
-                <Mail className="w-8 h-8 mx-auto mb-2 text-gray-300" />
-                <p className="text-sm text-gray-400">No pending requests</p>
+                <Mail className="w-8 h-8 mx-auto mb-2 text-gray-300 dark:text-zinc-600" />
+                <p className="text-sm text-gray-400 dark:text-zinc-500">No pending requests</p>
               </div>
             )}
           </div>
@@ -106,10 +106,10 @@ export default function COEDashboard() {
               deptData.map((dept) => (
                 <div key={dept.department} className="space-y-1">
                   <div className="flex items-center justify-between text-sm">
-                    <span className="text-gray-700 font-medium">{dept.department}</span>
-                    <span className="text-gray-500">{dept.count}</span>
+                    <span className="text-gray-700 dark:text-zinc-300 font-medium">{dept.department}</span>
+                    <span className="text-gray-500 dark:text-zinc-400">{dept.count}</span>
                   </div>
-                  <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                  <div className="h-2 bg-gray-100 dark:bg-zinc-700 rounded-full overflow-hidden">
                     <div
                       className="h-full bg-accent rounded-full transition-all duration-500"
                       style={{ width: `${(dept.count / maxDeptCount) * 100}%` }}
@@ -118,7 +118,7 @@ export default function COEDashboard() {
                 </div>
               ))
             ) : (
-              <div className="text-center py-8 text-gray-500 text-sm">No registration data</div>
+              <div className="text-center py-8 text-gray-500 dark:text-zinc-400 text-sm">No registration data</div>
             )}
           </div>
         </Card>
@@ -132,29 +132,29 @@ export default function COEDashboard() {
               competitions.map((comp) => (
                 <div
                   key={comp.id}
-                  className="flex items-center justify-between px-4 py-3 rounded-xl hover:cursor-pointer transition-colors"
+                  className="flex items-center justify-between px-4 py-3 rounded-xl hover:bg-gray-50 dark:hover:bg-zinc-800 hover:cursor-pointer transition-colors"
                   onClick={() => router.push(`/competitions/${comp.id}`)}
                 >
                   <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-lg bg-accent/10 flex items-center justify-center">
+                    <div className="w-9 h-9 rounded-lg bg-accent/10 dark:bg-accent/20 flex items-center justify-center">
                       <Trophy className="w-4 h-4 text-accent" />
                     </div>
                     <div>
-                      <p className="text-sm font-medium text-white-900">{comp.title}</p>
+                      <p className="text-sm font-medium text-gray-900 dark:text-white">{comp.title}</p>
                       <div className="flex items-center gap-2 mt-0.5">
                         <Badge variant="primary" size="xs">{comp.category}</Badge>
-                        <span className="text-xs text-gray-400">{comp.mode}</span>
+                        <span className="text-xs text-gray-400 dark:text-zinc-500">{comp.mode}</span>
                       </div>
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className="text-xs text-gray-400">{new Date(comp.registrationDeadline).toLocaleDateString()}</span>
-                    <ExternalLink className="w-3.5 h-3.5 text-gray-300" />
+                    <span className="text-xs text-gray-400 dark:text-zinc-500">{new Date(comp.registrationDeadline).toLocaleDateString()}</span>
+                    <ExternalLink className="w-3.5 h-3.5 text-gray-300 dark:text-zinc-600" />
                   </div>
                 </div>
               ))
             ) : (
-              <div className="text-center py-8 text-gray-500 text-sm">No competitions yet</div>
+              <div className="text-center py-8 text-gray-500 dark:text-zinc-400 text-sm">No competitions yet</div>
             )}
           </div>
         </Card>

@@ -71,6 +71,7 @@ export interface StudentDashboardStats {
   upcomingCompetitions: Competition[]
   recentVerifiedRegs: Registration[]
   selfVerificationRequests: any[]
+  odRequests: any[]
   totalStudents?: number
   registeredCount?: number
   unregisteredCount?: number

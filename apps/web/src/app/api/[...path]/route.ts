@@ -904,6 +904,7 @@ register('GET', '/student/dashboard/stats', async (req) => {
       ...c,
       registration: userRegs.find(r => r.competitionId === c.id),
     }))
+  const odRequests = verificationRequests.filter(v => v.studentId === userId)
 
   return ok({
     totalRegistered: userRegs.length,
@@ -915,6 +916,7 @@ register('GET', '/student/dashboard/stats', async (req) => {
       ...r,
       competition: competitions.find(c => c.id === r.competitionId),
     })),
+    odRequests,
   })
 })
 

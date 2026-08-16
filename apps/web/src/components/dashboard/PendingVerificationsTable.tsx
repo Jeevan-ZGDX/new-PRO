@@ -61,31 +61,31 @@ export function PendingVerificationsTable({ data }: PendingVerificationsTablePro
       <div className="mt-4 overflow-hidden">
         <table className="w-full">
           <thead>
-            <tr className="border-b border-gray-100">
-              <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider px-4 py-3">Student</th>
-              <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider px-4 py-3">Competition</th>
-              <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider px-4 py-3">Requested On</th>
-              <th className="text-right text-xs font-medium text-gray-500 uppercase tracking-wider px-4 py-3">Action</th>
+            <tr className="border-b border-gray-100 dark:border-zinc-700">
+              <th className="text-left text-xs font-medium text-gray-500 dark:text-zinc-400 uppercase tracking-wider px-4 py-3">Student</th>
+              <th className="text-left text-xs font-medium text-gray-500 dark:text-zinc-400 uppercase tracking-wider px-4 py-3">Competition</th>
+              <th className="text-left text-xs font-medium text-gray-500 dark:text-zinc-400 uppercase tracking-wider px-4 py-3">Requested On</th>
+              <th className="text-right text-xs font-medium text-gray-500 dark:text-zinc-400 uppercase tracking-wider px-4 py-3">Action</th>
             </tr>
           </thead>
           <tbody>
             {data.length === 0 ? (
               <tr>
-                <td colSpan={4} className="text-center py-8 text-gray-500">{t('common.noData')}</td>
+                <td colSpan={4} className="text-center py-8 text-gray-500 dark:text-zinc-400">{t('common.noData')}</td>
               </tr>
             ) : (
               data.map((reg) => {
                 const loading = isVerifying && actionId === reg.id
                 return (
-                  <tr key={reg.id} className="border-b border-gray-50 hover:bg-gray-50/50 transition-colors">
+                  <tr key={reg.id} className="border-b border-gray-50 dark:border-zinc-800 hover:bg-gray-50/50 dark:hover:bg-zinc-800/50 transition-colors">
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-3">
                         <Avatar name={reg.userId} size="sm" />
-                        <span className="text-sm font-medium text-gray-900">{reg.userId}</span>
+                        <span className="text-sm font-medium text-gray-900 dark:text-white">{reg.userId}</span>
                       </div>
                     </td>
-                    <td className="px-4 py-3 text-sm text-gray-600">{reg.competition.title}</td>
-                    <td className="px-4 py-3 text-sm text-gray-500">
+                    <td className="px-4 py-3 text-sm text-gray-600 dark:text-zinc-400">{reg.competition.title}</td>
+                    <td className="px-4 py-3 text-sm text-gray-500 dark:text-zinc-400">
                       {new Date(reg.createdAt).toLocaleDateString()}
                     </td>
                     <td className="px-4 py-3 text-right">

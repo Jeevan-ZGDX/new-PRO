@@ -24,7 +24,7 @@ export default function AdvisorsPage() {
     if (!data?.data) return
     exportToCSV(
       'advisors',
-      ['Name', 'Email', 'Department', 'Assigned Sections', 'Pending Verifications'],
+      ['Name', 'Email', 'Department', 'Assigned Sections', 'OD Requests'],
       data.data.map(a => [a.name, a.email, a.department, a.assignedSections.join(', '), String(a.pendingVerifications)])
     )
   }
@@ -72,7 +72,7 @@ export default function AdvisorsPage() {
                 <th className="text-left text-xs font-medium uppercase tracking-wider px-6 py-3.5">Advisor</th>
                 <th className="text-left text-xs font-medium uppercase tracking-wider px-6 py-3.5">Department</th>
                 <th className="text-left text-xs font-medium uppercase tracking-wider px-6 py-3.5">Assigned Sections</th>
-                <th className="text-left text-xs font-medium uppercase tracking-wider px-6 py-3.5">Pending Verifications</th>
+                <th className="text-left text-xs font-medium uppercase tracking-wider px-6 py-3.5">OD Requests</th>
                 <th className="text-right text-xs font-medium uppercase tracking-wider px-6 py-3.5">Actions</th>
               </tr>
             </thead>

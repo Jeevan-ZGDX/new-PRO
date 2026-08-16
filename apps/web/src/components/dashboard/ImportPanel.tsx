@@ -81,34 +81,34 @@ export function ImportPanel({ type, title, icon: Icon, description }: ImportPane
         </CardTitle>
       </CardHeader>
       <div className="px-6 pb-6 space-y-4">
-        <p className="text-sm text-gray-600">{description}</p>
+        <p className="text-sm text-gray-600 dark:text-zinc-400">{description}</p>
         
         {/* File Upload Area */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">CSV File</label>
+          <label className="block text-sm font-medium text-gray-700 dark:text-zinc-300 mb-2">CSV File</label>
           <div
             onDragOver={(e) => { e.preventDefault(); setIsDragOver(true) }}
             onDragLeave={() => setIsDragOver(false)}
             onDrop={handleDrop}
             className={`border-2 border-dashed rounded-xl p-8 text-center transition-all ${isDragOver
-              ? 'border-blue-500 bg-blue-50'
+              ? 'border-blue-500 bg-blue-50 dark:bg-blue-500/10'
               : selectedFile
-                ? 'border-green-500 bg-green-50'
-                : 'border-gray-300 hover:border-gray-400 hover:bg-gray-50'
+                ? 'border-green-500 bg-green-50 dark:bg-green-500/10'
+                : 'border-gray-300 dark:border-zinc-600 hover:border-gray-400 dark:hover:border-zinc-500 hover:bg-gray-50 dark:hover:bg-zinc-800'
             }`}
           >
             {selectedFile ? (
               <div className="space-y-3">
                 <div className="flex items-center justify-center gap-2">
-                  <FileText className="w-8 h-8 text-green-600" />
+                  <FileText className="w-8 h-8 text-green-600 dark:text-green-400" />
                   <div>
-                    <p className="text-sm font-medium text-gray-900">{selectedFile.name}</p>
-                    <p className="text-xs text-gray-500">{(selectedFile.size / 1024).toFixed(2)} KB</p>
+                    <p className="text-sm font-medium text-gray-900 dark:text-white">{selectedFile.name}</p>
+                    <p className="text-xs text-gray-500 dark:text-zinc-400">{(selectedFile.size / 1024).toFixed(2)} KB</p>
                   </div>
                 </div>
                 <button
                   onClick={clearFile}
-                  className="inline-flex items-center gap-1 text-red-600 hover:text-red-700 text-sm"
+                  className="inline-flex items-center gap-1 text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 text-sm"
                 >
                   <X className="w-4 h-4" />
                   Remove file
@@ -116,17 +116,17 @@ export function ImportPanel({ type, title, icon: Icon, description }: ImportPane
               </div>
             ) : (
               <div className="space-y-3">
-                <Upload className="w-12 h-12 text-gray-400 mx-auto" />
+                <Upload className="w-12 h-12 text-gray-400 dark:text-zinc-500 mx-auto" />
                 <div>
-                  <p className="text-sm text-gray-600">Drag and drop CSV file here or</p>
+                  <p className="text-sm text-gray-600 dark:text-zinc-400">Drag and drop CSV file here or</p>
                   <button
                     onClick={() => fileInputRef.current?.click()}
-                    className="text-blue-600 hover:text-blue-700 font-medium text-sm"
+                    className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-medium text-sm"
                   >
                     browse files
                   </button>
                 </div>
-                <p className="text-xs text-gray-500">CSV file only, max 10MB</p>
+                <p className="text-xs text-gray-500 dark:text-zinc-500">CSV file only, max 10MB</p>
               </div>
             )}
             <input
@@ -142,13 +142,13 @@ export function ImportPanel({ type, title, icon: Icon, description }: ImportPane
         {/* Preview Data */}
         {previewData.length > 0 && (
           <div>
-            <h3 className="text-sm font-medium text-gray-700 mb-3">Preview ({previewData.length} rows)</h3>
-            <div className="border border-gray-200 rounded-lg overflow-hidden">
+            <h3 className="text-sm font-medium text-gray-700 dark:text-zinc-300 mb-3">Preview ({previewData.length} rows)</h3>
+            <div className="border border-gray-200 dark:border-zinc-700 rounded-lg overflow-hidden">
               <table className="w-full text-xs">
-                <thead className="bg-gray-50">
+                <thead className="bg-gray-50 dark:bg-zinc-800">
                   <tr>
                     {Object.keys(previewData[0]).map((key) => (
-                      <th key={key} className="px-3 py-2 text-left font-medium text-gray-500 uppercase">
+                      <th key={key} className="px-3 py-2 text-left font-medium text-gray-500 dark:text-zinc-400 uppercase">
                         {key}
                       </th>
                     ))}
@@ -156,9 +156,9 @@ export function ImportPanel({ type, title, icon: Icon, description }: ImportPane
                 </thead>
                 <tbody>
                   {previewData.map((row, i) => (
-                    <tr key={i} className="border-t border-gray-200">
+                    <tr key={i} className="border-t border-gray-200 dark:border-zinc-700">
                       {Object.keys(previewData[0]).map((key) => (
-                        <td key={key} className="px-3 py-2 text-gray-600">
+                        <td key={key} className="px-3 py-2 text-gray-600 dark:text-zinc-400">
                           {String(row[key])}
                         </td>
                       ))}
@@ -185,7 +185,7 @@ export function ImportPanel({ type, title, icon: Icon, description }: ImportPane
             {isImporting ? 'Importing...' : 'Import Data'}
           </Button>
           {importedCount > 0 && type === 'students' && (
-            <div className="inline-flex items-center gap-2 px-4 py-2.5 bg-green-50 text-green-700 font-medium rounded-xl">
+            <div className="inline-flex items-center gap-2 px-4 py-2.5 bg-green-50 dark:bg-green-500/10 text-green-700 dark:text-green-400 font-medium rounded-xl">
               <CheckCircle className="w-4 h-4" />
               {importedCount} imported
             </div>

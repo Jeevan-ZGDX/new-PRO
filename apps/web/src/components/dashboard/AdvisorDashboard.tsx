@@ -218,7 +218,7 @@ export default function AdvisorDashboard() {
                   >
                     <td className="py-2.5 pr-4">
                       <span className="text-gray-900 dark:text-white">{r.studentName}</span>
-                      <span className="block text-xs text-gray-400">{r.studentEmail}</span>
+                      <span className="block text-xs text-gray-400 dark:text-zinc-500">{r.studentEmail}</span>
                     </td>
                     <td className="py-2.5 pr-4 text-gray-700 dark:text-zinc-300">{r.section}</td>
                     <td className="py-2.5 pr-4 text-gray-700 dark:text-zinc-300">
