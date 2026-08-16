@@ -59,13 +59,7 @@ export function HodSectionsPanel({
             <CardTitle className="text-xl font-bold text-gray-900 dark:text-ink-primary">
               Section-wise Registrations
             </CardTitle>
-            <Badge variant="primary" size="sm">HOD View</Badge>
           </div>
-          <p className="text-xs text-gray-500 dark:text-obsidian-faint" data-testid="hod-sections-scope">
-            {competitionTitle ? `${competitionTitle} · ` : ''}
-            {data?.eligibleYears?.join(', ') || 'Department Cohorts'} · {totals.sections} sections ·{' '}
-            {totals.students} students · {totals.registered} registered
-          </p>
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
@@ -231,19 +225,8 @@ export function HodSectionsPanel({
                       >
                         Section {s.section}
                       </p>
-                      <p className="text-xs text-gray-500 dark:text-obsidian-faint mt-1">
-                        {s.totalCount} students enrolled
-                      </p>
                     </div>
-                    <span
-                      className={`text-xs font-semibold px-2.5 py-1 rounded-full ${
-                        hasRegs
-                          ? 'bg-accent/10 dark:bg-striver/10 text-accent dark:text-striver'
-                          : 'bg-gray-100 dark:bg-obsidian-border text-gray-500 dark:text-obsidian-faint'
-                      }`}
-                    >
-                      {pct}%
-                    </span>
+                    
                   </div>
 
                   <div className="space-y-2 mt-4">
