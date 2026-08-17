@@ -4,7 +4,7 @@ export { useLogin, useProfile, useUpdateProfile, useUpdateNotificationPreference
 export { useCompetitions, useCompetition, useUpcomingDeadlines, useTrendingCompetitions, useSearchCompetitions } from './hooks/useCompetitions'
 // Leaderboard hooks come from useLeaderboard (Firestore-aware). useRegistrations
 // also declares same-named copies; exporting both would be an ambiguous re-export.
-export { useLeaderboardOverall, useLeaderboardDepartment, useLeaderboardDepartments } from './hooks/useLeaderboard'
+export { useLeaderboardOverall, useLeaderboardDepartment, useLeaderboardDepartments, LEADERBOARD_LIMIT } from './hooks/useLeaderboard'
 export {
   useRegistrations,
   useRegistration,

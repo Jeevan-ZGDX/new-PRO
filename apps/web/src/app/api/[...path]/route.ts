@@ -9,12 +9,21 @@ import {
   pushCompetition, syncRegistration, syncVerificationRequests, syncNotifications,
 } from '@/lib/firebase-data'
 import { getAllRoleAccessData, setUserAccess, checkUserAccess } from '@/lib/firestore-service'
-import { isFirestoreConfigured, getDocById } from '@/lib/firestore-data'
+import {
+  isFirestoreConfigured,
+  getDocById,
+  fetchNotificationsForUser,
+  countUnreadNotifications,
+  markNotificationRead,
+  fetchAuditLogs,
+} from '@/lib/firestore-data'
 import { COLLECTIONS } from '@/lib/firebase/config'
 import { storeGmailTokens, getValidAccessToken as getValidGmailAccessToken, getGmailTokens, clearGmailTokens } from '@/lib/gmail-tokens'
 import type { UserRole } from '@/lib/auth'
 import { normalizeSection, sectionMatches } from '@comp-dash/utils'
 import { getSessionUser } from '@/lib/firebase/server-session'
+import { refreshStudentLeaderboard, LEADERBOARD_TAG } from '@/lib/leaderboard'
+import { revalidateTag } from 'next/cache'
 
 // ─── Types & Helper Functions ───────────────────────────────────────
 type RouteHandler = (req: NextRequest, segments: string[]) => Promise<NextResponse>
@@ -726,32 +735,34 @@ register('GET', '/notifications', async (req) => {
   const qs = new URL(req.url).searchParams
   const userId = qs.get('userId')
   if (!userId) return NextResponse.json({ success: false, error: { code: 'BAD_REQUEST', message: 'userId required' } }, { status: 400 })
-  const userNotifications = notifications.filter(n => n.userId === userId)
-  return ok(userNotifications)
+  // Scoped query rather than filtering the whole collection in memory: this
+  // reads one user's rows instead of ~15,000.
+  const limit = Math.min(parseInt(qs.get('limit') || '50', 10) || 50, 200)
+  return ok(await fetchNotificationsForUser(userId, limit))
 })
 
 register('PUT', '/notifications/:id/read', async (req, seg) => {
   const id = seg[1]
-  const item = notifications.find(n => n.id === id)
-  if (!item) return NextResponse.json({ success: false, error: { code: 'NOT_FOUND', message: 'Notification not found' } }, { status: 404 })
-  item.isRead = true
-  const idx = notifications.indexOf(item)
-  notifications[idx] = item
-  await syncNotifications()
-  return ok(item)
+  // A single targeted write. The old path loaded every notification, mutated
+  // one in memory, then wrote the entire array back.
+  const updated = await markNotificationRead(id)
+  if (!updated) return NextResponse.json({ success: false, error: { code: 'NOT_FOUND', message: 'Notification not found' } }, { status: 404 })
+  return ok({ id, isRead: true })
 })
 
 // ─── AUDIT LOGS ───────────────────────────────────────────────────────
+// Read on demand rather than at warm-up: only someone opening the audit page
+// pays for this collection, instead of every cold start paying for it.
 register('GET', '/audit-logs', async (req) => {
   const qs = new URL(req.url).searchParams
   const page = parseInt(qs.get('page') || '1')
   const limit = parseInt(qs.get('limit') || '10')
-  return ok(paginated(auditLogs, page, limit))
+  return ok(paginated(await fetchAuditLogs(), page, limit))
 })
 
 register('GET', '/audit-logs/:id', async (req, seg) => {
   const id = seg[1]
-  const log = auditLogs.find(l => l.id === id)
+  const log = (await fetchAuditLogs()).find(l => l.id === id)
   if (!log) return NextResponse.json({ success: false, error: { code: 'NOT_FOUND', message: 'Audit log not found' } }, { status: 404 })
   return ok(log)
 })
@@ -920,8 +931,10 @@ register('GET', '/notifications/unread-count', async (req) => {
     }
   }
   if (!userId) return ok({ count: 0 })
-  const count = notifications.filter(n => n.userId === userId && !n.isRead).length
-  return ok({ count })
+  // The header polls this on every page. A count() aggregation bills one read
+  // per 1,000 index entries instead of one per document, so this stays cheap
+  // no matter how large the collection grows.
+  return ok({ count: await countUnreadNotifications(userId) })
 })
 
 register('GET', '/admin/registrations/stats', async () => {
@@ -1026,6 +1039,11 @@ register('POST', '/admin/winners', async (req) => {
     registrationId: null,
   }
   await pushWinner(newWinner)
+  // Fold the win into the precomputed leaderboard now, so the page never has to
+  // derive it. Failure here is logged, not thrown — a lagging ranking must not
+  // cost us the recorded win.
+  await refreshStudentLeaderboard(email)
+  revalidateTag(LEADERBOARD_TAG)
   await pushNotification({
     id: 'notif-' + (notifications.length + 1),
     userId: 'user-1',
@@ -1381,6 +1399,16 @@ register('POST', '/admin/import', async (req) => {
       }
     }
     
+    // One rebuild for the whole import rather than one per row — a bulk winner
+    // upload would otherwise re-derive the same students over and over.
+    if (type === 'winners') {
+      const { recomputeLeaderboard } = await import('@/lib/leaderboard')
+      await recomputeLeaderboard().catch((err) =>
+        console.error('Leaderboard rebuild after import failed:', err.message)
+      )
+      revalidateTag(LEADERBOARD_TAG)
+    }
+
     const remainingItems = items.length > 100 ? items.slice(0, 100) : items
     return ok({
       success: true,

@@ -1,7 +1,7 @@
 'use client'
 
 import { Card } from '@comp-dash/design-system'
-import { useLeaderboardOverall } from '@comp-dash/api'
+import { useLeaderboardOverall, LEADERBOARD_LIMIT } from '@comp-dash/api'
 import { Star } from 'lucide-react'
 
 function RankBadge({ rank }: { rank: number }) {
@@ -17,7 +17,12 @@ export default function LeaderboardPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Leaderboard</h1>
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Leaderboard</h1>
+          <p className="text-sm text-gray-500 dark:text-zinc-400 mt-1">
+            Top {LEADERBOARD_LIMIT} by points
+          </p>
+        </div>
       </div>
 
       <Card padding="none" className="overflow-hidden bg-white dark:bg-[#18181b] border border-gray-200 dark:border-zinc-800">

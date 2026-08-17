@@ -84,6 +84,14 @@ service cloud.firestore {
       allow write: if isStaff();
     }
 
+    // Precomputed ranking rows. Readable so the UI can render them, but never
+    // client-writable: the values are derived from `winners` server-side, and a
+    // student who could edit their own row could award themselves the top spot.
+    match /leaderboard/{docId} {
+      allow read: if collegeUser();
+      allow write: if false;
+    }
+
     // ─── Registrations ────────────────────────────────────────────────
     // A student may create and amend their own registration; staff see and
     // manage all of them. Verification status is deliberately NOT writable by

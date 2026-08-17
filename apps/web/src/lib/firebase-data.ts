@@ -6,8 +6,6 @@ import {
   fetchCompetitions,
   fetchRegistrations,
   fetchWinners,
-  fetchNotifications,
-  fetchAuditLogs,
   fetchVerificationRequests,
   upsertStudents,
   upsertAdvisor,
@@ -132,14 +130,19 @@ export async function ensureLoaded() {
 
   console.log('[Comp-Dash] Loading data from Firestore...')
 
-  const [sStudents, sAdvisors, sComps, sRegs, sWinners, sNotifs, sLogs, sVRs] = await Promise.all([
+  // `notifications` (~15,000 docs) and `audit_logs` are deliberately NOT loaded
+  // here. Firestore bills per document returned, and this ran on the first API
+  // request after every cold start — which on Render's free tier means every
+  // time the service wakes from idle. Those two collections alone were most of
+  // a ~17,500-read warm-up, so roughly three wake-ups exhausted the 50k/day
+  // quota before a single user did anything. Both are now read scoped, on
+  // demand, by the routes that need them.
+  const [sStudents, sAdvisors, sComps, sRegs, sWinners, sVRs] = await Promise.all([
     fetchStudents(),
     fetchAdvisors(),
     fetchCompetitions(),
     fetchRegistrations(),
     fetchWinners(),
-    fetchNotifications(),
-    fetchAuditLogs(),
     fetchVerificationRequests(),
   ])
 
@@ -151,8 +154,6 @@ export async function ensureLoaded() {
   if (sComps.length > 0) competitions.splice(0, competitions.length, ...sComps)
   if (sRegs.length > 0) registrations.splice(0, registrations.length, ...sRegs)
   if (sWinners.length > 0) winners.splice(0, winners.length, ...sWinners)
-  if (sNotifs.length > 0) notifications.splice(0, notifications.length, ...sNotifs)
-  if (sLogs.length > 0) auditLogs.splice(0, auditLogs.length, ...sLogs)
   if (sVRs.length > 0) verificationRequests.splice(0, verificationRequests.length, ...sVRs)
 
   persistToStorage()

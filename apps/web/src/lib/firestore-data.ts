@@ -324,13 +324,8 @@ export async function upsertWinner(winner: Record<string, unknown>) {
 }
 
 // ─── Notifications ─────────────────────────────────────────────────
-export async function fetchNotifications(userId?: string) {
-  const rows = await readAll(COLLECTIONS.notifications, {
-    field: 'created_at',
-    direction: 'desc',
-  })
-  const scoped = userId ? rows.filter((row) => row.user_id === userId) : rows
-  return scoped.map((row) => ({
+function mapNotification(row: Row) {
+  return {
     id: row.id,
     userId: row.user_id,
     type: row.type,
@@ -339,7 +334,99 @@ export async function fetchNotifications(userId?: string) {
     data: row.data,
     isRead: row.is_read,
     createdAt: row.created_at,
-  }))
+  }
+}
+
+/**
+ * Reads the ENTIRE notifications collection.
+ *
+ * Retained only for callers that genuinely need every row. Prefer
+ * `fetchNotificationsForUser` — this collection holds ~15,000 documents and
+ * Firestore bills per document returned, so one unscoped call is roughly a
+ * third of the free daily read quota.
+ */
+export async function fetchNotifications(userId?: string) {
+  const rows = await readAll(COLLECTIONS.notifications, {
+    field: 'created_at',
+    direction: 'desc',
+  })
+  const scoped = userId ? rows.filter((row) => row.user_id === userId) : rows
+  return scoped.map(mapNotification)
+}
+
+/**
+ * One user's notifications, newest first.
+ *
+ * Scoped and capped in the QUERY rather than after the fact. The previous path
+ * pulled all ~15,000 documents into memory and filtered there, so every caller
+ * paid ~15,000 reads to look at their own handful — the single largest source
+ * of read-quota burn in the app.
+ */
+export async function fetchNotificationsForUser(userId: string, limit = 50) {
+  const db = getAdminDb()
+  if (!db || !userId) return []
+
+  const scoped = db.collection(COLLECTIONS.notifications).where('user_id', '==', userId)
+
+  let docs
+  try {
+    // Needs the composite index declared in firestore.indexes.json.
+    docs = (await scoped.orderBy('created_at', 'desc').limit(limit).get()).docs
+  } catch (err) {
+    // FAILED_PRECONDITION means the composite index is not deployed yet.
+    // Fall back to an unordered scoped read and sort here: still only this
+    // user's documents, so the quota win holds even before the index exists.
+    console.warn('Notification index unavailable, sorting in memory:', (err as Error).message)
+    docs = (await scoped.limit(Math.max(limit, 200)).get()).docs
+  }
+
+  const rows: Row[] = docs.map((doc) => ({ id: doc.id, ...doc.data() }))
+  rows.sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || '')))
+
+  return rows.slice(0, limit).map(mapNotification)
+}
+
+/**
+ * Unread count for one user.
+ *
+ * Uses Firestore's `count()` aggregation, which bills one read per 1,000 index
+ * entries scanned instead of one per document — so this stays cheap even as the
+ * collection grows. The two filters are both equality, which Firestore serves
+ * from automatic single-field indexes; no composite index is required.
+ */
+export async function countUnreadNotifications(userId: string): Promise<number> {
+  const db = getAdminDb()
+  if (!db || !userId) return 0
+
+  try {
+    const snap = await db
+      .collection(COLLECTIONS.notifications)
+      .where('user_id', '==', userId)
+      .where('is_read', '==', false)
+      .count()
+      .get()
+    return snap.data().count
+  } catch (err) {
+    console.error('Unread notification count failed:', (err as Error).message)
+    return 0
+  }
+}
+
+/** Marks one notification read without loading the collection. */
+export async function markNotificationRead(id: string): Promise<boolean> {
+  const db = getAdminDb()
+  if (!db || !id) return false
+
+  try {
+    await db.collection(COLLECTIONS.notifications).doc(String(id)).set(
+      { is_read: true },
+      { merge: true }
+    )
+    return true
+  } catch (err) {
+    console.error('Marking notification read failed:', (err as Error).message)
+    return false
+  }
 }
 
 function notificationDoc(notif: Record<string, unknown>) {

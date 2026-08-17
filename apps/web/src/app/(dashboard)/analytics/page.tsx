@@ -16,7 +16,7 @@ export default function AnalyticsPage() {
   const { t } = useTranslation()
   const { isDark } = useTheme()
   const { data: stats, isLoading } = useAdminAnalytics()
-  const { data: leaderboard } = useLeaderboardOverall()
+  const { data: leaderboard } = useLeaderboardOverall(200)
 
   const gridStroke = isDark ? '#333537' : '#E5E7EB'
   const axisColor = isDark ? '#9AA0A6' : '#6B7280'

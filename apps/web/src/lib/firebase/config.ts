@@ -38,6 +38,8 @@ export const COLLECTIONS = {
   userProfiles: 'user_profiles',
   studentCompetitions: 'student_competitions',
   gmailTokens: 'gmail_tokens',
+  /** Precomputed ranking rows, one per student with at least one win. */
+  leaderboard: 'leaderboard',
 } as const
 
 export type CollectionName = (typeof COLLECTIONS)[keyof typeof COLLECTIONS]
