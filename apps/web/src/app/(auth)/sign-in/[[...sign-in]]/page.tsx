@@ -127,7 +127,7 @@ export default function SignInPage() {
           {!configured && (
             <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-700 text-sm">
               Firebase Auth is not configured. Add NEXT_PUBLIC_FIREBASE_API_KEY and
-              NEXT_PUBLIC_SUPABASE_ANON_KEY to your environment to enable sign in.
+              NEXT_PUBLIC_FIREBASE_PROJECT_ID to your environment to enable sign in.
             </div>
           )}
 
@@ -180,10 +180,10 @@ export default function SignInPage() {
               Demo Accounts:
             </p>
             <div className="grid grid-cols-2 gap-2">
-              <button className="text-left text-xs p-1 rounded hover:bg-accent/10" onClick={()=>{setEmail('admin@citchennai.net');setPassword('CompDash@123')}}>Admin: admin@citchennai.net / CompDash@123</button>
-              <button className="text-left text-xs p-1 rounded hover:bg-accent/10" onClick={()=>{setEmail('hod@citchennai.net');setPassword('CompDash@123')}}>HOD: hod@citchennai.net / CompDash@123</button>
-              <button className="text-left text-xs p-1 rounded hover:bg-accent/10" onClick={()=>{setEmail('advisor@citchennai.net');setPassword('CompDash@123')}}>Advisor: advisor@citchennai.net / CompDash@123</button>
-              <button className="text-left text-xs p-1 rounded hover:bg-accent/10" onClick={()=>{setEmail('student@citchennai.net');setPassword('CompDash@123')}}>Student: student@citchennai.net / CompDash@123</button>
+              <button type="button" className="text-left text-xs p-1 rounded hover:bg-accent/10" onClick={()=>{setEmail('admin@citchennai.net');setPassword('CompDash@123')}}>Admin: admin@citchennai.net / CompDash@123</button>
+              <button type="button" className="text-left text-xs p-1 rounded hover:bg-accent/10" onClick={()=>{setEmail('hod@citchennai.net');setPassword('CompDash@123')}}>HOD: hod@citchennai.net / CompDash@123</button>
+              <button type="button" className="text-left text-xs p-1 rounded hover:bg-accent/10" onClick={()=>{setEmail('advisor@citchennai.net');setPassword('CompDash@123')}}>Advisor: advisor@citchennai.net / CompDash@123</button>
+              <button type="button" className="text-left text-xs p-1 rounded hover:bg-accent/10" onClick={()=>{setEmail('student@citchennai.net');setPassword('CompDash@123')}}>Student: student@citchennai.net / CompDash@123</button>
             </div>
           </div>
 

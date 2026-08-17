@@ -113,10 +113,37 @@ export async function syncUserClaims(
   return true
 }
 
+/**
+ * Rejections that mean the token really is unusable. Anything else that comes
+ * out of the revocation lookup is treated as a transport problem, not a verdict
+ * on the token.
+ */
+const FATAL_TOKEN_ERRORS = new Set([
+  'auth/id-token-expired',
+  'auth/id-token-revoked',
+  'auth/user-disabled',
+  'auth/user-not-found',
+  'auth/argument-error',
+])
+
 /** Verifies an ID token server-side using the Admin SDK (Node runtime only). */
 export async function verifyIdTokenAdmin(idToken: string) {
   const auth = getAdminAuth()
   if (!auth) throw new Error('Firebase Admin is not configured')
-  // `checkRevoked` catches tokens belonging to a disabled or signed-out user.
-  return auth.verifyIdToken(idToken, true)
+
+  try {
+    // `checkRevoked` catches tokens belonging to a disabled or signed-out user.
+    return await auth.verifyIdToken(idToken, true)
+  } catch (err) {
+    const code = (err as { code?: string }).code || ''
+    if (FATAL_TOKEN_ERRORS.has(code)) throw err
+
+    // checkRevoked costs an EXTRA round trip to Google's user store, separate
+    // from the signature check. On a slow or flaky link that call is the part
+    // that fails — and reporting it as "invalid token" locks out users holding
+    // a perfectly valid one. Fall back to signature/issuer/audience/expiry,
+    // which needs only Google's cached public keys.
+    console.warn(`Revocation check unavailable (${code || 'no code'}), verifying signature only`)
+    return auth.verifyIdToken(idToken)
+  }
 }

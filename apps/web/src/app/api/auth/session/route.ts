@@ -45,8 +45,22 @@ export async function POST(request: NextRequest) {
   try {
     decoded = await verifyIdTokenAdmin(idToken)
   } catch (err) {
-    console.error('ID token verification failed:', (err as Error).message)
-    return NextResponse.json({ error: 'Invalid or expired token' }, { status: 401 })
+    // The Firebase error code is the only thing that distinguishes "your token
+    // aged out" from "Admin credentials are wrong" from "this account is
+    // disabled". Collapsing them into one opaque string made every sign-in
+    // failure look identical, so the code travels to the client and the log.
+    const code = (err as { code?: string }).code || 'unknown'
+    console.error('ID token verification failed:', code, (err as Error).message)
+    return NextResponse.json(
+      {
+        error:
+          code === 'auth/id-token-expired'
+            ? 'Your sign-in expired before it reached us. Please try again.'
+            : `Could not verify your sign-in (${code}).`,
+        code,
+      },
+      { status: 401 }
+    )
   }
 
   const email = String(decoded.email || '').trim().toLowerCase()
