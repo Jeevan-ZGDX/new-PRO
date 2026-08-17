@@ -1,14 +1,14 @@
 import studentsData from './students-data.json'
 import {
-  isSupabaseConfigured,
-  fetchStudentsFromSupabase,
-  fetchAdvisorsFromSupabase,
-  fetchCompetitionsFromSupabase,
-  fetchRegistrationsFromSupabase,
-  fetchWinnersFromSupabase,
-  fetchNotificationsFromSupabase,
-  fetchAuditLogsFromSupabase,
-  fetchVerificationRequestsFromSupabase,
+  isFirestoreConfigured,
+  fetchStudents,
+  fetchAdvisors,
+  fetchCompetitions,
+  fetchRegistrations,
+  fetchWinners,
+  fetchNotifications,
+  fetchAuditLogs,
+  fetchVerificationRequests,
   upsertStudents,
   upsertAdvisor,
   upsertCompetition,
@@ -18,7 +18,7 @@ import {
   upsertNotifications,
   upsertVerificationRequest,
   insertAuditLog,
-} from './supabase-client'
+} from './firestore-data'
 
 // ─── In-memory caches ───────────────────────────────────────────────
 export const departments: any[] = [
@@ -125,22 +125,22 @@ export async function ensureLoaded() {
 
   hydrateFromStorage()
 
-  if (!isSupabaseConfigured()) {
-    console.log('[Comp-Dash] Supabase not configured — using local data only')
+  if (!isFirestoreConfigured()) {
+    console.log('[Comp-Dash] Firestore not configured — using local data only')
     return
   }
 
-  console.log('[Comp-Dash] Loading data from Supabase...')
+  console.log('[Comp-Dash] Loading data from Firestore...')
 
   const [sStudents, sAdvisors, sComps, sRegs, sWinners, sNotifs, sLogs, sVRs] = await Promise.all([
-    fetchStudentsFromSupabase(),
-    fetchAdvisorsFromSupabase(),
-    fetchCompetitionsFromSupabase(),
-    fetchRegistrationsFromSupabase(),
-    fetchWinnersFromSupabase(),
-    fetchNotificationsFromSupabase(),
-    fetchAuditLogsFromSupabase(),
-    fetchVerificationRequestsFromSupabase(),
+    fetchStudents(),
+    fetchAdvisors(),
+    fetchCompetitions(),
+    fetchRegistrations(),
+    fetchWinners(),
+    fetchNotifications(),
+    fetchAuditLogs(),
+    fetchVerificationRequests(),
   ])
 
   if (sStudents.length > 0) {

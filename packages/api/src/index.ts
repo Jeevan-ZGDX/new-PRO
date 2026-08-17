@@ -1,8 +1,8 @@
 export { apiClient } from './client'
-export { setSupabaseClient, getSupabaseClient, isSupabaseEnabled } from './supabase-manager'
+export { setFirestoreDb, getFirestoreDb, isFirestoreEnabled } from './firestore-manager'
 export { useLogin, useProfile, useUpdateProfile, useUpdateNotificationPreferences, useUpdateLanguage, useLogout } from './hooks/useAuth'
 export { useCompetitions, useCompetition, useUpcomingDeadlines, useTrendingCompetitions, useSearchCompetitions } from './hooks/useCompetitions'
-// Leaderboard hooks come from useLeaderboard (Supabase-aware). useRegistrations
+// Leaderboard hooks come from useLeaderboard (Firestore-aware). useRegistrations
 // also declares same-named copies; exporting both would be an ambiguous re-export.
 export { useLeaderboardOverall, useLeaderboardDepartment, useLeaderboardDepartments } from './hooks/useLeaderboard'
 export {

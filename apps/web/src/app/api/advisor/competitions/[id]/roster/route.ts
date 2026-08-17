@@ -1,8 +1,12 @@
 import { apiOk, apiError } from '@/lib/api-response'
-import { createSupabaseAdminClient } from '@/lib/supabase/admin'
-import { supabase as anonClient } from '@/lib/supabase-client'
-import { getSessionUser } from '@/lib/supabase/server'
-import { fetchAllRows } from '@/lib/fetch-all-rows'
+import {
+  isFirestoreConfigured,
+  fetchAdvisors,
+  getDocById,
+  queryByField,
+} from '@/lib/firestore-data'
+import { COLLECTIONS } from '@/lib/firebase/config'
+import { SESSION_COOKIE, verifyIdToken } from '@/lib/firebase/session'
 import {
   normalizeSection,
   storedSectionVariants,
@@ -17,9 +21,9 @@ import type {
 } from '@comp-dash/types'
 
 export const dynamic = 'force-dynamic'
-// `dynamic` only controls route rendering. supabase-js goes through `fetch`,
-// which Next caches separately, so without this a query's first result was
-// replayed forever and rows written later stayed invisible.
+// `dynamic` only controls route rendering. The Firestore reads below go through
+// the Admin SDK rather than `fetch`, but the route must still opt out of Next's
+// fetch cache so nothing upstream replays a stale first result.
 export const fetchCache = 'force-no-store'
 
 /**
@@ -28,6 +32,23 @@ export const fetchCache = 'force-no-store'
  * Overridable per-request with ?year=3 so widening later needs no code change.
  */
 const DEFAULT_YEAR_NUMBER = 3
+
+/**
+ * Session identity for a route handler.
+ *
+ * `@/lib/auth`'s `getSessionUser` runs against the browser Firebase SDK, so a
+ * route handler has to verify the session cookie the middleware maintains
+ * itself. Reading the raw header rather than `cookies()` keeps this working off
+ * the plain `Request` the handler receives.
+ */
+async function getSessionEmail(request: Request): Promise<string | null> {
+  const header = request.headers.get('cookie') ?? ''
+  const entry = header.split(/;\s*/).find((c) => c.startsWith(`${SESSION_COOKIE}=`))
+  if (!entry) return null
+  const token = decodeURIComponent(entry.slice(SESSION_COOKIE.length + 1))
+  const user = await verifyIdToken(token)
+  return user?.email?.trim().toLowerCase() || null
+}
 
 function mapStatus(verificationStatus: string | null | undefined): AdvisorStudentStatus {
   if (!verificationStatus) return 'not_registered'
@@ -53,63 +74,50 @@ export async function GET(
     return apiError('BAD_REQUEST', 'Missing competition id', 400)
   }
 
-  const sessionUser = await getSessionUser()
-  const email = sessionUser?.email?.trim().toLowerCase()
+  const email = await getSessionEmail(request)
   if (!email) {
     return apiError('UNAUTHENTICATED', 'Not authenticated', 401)
   }
 
-  const db = createSupabaseAdminClient() ?? anonClient
-  if (!db) return apiError('NOT_CONFIGURED', 'Supabase not configured', 500)
+  if (!isFirestoreConfigured()) {
+    return apiError('NOT_CONFIGURED', 'Firestore not configured', 500)
+  }
 
   // ── Advisor row (identity → assigned sections) ──────────────────────────
-  const advisorRes = await db
-    .from('advisors')
-    .select('id,name,email,department,assigned_sections')
-    .ilike('email', email)
-    .maybeSingle()
+  // Firestore has no case-insensitive predicate to replace `ilike`, so the
+  // advisors collection — a few dozen documents — is matched in memory.
+  const advisors = await fetchAdvisors()
+  const advisor = advisors.find((a) => String(a.email ?? '').trim().toLowerCase() === email)
 
-  if (advisorRes.error) {
-    return apiError('DB_ERROR', advisorRes.error.message, 500)
-  }
-  if (!advisorRes.data) {
+  if (!advisor) {
     return apiError(
       'ADVISOR_NOT_MAPPED',
       'No advisor record is mapped to this account',
       404,
-      { detail: `No row in public.advisors has email ${email}.` }
+      { detail: `No document in advisors has email ${email}.` }
     )
   }
-  const advisor = advisorRes.data
 
   // advisors.assigned_sections stores bare labels ("A"), students.section stores
   // them year-prefixed ("3%A"). Comparing them directly matches nothing.
-  const assignedSections: string[] = ((advisor.assigned_sections ?? []) as string[])
+  const assignedSections: string[] = ((advisor.assignedSections ?? []) as string[])
     .map((s) => normalizeSection(s))
     .filter((s): s is string => Boolean(s))
     .sort((a, b) => a.localeCompare(b))
 
   // ── Competition + eligibility ───────────────────────────────────────────
-  const compRes = await db
-    .from('competition_dashboard')
-    .select('id, competition_name, eligible_year')
-    .eq('id', competitionId)
-    .maybeSingle()
-
-  if (compRes.error) {
-    return apiError('DB_ERROR', compRes.error.message, 500)
-  }
-  if (!compRes.data) {
+  const competition = await getDocById(COLLECTIONS.competitionDashboard, competitionId)
+  if (!competition) {
     return apiError('NOT_FOUND', 'Competition not found', 404)
   }
 
-  const eligible = parseEligibleYears(compRes.data.eligible_year)
+  const eligible = parseEligibleYears(competition.eligible_year)
   const yearNumber = Number(new URL(request.url).searchParams.get('year')) || DEFAULT_YEAR_NUMBER
   const yearScope = yearNumberToLabel(yearNumber)
 
   const base = {
     competitionId,
-    competitionName: compRes.data.competition_name ?? '',
+    competitionName: competition.competition_name ?? '',
     eligibleYears: eligible.yearLabels,
     openToAllYears: eligible.openToAllYears,
     advisor: {
@@ -145,47 +153,27 @@ export async function GET(
   }
 
   // ── Students in the advisor's sections ──────────────────────────────────
-  // Both spellings are queried, then filtered by year — normalizing alone would
-  // pull 1st-year "A" in alongside 3rd-year "3%A".
-  const sectionVariants = assignedSections.flatMap((s) => storedSectionVariants(s))
+  // Both spellings are accepted, then filtered by year — normalizing alone would
+  // pull 1st-year "A" in alongside 3rd-year "3%A". The year is the indexed
+  // filter and the section list is applied in memory, since the old `.in()` has
+  // no Firestore equivalent for a list this size.
+  const sectionVariants = new Set(assignedSections.flatMap((s) => storedSectionVariants(s)))
 
-  const students = await fetchAllRows<{
-    id: string
-    name: string
-    email: string
-    department: string | null
-    section: string | null
-    year: string | null
-  }>(
-    db
-      .from('students')
-      .select('id,name,email,department,section,year')
-      .eq('year', yearScope)
-      .in('section', sectionVariants)
-      .order('name')
-  )
-  if (students.error) {
-    return apiError('DB_ERROR', students.error, 500)
-  }
+  const students = (await queryByField(COLLECTIONS.students, 'year', yearScope))
+    .filter((s) => sectionVariants.has(String(s.section ?? '')))
+    // Sorted here rather than with `orderBy`, which drops documents that have no
+    // `name` field at all.
+    .sort((a, b) => String(a.name ?? '').localeCompare(String(b.name ?? '')))
 
   // ── Registration status for this competition ────────────────────────────
-  const registrations = await fetchAllRows<{
-    student_email: string | null
-    verification_status: string | null
-    created_at: string | null
-    verified_at: string | null
-  }>(
-    db
-      .from('student_competitions')
-      .select('student_email, verification_status, created_at, verified_at')
-      .eq('competition_id', competitionId)
+  const registrations = await queryByField(
+    COLLECTIONS.studentCompetitions,
+    'competition_id',
+    competitionId
   )
-  if (registrations.error) {
-    return apiError('DB_ERROR', registrations.error, 500)
-  }
 
-  const regByEmail = new Map<string, (typeof registrations.rows)[number]>()
-  for (const reg of registrations.rows) {
+  const regByEmail = new Map<string, Record<string, any>>()
+  for (const reg of registrations) {
     const key = String(reg.student_email ?? '').trim().toLowerCase()
     if (!key) continue
     // Keep the most advanced record if a student somehow has duplicates.
@@ -197,7 +185,7 @@ export async function GET(
   const bySection = new Map<string, AdvisorStudentRow[]>()
   for (const section of assignedSections) bySection.set(section, [])
 
-  for (const student of students.rows) {
+  for (const student of students) {
     const section = normalizeSection(student.section)
     const bucket = bySection.get(section)
     if (!bucket) continue // section outside this advisor's assignment

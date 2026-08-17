@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { supabase } from '@/lib/supabase-client'
+import { updateDocById, deleteDocById, isFirestoreConfigured } from '@/lib/firestore-data'
+import { COLLECTIONS } from '@/lib/firebase/config'
 
 export async function PUT(
   request: NextRequest,
@@ -9,8 +10,8 @@ export async function PUT(
   if (!competitionId) {
     return NextResponse.json({ error: 'Missing competition id' }, { status: 400 })
   }
-  if (!supabase) {
-    return NextResponse.json({ error: 'Supabase not configured' }, { status: 500 })
+  if (!isFirestoreConfigured()) {
+    return NextResponse.json({ error: 'Firestore not configured' }, { status: 500 })
   }
 
   const body = await request.json()
@@ -39,14 +40,15 @@ export async function PUT(
   }
   updates.updated_at = new Date().toISOString()
 
-  const { error } = await supabase
-    .from('competition_dashboard')
-    .update(updates)
-    .eq('id', competitionId)
+  const result = await updateDocById(
+    COLLECTIONS.competitionDashboard,
+    competitionId,
+    updates
+  )
 
-  if (error) {
-    console.error('Supabase update competition error:', error)
-    return NextResponse.json({ error: error.message }, { status: 500 })
+  if (!result.success) {
+    console.error('Firestore update competition error:', result.reason)
+    return NextResponse.json({ error: result.reason }, { status: 500 })
   }
 
   return NextResponse.json({ success: true })
@@ -60,18 +62,15 @@ export async function DELETE(
   if (!competitionId) {
     return NextResponse.json({ error: 'Missing competition id' }, { status: 400 })
   }
-  if (!supabase) {
-    return NextResponse.json({ error: 'Supabase not configured' }, { status: 500 })
+  if (!isFirestoreConfigured()) {
+    return NextResponse.json({ error: 'Firestore not configured' }, { status: 500 })
   }
 
-  const { error } = await supabase
-    .from('competition_dashboard')
-    .delete()
-    .eq('id', competitionId)
+  const result = await deleteDocById(COLLECTIONS.competitionDashboard, competitionId)
 
-  if (error) {
-    console.error('Supabase delete competition error:', error)
-    return NextResponse.json({ error: error.message }, { status: 500 })
+  if (!result.success) {
+    console.error('Firestore delete competition error:', result.reason)
+    return NextResponse.json({ error: result.reason }, { status: 500 })
   }
 
   return NextResponse.json({ success: true })

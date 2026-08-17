@@ -1,8 +1,33 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { supabase } from '@/lib/supabase-client'
+import {
+  isFirestoreConfigured,
+  getDocById,
+  queryByField,
+  createDoc,
+  writeDocById,
+} from '@/lib/firestore-data'
+import { COLLECTIONS } from '@/lib/firebase/config'
 import { getValidAccessToken } from '@/lib/gmail-tokens'
 
 const GMAIL_API_BASE = 'https://www.googleapis.com/gmail/v1/users/me'
+
+/**
+ * Postgres enforced `unique(student_email, competition_id)`, which is what made
+ * the old upsert idempotent. Firestore has no unique constraint, so the pair is
+ * looked up first and that document rewritten.
+ *
+ * Only `student_email` goes to Firestore — one student holds a handful of
+ * registrations, so filtering the competition in memory avoids a second
+ * indexed field for no gain.
+ */
+async function findRegistration(studentEmail: string, competitionId: string) {
+  const rows = await queryByField(
+    COLLECTIONS.studentCompetitions,
+    'student_email',
+    studentEmail
+  )
+  return rows.find((row) => row.competition_id === competitionId) ?? null
+}
 
 async function searchEmails(accessToken: string, query: string, maxResults = 30) {
   const response = await fetch(
@@ -68,15 +93,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: 'Missing competitionId or userEmail' }, { status: 400 })
     }
 
-    if (!supabase) {
-      return NextResponse.json({ success: false, error: 'Supabase not configured' }, { status: 500 })
+    if (!isFirestoreConfigured()) {
+      return NextResponse.json({ success: false, error: 'Firestore not configured' }, { status: 500 })
     }
 
-    const { data: competition } = await supabase
-      .from('competition_dashboard')
-      .select('*')
-      .eq('id', competitionId)
-      .single()
+    const competition = await getDocById(COLLECTIONS.competitionDashboard, competitionId)
 
     if (!competition) {
       return NextResponse.json({ success: false, error: 'Competition not found' }, { status: 404 })
@@ -89,7 +110,10 @@ export async function POST(request: NextRequest) {
     }
 
     const query = `from:${competition.organizer_email} OR subject:"${competition.competition_name}" OR subject:registration OR subject:confirmation`
-    const messages = await searchEmails(accessToken, query, 30)
+    // The Gmail search response is `{ messages: [...] }`; iterating the envelope
+    // itself threw before it ever reached the match loop.
+    const searchResult = await searchEmails(accessToken, query, 30)
+    const messages = searchResult.messages ?? []
 
     let verified = false
     let matchedEmail: any = null
@@ -111,8 +135,11 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    const existing = await findRegistration(userEmail, competitionId)
+
     if (verified && matchedEmail) {
-      await supabase.from('student_competitions').upsert({
+      const now = new Date().toISOString()
+      const doc = {
         student_id: userEmail,
         student_email: userEmail,
         student_name: userEmail.split('@')[0],
@@ -123,32 +150,25 @@ export async function POST(request: NextRequest) {
         verification_method: 'gmail_auto',
         gmail_message_id: matchedEmail.messageId,
         gmail_thread_id: matchedEmail.threadId,
-        verified_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      }, {
-        onConflict: 'student_email,competition_id',
-        ignoreDuplicates: false,
-      })
-    } else {
-      const { data: existing } = await supabase
-        .from('student_competitions')
-        .select('*')
-        .eq('student_email', userEmail)
-        .eq('competition_id', competitionId)
-        .single()
-
-      if (!existing) {
-        await supabase.from('student_competitions').insert({
-          student_id: userEmail,
-          student_email: userEmail,
-          student_name: userEmail.split('@')[0],
-          competition_id: competitionId,
-          competition_name: competition.competition_name,
-          registration_link: competition.registration_link || '',
-          verification_status: 'pending',
-          verification_method: 'manual',
-        })
+        verified_at: now,
+        updated_at: now,
       }
+      if (existing) {
+        await writeDocById(COLLECTIONS.studentCompetitions, existing.id, doc)
+      } else {
+        await createDoc(COLLECTIONS.studentCompetitions, doc)
+      }
+    } else if (!existing) {
+      await createDoc(COLLECTIONS.studentCompetitions, {
+        student_id: userEmail,
+        student_email: userEmail,
+        student_name: userEmail.split('@')[0],
+        competition_id: competitionId,
+        competition_name: competition.competition_name,
+        registration_link: competition.registration_link || '',
+        verification_status: 'pending',
+        verification_method: 'manual',
+      })
     }
 
     return NextResponse.json({ success: true, verified, email: matchedEmail })

@@ -311,7 +311,7 @@ function CreateCompetitionContent() {
                   className={inputClass}
                   placeholder="https://"
                 />
-                <p className="text-xs text-gray-500 dark:text-zinc-400 mt-1.5">Direct registration link (used for Supabase dashboard sync)</p>
+                <p className="text-xs text-gray-500 dark:text-zinc-400 mt-1.5">Direct registration link (used for dashboard sync)</p>
               </div>
             </div>
           </div>

@@ -12,7 +12,8 @@
     "@comp-dash/types": "*",
     "@comp-dash/utils": "*",
     "@tanstack/react-query": "^5.17.0",
-    "axios": "^1.6.0"
+    "axios": "^1.6.0",
+    "firebase": "^12.17.1"
   },
   "devDependencies": {
     "@types/react": "^18.2.0",

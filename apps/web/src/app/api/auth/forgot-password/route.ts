@@ -1,8 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createSupabaseAdminClient } from '@/lib/supabase/admin'
+import { getAdminAuth } from '@/lib/firebase/admin'
+import { findOneByField, writeDocById, insertAuditLog } from '@/lib/firestore-data'
+import { COLLECTIONS } from '@/lib/firebase/config'
+import { syncUserClaims } from '@/lib/firebase-auth'
+import { normalizeRole } from '@/lib/firebase/session'
 
 export const dynamic = 'force-dynamic'
 export const fetchCache = 'force-no-store'
+export const runtime = 'nodejs'
 
 const ALLOWED_EMAILS = new Set(['hod@citchennai.net', 'admin@citchennai.net'])
 const ALLOWED_ROLES = new Set(['hod', 'admin', 'super_admin'])
@@ -35,44 +40,32 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    const admin = createSupabaseAdminClient()
-    if (!admin) {
+    const auth = getAdminAuth()
+    if (!auth) {
       return NextResponse.json(
         { success: false, error: 'Database service is not configured on the server.' },
         { status: 500 }
       )
     }
 
-    // 1. Fetch user from Supabase auth to check existence & role
-    const { data: usersData, error: listErr } = await admin.auth.admin.listUsers({
-      page: 1,
-      perPage: 1000,
-    })
-
-    if (listErr) {
-      console.error('Failed to list users:', listErr.message)
+    // 1. Look the account up in Firebase Auth. A direct lookup by email replaces
+    //    the old paged listUsers() scan, which silently missed anyone past 1,000.
+    let existingUser: Awaited<ReturnType<typeof auth.getUserByEmail>> | null = null
+    try {
+      existingUser = await auth.getUserByEmail(cleanEmail)
+    } catch {
+      existingUser = null // auth/user-not-found — handled as a create below
     }
 
-    const existingUser = (usersData?.users || []).find(
-      (u) => u.email?.toLowerCase() === cleanEmail
-    )
-
-    let userRole = (existingUser?.user_metadata?.role as string) || ''
-    let userName = (existingUser?.user_metadata?.name as string) || ''
+    const claims = (existingUser?.customClaims || {}) as Record<string, unknown>
+    let userRole = typeof claims.role === 'string' ? claims.role : ''
+    let userName = typeof claims.name === 'string' ? claims.name : ''
 
     if (existingUser && !userRole) {
-      try {
-        const { data: profile } = await admin
-          .from('user_profiles')
-          .select('role, full_name')
-          .eq('user_id', existingUser.id)
-          .single()
-        if (profile?.role) {
-          userRole = profile.role
-          userName = profile.full_name || userName
-        }
-      } catch {
-        // Fall through
+      const profile = await findOneByField(COLLECTIONS.userProfiles, 'email', cleanEmail)
+      if (profile?.role) {
+        userRole = profile.role
+        userName = profile.full_name || profile.name || userName
       }
     }
 
@@ -97,83 +90,58 @@ export async function POST(req: NextRequest) {
       userRole || (cleanEmail === 'hod@citchennai.net' ? 'hod' : 'super_admin')
     const assignedName =
       userName || (cleanEmail === 'hod@citchennai.net' ? 'Head of Department' : 'System Admin')
+    const assignedDepartment = (existingUser && (claims.department as string)) || 'CSE'
 
     let userId: string
 
     if (existingUser) {
-      userId = existingUser.id
-      const { error: updateErr } = await admin.auth.admin.updateUserById(userId, {
-        password: newPassword,
-        user_metadata: {
-          ...existingUser.user_metadata,
-          role: assignedRole,
-          name: assignedName,
-          department: existingUser.user_metadata?.department || 'CSE',
-        },
-      })
-
-      if (updateErr) {
-        return NextResponse.json(
-          { success: false, error: `Failed to update password: ${updateErr.message}` },
-          { status: 500 }
-        )
-      }
+      userId = existingUser.uid
+      await auth.updateUser(userId, { password: newPassword })
     } else {
-      // If user doesn't exist yet, create them with the new password
-      const { data: createData, error: createErr } = await admin.auth.admin.createUser({
+      const created = await auth.createUser({
         email: cleanEmail,
         password: newPassword,
-        email_confirm: true,
-        user_metadata: {
-          role: assignedRole,
-          name: assignedName,
-          department: 'CSE',
-        },
+        emailVerified: true,
+        displayName: assignedName,
       })
-
-      if (createErr || !createData.user) {
-        return NextResponse.json(
-          {
-            success: false,
-            error: `Failed to create user account: ${createErr?.message || 'Unknown error'}`,
-          },
-          { status: 500 }
-        )
-      }
-
-      userId = createData.user.id
+      userId = created.uid
     }
 
-    // 2. Sync to user_profiles table
-    try {
-      await admin
-        .from('user_profiles')
-        .upsert(
-          {
-            user_id: userId,
-            email: cleanEmail,
-            full_name: assignedName,
-            role: assignedRole,
-            department: 'CSE',
-          },
-          { onConflict: 'user_id' }
-        )
-    } catch (profileErr) {
-      console.warn('user_profiles sync warning:', profileErr)
+    await syncUserClaims(userId, {
+      role: normalizeRole(assignedRole),
+      department: assignedDepartment,
+      name: assignedName,
+    })
+
+    // Revoke outstanding sessions so an old ID token cannot keep using the
+    // account after its password was reset.
+    await auth.revokeRefreshTokens(userId).catch(() => {})
+
+    // 2. Sync to user_profiles, keyed by email. The migrated documents use email
+    //    as their id because the old `user_id` was a Supabase UUID; writing by
+    //    Firebase uid here would create a second, orphaned document per user.
+    const profileWrite = await writeDocById(COLLECTIONS.userProfiles, cleanEmail, {
+      user_id: userId,
+      email: cleanEmail,
+      full_name: assignedName,
+      role: assignedRole,
+      department: assignedDepartment,
+    })
+    if (!profileWrite.success) {
+      console.warn('user_profiles sync warning:', profileWrite.reason)
     }
 
     // 3. Log audit event
-    try {
-      await admin.from('audit_logs').insert({
-        id: `audit_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
-        timestamp: new Date().toISOString(),
-        user: cleanEmail,
-        action: 'PASSWORD_RESET',
-        resource: 'auth',
-        details: `Password reset successfully completed for ${cleanEmail}`,
-      })
-    } catch (auditErr) {
-      console.warn('Audit log write error:', auditErr)
+    const audit = await insertAuditLog({
+      id: `audit_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+      timestamp: new Date().toISOString(),
+      user: cleanEmail,
+      action: 'PASSWORD_RESET',
+      resource: 'auth',
+      details: `Password reset successfully completed for ${cleanEmail}`,
+    })
+    if (!audit.success) {
+      console.warn('Audit log write error:', audit.reason)
     }
 
     return NextResponse.json({

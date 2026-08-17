@@ -147,12 +147,13 @@ return <h1>{t('home.greeting', { name: 'John' })}</h1>
 ### Web App (`apps/web/.env.local`)
 
 ```env
-# Supabase (public)
-NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
-
-# Supabase (server-only)
-SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
+# Firebase web config (public)
+NEXT_PUBLIC_FIREBASE_API_KEY=your-api-key
+NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=your-project.firebaseapp.com
+NEXT_PUBLIC_FIREBASE_PROJECT_ID=your-project
+NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=your-project.firebasestorage.app
+NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=000000000000
+NEXT_PUBLIC_FIREBASE_APP_ID=1:000000000000:web:abcdef
 
 # App API base URL
 NEXT_PUBLIC_API_URL=http://localhost:3000/api
@@ -171,85 +172,99 @@ FIREBASE_SERVICE_ACCOUNT='{"type":"service_account",...}'
 
 See `apps/web/.env.example` for the full annotated list.
 
-## Auth & Database (Supabase)
+## Auth & Database (Firebase)
 
-- Run `supabase/schema.sql` in the Supabase SQL editor to create every table,
-  RLS policies, and the `on_auth_user_created` trigger that auto-creates a
-  `profiles` row on signup.
-- Sign in / sign up use Supabase Auth (`/sign-in`, `/sign-up`).
-- Seed demo users:
-  ```bash
-  SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... npm run seed:auth
-  ```
-  Demo logins: `admin@citchennai.net`, `hod@citchennai.net`,
-  `advisor@citchennai.net`, `student@citchennai.net` (password `CompDash@123`).
-- Gmail OAuth tokens are stored **server-side** in the `gmail_tokens` table and
-  are only touched via the service role. The client never sees or stores them.
-  The OAuth dance runs through `/api/auth/gmail` and `/api/auth/gmail/callback`.
+- **Auth** is Firebase Auth (Google + Email/Password). Enable both providers in
+  the Firebase console before first use.
+- **Database** is Cloud Firestore. Collections are created on first write — run
+  the migration below, or seed them yourself.
+- Roles are **not** stored on the client. They live in the `role_access`
+  collection, are resolved server-side, and ride in the ID token as custom
+  claims. Add a `role_access` document to grant staff access.
+- Gmail OAuth tokens are stored **server-side** in the `gmail_tokens` collection
+  and are only touched via the Admin SDK. Security rules deny all client access
+  to that collection. The Gmail OAuth dance runs through `/api/auth/gmail`.
 
-### Google Sign-In (OAuth)
+### Google Sign-In (Firebase Auth)
 
-The "Continue with Google" button on `/sign-in` and `/sign-up` uses the
-**Supabase-hosted** OAuth flow — Supabase, not this app, is Google's redirect
-target, so the only URI Google needs to know about is Supabase's:
+Sign-in runs through **Firebase Auth**, which owns the OAuth handshake with
+Google. This app registers no redirect URI of its own:
 
 ```
-browser → supabase.auth.signInWithOAuth({ provider: 'google' })
-        → accounts.google.com  (hd=citchennai.net narrows the account picker)
-        → https://<project-ref>.supabase.co/auth/v1/callback
-        → {NEXT_PUBLIC_APP_URL}/auth/callback?code=…&next=/dashboard
-        → /dashboard
+browser -> signInWithPopup(GoogleAuthProvider)   (hd=citchennai.net narrows the picker)
+        -> <project>.firebaseapp.com/__/auth/handler
+        -> back to the app with a Firebase ID token
+        -> POST /api/auth/session  (twice, see below)
+        -> /dashboard
 ```
 
-`/auth/callback` is the important half. `@supabase/ssr` uses **PKCE**, so the
-`?code=` Supabase returns is inert until it is exchanged — the route:
+`/api/auth/session` is the important half:
 
-1. Calls `exchangeCodeForSession(code)`, which writes the `sb-…-auth-token`
-   session cookies. Skipping this step is why a login can appear to succeed and
-   still bounce straight back to `/sign-in`.
+1. Verifies the ID token with the Admin SDK.
 2. **Enforces that the account ends in `@citchennai.net`** — anything else is
-   signed back out and redirected to `/sign-in` with an error. The `hd`
-   parameter is only a UX filter; this is the real gate.
-3. **Verifies the user against the database** to grant the right privileges:
-   - `role_access` (explicit allowlist `email → role/department`; `granted = false`
-     blocks the account),
-   - falling back to `profiles`, then `user_profiles`,
-   - otherwise the account defaults to the `student` role.
-4. Writes the resolved role/department into the auth user's metadata, refreshes
-   the session so the JWT claims match, and sets the `comp_dash_user` cookie —
-   so the role is correct from the very first request.
+   rejected and signed back out. The `hd` parameter is only a UX filter.
+3. **Resolves the role from Firestore**: `role_access` (keyed by lowercased
+   email; `granted: false` blocks the account) -> `profiles` -> `user_profiles`,
+   otherwise `student`.
+4. Writes role/department as **custom claims** and answers
+   `{ refreshRequired: true }`. Custom claims only appear in a token minted
+   *after* they are set, so the client force-refreshes and posts again — that
+   second token becomes the `fb_session` cookie. Without the second pass every
+   user would read as `student`.
+
+The middleware verifies that cookie in the **Edge** runtime using `jose` against
+Google's public JWKS, because the Admin SDK cannot run on Edge. Firebase ID
+tokens expire hourly and the SDK refreshes them silently, so `FirebaseAuthSync`
+mirrors every refresh back into the cookie — otherwise sessions would die
+mid-use while the tab still looked signed in.
 
 **Required setup:**
 
-- `NEXT_PUBLIC_APP_URL` must point at the app origin, no trailing slash
-  (`http://localhost:3000` locally, `https://comp-dash.onrender.com` in prod).
-- In the [Google Cloud Console](https://console.cloud.google.com/apis/credentials),
-  on the OAuth client:
-  - **Authorized JavaScript origin** → `https://comp-dash.onrender.com`
-  - **Authorized redirect URI** → `https://<project-ref>.supabase.co/auth/v1/callback`
-
-  Note this is Supabase's URL, *not* one of ours. Adding an app-hosted callback
-  here is not required and does nothing for this flow.
-- In **Supabase → Auth → Providers → Google**: enable it and paste the same
-  `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`.
-- In **Supabase → Auth → URL Configuration**:
-  - Site URL → `https://comp-dash.onrender.com`
-  - Redirect URLs → `https://comp-dash.onrender.com/auth/callback` **and**
-    `http://localhost:3000/auth/callback`
-
-  An origin missing from this allowlist is silently rewritten to the Site URL,
-  which looks like the app ignoring `redirectTo`.
-- For staff/admin access, insert rows into `role_access`, e.g.:
-  ```sql
-  insert into role_access (email, role, department, granted)
-  values ('hod@citchennai.net', 'hod', 'CSE', true);
+- Firebase console -> Authentication -> Sign-in method: enable **Google** and
+  **Email/Password**.
+- Firebase console -> Authentication -> Settings -> Authorized domains: add
+  `comp-dash.onrender.com` (`localhost` is there by default).
+- Set the `NEXT_PUBLIC_FIREBASE_*` variables (see `apps/web/.env.example`) and
+  supply admin credentials via `FIREBASE_SERVICE_ACCOUNT` or a local
+  `apps/web/service-account.json`.
+- Grant staff access by adding `role_access` documents keyed by email:
+  ```js
+  // Firestore -> role_access -> document id: "hod@citchennai.net"
+  { email: "hod@citchennai.net", role: "hod", department: "CSE", granted: true }
   ```
 
-> The older self-hosted routes (`/api/auth/google` + `/api/auth/google/callback`,
-> driven by `GOOGLE_LOGIN_REDIRECT_URI`) are no longer wired to any button. They
-> require `{NEXT_PUBLIC_APP_URL}/api/auth/google/callback` to be an authorized
-> redirect URI in Google Cloud; without it they fail with `redirect_uri_mismatch`.
+> Gmail verification (`/api/auth/gmail`) is a **separate** flow that still uses a
+> raw Google OAuth client via `GOOGLE_CLIENT_ID` / `GOOGLE_REDIRECT_URI`, and
+> still needs its redirect URI authorized in Google Cloud.
 
+### Firestore
+
+Collections mirror the old Postgres tables one-for-one, and documents keep the
+original **snake_case** field names (`competition_id`, `registered_competitions`,
+…) so the migration was a straight row->document copy:
+
+`students`, `advisors`, `competitions`, `registrations`, `winners`,
+`notifications`, `audit_logs`, `verification_requests`, `competition_dashboard`,
+`role_access`, `profiles`, `user_profiles`, `student_competitions`, `gmail_tokens`.
+
+Security rules live in [`firestore.rules`](firestore.rules) and are what replaces
+Postgres RLS. They apply only to the client SDK — server routes use the Admin
+SDK and bypass them. Deploy with `firebase deploy --only firestore:rules`.
+
+Two Firestore behaviours worth knowing, both worked around in code:
+
+- **`orderBy` silently excludes documents missing the sort field**, so a
+  nullable sort would quietly drop records. Those sorts are done in memory.
+- **No `ilike`, no joins, no SQL aggregates.** Text search and cross-collection
+  joins are done in memory after fetching. Fine at current data sizes; it will
+  not scale to tens of thousands of documents.
+
+To migrate data from an existing Supabase project:
+
+```bash
+npm run migrate:firestore -- --dry-run   # report counts, write nothing
+npm run migrate:firestore                # apply; safe to re-run
+```
 
 ### Mobile App (`apps/mobile/.env`)
 

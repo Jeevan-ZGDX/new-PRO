@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
-import { getSupabaseClient, isSupabaseEnabled } from '../supabase-manager'
+import { collection, getDocs, query as fsQuery, where } from 'firebase/firestore'
+import { getFirestoreDb, isFirestoreEnabled } from '../firestore-manager'
 import { apiClient } from '../client'
 import { ACTIVE_YEAR_LABELS, normalizeSection } from '@comp-dash/utils'
 import type { LeaderboardEntry, DepartmentLeaderboardEntry } from '@comp-dash/types'
@@ -46,38 +47,32 @@ function extractNumericPrize(prizeStr: string): number {
   return 0
 }
 
-async function fetchLeaderboardOverallFromSupabase(): Promise<LeaderboardEntry[]> {
-  const sb = getSupabaseClient()
-  if (!sb) return []
+async function fetchLeaderboardOverallFromFirestore(): Promise<LeaderboardEntry[]> {
+  const db = getFirestoreDb()
+  if (!db) return []
 
-  // Paged and scoped to the cohorts we report on. Previously this was an
-  // unbounded select, so PostgREST's 1,000-row cap silently truncated 2,200+
-  // students and every section count was partial.
-  const students: any[] = []
-  const PAGE = 1000
-  for (let offset = 0; ; offset += PAGE) {
-    const { data, error } = await sb
-      .from('students')
-      .select('id, name, email, department, section, year')
-      .in('year', ACTIVE_YEAR_LABELS as string[])
-      .order('name')
-      .range(offset, offset + PAGE - 1)
-    if (error) break
-    const batch = data ?? []
-    students.push(...batch)
-    if (batch.length < PAGE) break
-  }
+  // Scoped to the cohorts we report on. Firestore returns the whole result set,
+  // so the manual paging that PostgREST's 1,000-row cap forced is gone. `in`
+  // accepts up to 30 values, well above the cohort list.
+  const studentsSnap = await getDocs(
+    fsQuery(collection(db, 'students'), where('year', 'in', ACTIVE_YEAR_LABELS as string[]))
+  )
+  const students = studentsSnap.docs.map((d) => ({ ...(d.data() as any), id: d.id }))
+  // Ordering by name server-side would need a composite index alongside the
+  // year filter and would drop any student without a name, so sort in memory.
+  students.sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')))
 
-  const { data: winners } = await sb
-    .from('winners')
-    .select('student_name, email, competition, prize, date')
-    .order('date', { ascending: false })
+  const winnersSnap = await getDocs(collection(db, 'winners'))
+  const winners = winnersSnap.docs.map((d) => d.data() as any)
+  // winners.date is nullable and Firestore's orderBy() excludes docs missing
+  // the field, so the newest-first ordering is done here.
+  winners.sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')))
 
   if (!students.length) return []
 
   const winsByEmail = new Map<string, { count: number; totalPrize: number; recentComp: string; recentDate: string }>()
 
-  for (const w of winners || []) {
+  for (const w of winners) {
     const email = (w.email || '').toLowerCase().trim()
     if (!email) continue
     const existing = winsByEmail.get(email) || { count: 0, totalPrize: 0, recentComp: '', recentDate: '' }
@@ -118,14 +113,14 @@ async function fetchLeaderboardOverallFromSupabase(): Promise<LeaderboardEntry[]
   return entries
 }
 
-async function fetchDepartmentLeaderboardFromSupabase(dept?: string): Promise<LeaderboardEntry[]> {
-  const all = await fetchLeaderboardOverallFromSupabase()
+async function fetchDepartmentLeaderboardFromFirestore(dept?: string): Promise<LeaderboardEntry[]> {
+  const all = await fetchLeaderboardOverallFromFirestore()
   if (!dept) return all
   return all.filter((e) => e.department === dept || e.section === dept)
 }
 
-async function fetchDepartmentsFromSupabase(): Promise<DepartmentLeaderboardEntry[]> {
-  const all = await fetchLeaderboardOverallFromSupabase()
+async function fetchDepartmentsFromFirestore(): Promise<DepartmentLeaderboardEntry[]> {
+  const all = await fetchLeaderboardOverallFromFirestore()
   const deptMap = new Map<string, { totalPoints: number; totalCompetitions: number; totalWins: number; studentCount: number }>()
 
   for (const entry of all) {
@@ -150,12 +145,12 @@ async function fetchDepartmentsFromSupabase(): Promise<DepartmentLeaderboardEntr
 export function useLeaderboardOverall() {
   return useQuery({
     queryKey: ['leaderboard', 'overall'],
-    // Resolved at fetch time, not render time: Providers registers the Supabase
-    // client in an effect, so reading isSupabaseEnabled() during the first
+    // Resolved at fetch time, not render time: Providers registers the Firestore
+    // instance in an effect, so reading isFirestoreEnabled() during the first
     // render sent this down the apiClient path, which 404s because the
     // catch-all API has no /leaderboard route.
     queryFn: () => {
-      if (isSupabaseEnabled()) return fetchLeaderboardOverallFromSupabase()
+      if (isFirestoreEnabled()) return fetchLeaderboardOverallFromFirestore()
       return apiClient.get<LeaderboardEntry[]>('/leaderboard/overall')
     },
     staleTime: 2 * 60 * 1000,
@@ -166,7 +161,7 @@ export function useLeaderboardDepartment(params?: { department?: string }) {
   return useQuery({
     queryKey: ['leaderboard', 'department', params],
     queryFn: () => {
-      if (isSupabaseEnabled()) return fetchDepartmentLeaderboardFromSupabase(params?.department)
+      if (isFirestoreEnabled()) return fetchDepartmentLeaderboardFromFirestore(params?.department)
       return apiClient.get<LeaderboardEntry[]>('/leaderboard/department', params as Record<string, unknown>)
     },
     staleTime: 2 * 60 * 1000,
@@ -177,7 +172,7 @@ export function useLeaderboardDepartments() {
   return useQuery({
     queryKey: ['leaderboard', 'departments'],
     queryFn: () => {
-      if (isSupabaseEnabled()) return fetchDepartmentsFromSupabase()
+      if (isFirestoreEnabled()) return fetchDepartmentsFromFirestore()
       return apiClient.get<DepartmentLeaderboardEntry[]>('/leaderboard/departments')
     },
     staleTime: 2 * 60 * 1000,

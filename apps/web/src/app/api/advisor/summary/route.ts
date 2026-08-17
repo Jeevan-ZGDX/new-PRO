@@ -1,51 +1,72 @@
 import { apiOk, apiError } from '@/lib/api-response'
-import { createSupabaseAdminClient } from '@/lib/supabase/admin'
-import { supabase as anonClient } from '@/lib/supabase-client'
-import { getSessionUser } from '@/lib/supabase/server'
-import { fetchAllRows } from '@/lib/fetch-all-rows'
+import {
+  isFirestoreConfigured,
+  fetchAdvisors,
+  fetchCompetitionDashboard,
+  queryByField,
+} from '@/lib/firestore-data'
+import { getAdminDb } from '@/lib/firebase/admin'
+import { COLLECTIONS } from '@/lib/firebase/config'
+import { SESSION_COOKIE, verifyIdToken } from '@/lib/firebase/session'
 import { normalizeSection, storedSectionVariants, yearNumberToLabel } from '@comp-dash/utils'
 import type { AdvisorRecentRegistration, AdvisorSummaryResponse } from '@comp-dash/types'
 
 export const dynamic = 'force-dynamic'
-// `dynamic` only controls route rendering. supabase-js goes through `fetch`,
-// which Next caches separately, so without this a query's first result was
-// replayed forever and rows written later stayed invisible.
+// `dynamic` only controls route rendering. The Firestore reads below go through
+// the Admin SDK rather than `fetch`, but the route must still opt out of Next's
+// fetch cache so nothing upstream replays a stale first result.
 export const fetchCache = 'force-no-store'
 
 const DEFAULT_YEAR_NUMBER = 3
 /** How many recent registrations to return for the activity table. */
 const RECENT_LIMIT = 20
+/** Firestore caps an `in` filter at 30 values per query. */
+const IN_CHUNK = 30
+
+/**
+ * Session identity for a route handler.
+ *
+ * `@/lib/auth`'s `getSessionUser` runs against the browser Firebase SDK, so a
+ * route handler has to verify the session cookie the middleware maintains
+ * itself. Reading the raw header rather than `cookies()` keeps this working off
+ * the plain `Request` the handler receives.
+ */
+async function getSessionEmail(request: Request): Promise<string | null> {
+  const header = request.headers.get('cookie') ?? ''
+  const entry = header.split(/;\s*/).find((c) => c.startsWith(`${SESSION_COOKIE}=`))
+  if (!entry) return null
+  const token = decodeURIComponent(entry.slice(SESSION_COOKIE.length + 1))
+  const user = await verifyIdToken(token)
+  return user?.email?.trim().toLowerCase() || null
+}
 
 /**
  * Dashboard summary for the signed-in advisor, across every competition.
  *
- * Reads `student_competitions` — the table the app actually writes
+ * Reads `student_competitions` — the collection the app actually writes
  * registrations to. The older `/advisor/dashboard/stats` handler counted the
- * legacy `registrations` table, which is empty, so the dashboard rendered
+ * legacy `registrations` collection, which is empty, so the dashboard rendered
  * zeroes even when an advisor's students had registered.
  */
 export async function GET(request: Request) {
-  const sessionUser = await getSessionUser()
-  const email = sessionUser?.email?.trim().toLowerCase()
+  const email = await getSessionEmail(request)
   if (!email) return apiError('UNAUTHENTICATED', 'Not authenticated', 401)
 
-  const db = createSupabaseAdminClient() ?? anonClient
-  if (!db) return apiError('NOT_CONFIGURED', 'Supabase not configured', 500)
+  if (!isFirestoreConfigured()) {
+    return apiError('NOT_CONFIGURED', 'Firestore not configured', 500)
+  }
 
-  const advisorRes = await db
-    .from('advisors')
-    .select('id,name,email,department,assigned_sections')
-    .ilike('email', email)
-    .maybeSingle()
-  if (advisorRes.error) return apiError('DB_ERROR', advisorRes.error.message, 500)
-  if (!advisorRes.data) {
+  // Firestore has no case-insensitive predicate to replace `ilike`, so the
+  // advisors collection — a few dozen documents — is matched in memory.
+  const advisors = await fetchAdvisors()
+  const advisor = advisors.find((a) => String(a.email ?? '').trim().toLowerCase() === email)
+  if (!advisor) {
     return apiError('ADVISOR_NOT_MAPPED', 'No advisor record is mapped to this account', 404, {
-      detail: `No row in public.advisors has email ${email}.`,
+      detail: `No document in advisors has email ${email}.`,
     })
   }
-  const advisor = advisorRes.data
 
-  const assignedSections: string[] = ((advisor.assigned_sections ?? []) as string[])
+  const assignedSections: string[] = ((advisor.assignedSections ?? []) as string[])
     .map((s) => normalizeSection(s))
     .filter((s): s is string => Boolean(s))
     .sort((a, b) => a.localeCompare(b))
@@ -81,47 +102,37 @@ export async function GET(request: Request) {
     })
   }
 
-  const students = await fetchAllRows<{
-    id: string
-    name: string
-    email: string
-    section: string | null
-  }>(
-    db
-      .from('students')
-      .select('id,name,email,section')
-      .eq('year', yearScope)
-      .in('section', assignedSections.flatMap((s) => storedSectionVariants(s)))
+  // The year is the indexed filter and the section list is applied in memory:
+  // the old `.in('section', …)` has no Firestore equivalent for a list this
+  // size, and the year cohort is the smaller of the two slices anyway.
+  const sectionVariants = new Set(assignedSections.flatMap((s) => storedSectionVariants(s)))
+  const students = (await queryByField(COLLECTIONS.students, 'year', yearScope)).filter((s) =>
+    sectionVariants.has(String(s.section ?? ''))
   )
-  if (students.error) return apiError('DB_ERROR', students.error, 500)
 
   const byEmail = new Map(
-    students.rows.map((s) => [String(s.email ?? '').trim().toLowerCase(), s])
+    students.map((s) => [String(s.email ?? '').trim().toLowerCase(), s])
   )
 
   // One pass over this advisor's students' registrations, across all competitions.
   const emails = [...byEmail.keys()]
-  const registrations: Array<{
-    student_email: string | null
-    student_name: string | null
-    competition_id: string | null
-    verification_status: string | null
-    created_at: string | null
-    verified_at: string | null
-  }> = []
+  const registrations: Array<Record<string, any>> = []
 
-  // Chunked: a single .in() with 1000+ values overflows the query string.
-  const CHUNK = 200
-  for (let i = 0; i < emails.length; i += CHUNK) {
-    const slice = emails.slice(i, i + CHUNK)
-    const page = await fetchAllRows<(typeof registrations)[number]>(
-      db
-        .from('student_competitions')
-        .select('student_email, student_name, competition_id, verification_status, created_at, verified_at')
-        .in('student_email', slice)
-    )
-    if (page.error) return apiError('DB_ERROR', page.error, 500)
-    registrations.push(...page.rows)
+  // Chunked, as the Supabase version was, but at Firestore's much smaller `in`
+  // limit. Raw Admin access because the shared helpers only expose single-value
+  // equality, and one query per student would be hundreds of round trips.
+  const db = getAdminDb()
+  if (!db) return apiError('NOT_CONFIGURED', 'Firestore not configured', 500)
+  try {
+    for (let i = 0; i < emails.length; i += IN_CHUNK) {
+      const snapshot = await db
+        .collection(COLLECTIONS.studentCompetitions)
+        .where('student_email', 'in', emails.slice(i, i + IN_CHUNK))
+        .get()
+      registrations.push(...snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })))
+    }
+  } catch (err) {
+    return apiError('DB_ERROR', (err as Error).message, 500)
   }
 
   const competitionIds = new Set<string>()
@@ -146,7 +157,7 @@ export async function GET(request: Request) {
   for (const section of assignedSections) {
     sectionBuckets.set(section, { total: 0, registered: new Set(), verified: 0 })
   }
-  for (const student of students.rows) {
+  for (const student of students) {
     const bucket = sectionBuckets.get(normalizeSection(student.section))
     if (bucket) bucket.total++
   }
@@ -160,14 +171,12 @@ export async function GET(request: Request) {
     if ((reg.verification_status ?? '').toLowerCase() === 'verified') bucket.verified++
   }
 
-  // Competition names for the activity table.
+  // Competition names for the activity table. Firestore cannot join, so the
+  // dashboard collection is read once and indexed by id in memory.
   const nameById = new Map<string, string>()
   if (competitionIds.size) {
-    const comps = await fetchAllRows<{ id: string; competition_name: string | null }>(
-      db.from('competition_dashboard').select('id,competition_name').in('id', [...competitionIds])
-    )
-    if (!comps.error) {
-      for (const c of comps.rows) nameById.set(c.id, c.competition_name ?? c.id)
+    for (const c of await fetchCompetitionDashboard()) {
+      if (competitionIds.has(c.id)) nameById.set(c.id, c.competitionName ?? c.id)
     }
   }
 
@@ -188,15 +197,15 @@ export async function GET(request: Request) {
         competitionId: r.competition_id ?? '',
         competitionName: r.competition_id ? nameById.get(r.competition_id) ?? r.competition_id : '',
         status,
-        registeredAt: r.created_at,
-        verifiedAt: r.verified_at,
+        registeredAt: r.created_at ?? null,
+        verifiedAt: r.verified_at ?? null,
       }
     })
 
   return apiOk<AdvisorSummaryResponse>({
     ...base,
     totals: {
-      totalStudents: students.rows.length,
+      totalStudents: students.length,
       registeredStudents: registeredStudentEmails.size,
       verifiedRegistrations: verified,
       pendingRegistrations: pending,

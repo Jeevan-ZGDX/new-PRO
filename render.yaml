@@ -33,29 +33,38 @@ services:
       - key: NODE_VERSION
         value: 20.18.0
 
-      # Public, baked in at build time
-      - key: NEXT_PUBLIC_SUPABASE_URL
-        sync: false
-      - key: NEXT_PUBLIC_SUPABASE_ANON_KEY
-        sync: false
+      # Public, baked in at build time. NEXT_PUBLIC_* is read at BUILD time, so
+      # changing any of these requires a redeploy, not just a restart.
       - key: NEXT_PUBLIC_API_URL
         value: https://comp-dash.onrender.com/api
       - key: NEXT_PUBLIC_APP_URL
         value: https://comp-dash.onrender.com
 
-      # Google OAuth (private)
+      # Firebase web config. Public by design — access is governed by Firestore
+      # security rules and Auth, never by hiding these values.
+      - key: NEXT_PUBLIC_FIREBASE_API_KEY
+        sync: false
+      - key: NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN
+        value: compdash-bf688.firebaseapp.com
+      - key: NEXT_PUBLIC_FIREBASE_PROJECT_ID
+        value: compdash-bf688
+      - key: NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET
+        value: compdash-bf688.firebasestorage.app
+      - key: NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID
+        value: "186993725359"
+      - key: NEXT_PUBLIC_FIREBASE_APP_ID
+        sync: false
+      - key: NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID
+        value: G-BZP7HG16PE
+
+      # Google OAuth for the Gmail verification flow only. Sign-in no longer
+      # uses these — Firebase Auth performs that handshake itself.
       - key: GOOGLE_CLIENT_ID
         sync: false
       - key: GOOGLE_CLIENT_SECRET
         sync: false
       - key: GOOGLE_REDIRECT_URI
         value: https://comp-dash.onrender.com/api/auth/gmail/callback
-      - key: GOOGLE_LOGIN_REDIRECT_URI
-        value: https://comp-dash.onrender.com/api/auth/google/callback
-
-      # Supabase server-side (private)
-      - key: SUPABASE_SERVICE_ROLE_KEY
-        sync: false
 
       # Webhook secret for /api/real-time/registration (private)
       - key: REAL_TIME_API_SECRET
@@ -78,9 +87,11 @@ services:
         value: production
       - key: NODE_VERSION
         value: 20.18.0
-      - key: NEXT_PUBLIC_SUPABASE_URL
-        sync: false
-      - key: NEXT_PUBLIC_SUPABASE_ANON_KEY
-        sync: false
-      - key: SUPABASE_SERVICE_ROLE_KEY
+      - key: NEXT_PUBLIC_FIREBASE_PROJECT_ID
+        value: compdash-bf688
+      - key: NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET
+        value: compdash-bf688.firebasestorage.app
+      # The cron job writes through the Admin SDK, so this is the only
+      # credential it needs.
+      - key: FIREBASE_SERVICE_ACCOUNT
         sync: false

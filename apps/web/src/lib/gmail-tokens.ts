@@ -1,4 +1,5 @@
-import { createSupabaseAdminClient } from '@/lib/supabase/admin'
+import { getDocById, writeGmailTokenDoc, deleteDocById } from '@/lib/firestore-data'
+import { COLLECTIONS } from '@/lib/firebase/config'
 
 export interface GmailTokenRecord {
   user_id: string
@@ -9,15 +10,14 @@ export interface GmailTokenRecord {
   history_id: string | null
 }
 
+/**
+ * Keyed by user id as the document id — the old table used
+ * `onConflict: 'user_id'`, so making it the key preserves the one-row-per-user
+ * guarantee that Firestore would not otherwise enforce.
+ */
 export async function getGmailTokens(userId: string): Promise<GmailTokenRecord | null> {
-  const admin = createSupabaseAdminClient()
-  if (!admin) return null
-  const { data } = await admin
-    .from('gmail_tokens')
-    .select('*')
-    .eq('user_id', userId)
-    .maybeSingle()
-  return (data as GmailTokenRecord | null) || null
+  const doc = await getDocById(COLLECTIONS.gmailTokens, userId)
+  return (doc as GmailTokenRecord | null) || null
 }
 
 export async function storeGmailTokens(record: {
@@ -28,28 +28,21 @@ export async function storeGmailTokens(record: {
   expires_at?: string | null
   history_id?: string | null
 }) {
-  const admin = createSupabaseAdminClient()
-  if (!admin) return { success: false, reason: 'missing-config' }
-  const { error } = await admin.from('gmail_tokens').upsert(
-    {
-      user_id: record.user_id,
-      user_email: record.user_email,
-      access_token: record.access_token,
-      refresh_token: record.refresh_token || null,
-      expires_at: record.expires_at || null,
-      history_id: record.history_id || null,
-      updated_at: new Date().toISOString(),
-    },
-    { onConflict: 'user_id' }
-  )
-  return { success: !error, error }
+  const result = await writeGmailTokenDoc(record.user_id, {
+    user_id: record.user_id,
+    user_email: record.user_email,
+    access_token: record.access_token,
+    refresh_token: record.refresh_token || null,
+    expires_at: record.expires_at || null,
+    history_id: record.history_id || null,
+    updated_at: new Date().toISOString(),
+  })
+  return { success: result.success, error: result.reason }
 }
 
 export async function clearGmailTokens(userId: string) {
-  const admin = createSupabaseAdminClient()
-  if (!admin) return { success: false, reason: 'missing-config' }
-  const { error } = await admin.from('gmail_tokens').delete().eq('user_id', userId)
-  return { success: !error, error }
+  const result = await deleteDocById(COLLECTIONS.gmailTokens, userId)
+  return { success: result.success, error: result.reason }
 }
 
 export async function refreshGmailAccessToken(refreshToken: string): Promise<{ access_token: string; expires_in: number } | null> {

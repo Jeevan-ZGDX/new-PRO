@@ -85,3 +85,7 @@ schema.svg
 
 
 e2e/.auth/
+
+# Firebase Admin private keys — never commit, whatever they are named
+*firebase-adminsdk*.json
+*-adminsdk-*.json

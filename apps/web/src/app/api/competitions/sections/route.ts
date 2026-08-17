@@ -1,8 +1,7 @@
 import { apiOk, apiError } from '@/lib/api-response'
-import { createSupabaseAdminClient } from '@/lib/supabase/admin'
-import { supabase as anonClient } from '@/lib/supabase-client'
+import { getAdminDb } from '@/lib/firebase/admin'
+import { COLLECTIONS } from '@/lib/firebase/config'
 import { normalizeSection, yearNumberToLabel } from '@comp-dash/utils'
-import { fetchAllRows } from '@/lib/fetch-all-rows'
 
 export const dynamic = 'force-dynamic'
 export const fetchCache = 'force-no-store'
@@ -55,20 +54,20 @@ export async function GET(request: Request) {
 
   const targetYearLabel = yearNumberToLabel(yearNumber) // e.g. "2nd Year" or "3rd Year"
 
-  const db = createSupabaseAdminClient() ?? anonClient
-  if (!db) return apiError('NOT_CONFIGURED', 'Supabase not configured', 500)
+  const db = getAdminDb()
+  if (!db) return apiError('NOT_CONFIGURED', 'Firestore not configured', 500)
 
-  // 1. Fetch all available competitions for the dropdown filter
-  const compQuery = db
-    .from('competition_dashboard')
-    .select('id, competition_name')
-    .order('serial_no', { ascending: true })
-  
-  const compRes = await fetchAllRows(compQuery)
-  const availableCompetitions = (compRes.rows || []).map((c: any) => ({
-    id: c.id,
-    title: c.competition_name || 'Untitled Competition',
-  }))
+  // 1. Fetch all available competitions for the dropdown filter.
+  // Sorted in memory: Firestore's orderBy silently EXCLUDES documents missing
+  // the sort field, which would drop competitions with no serial_no.
+  const compSnap = await db.collection(COLLECTIONS.competitionDashboard).get()
+  const availableCompetitions = compSnap.docs
+    .map((doc) => ({ id: doc.id, ...doc.data() }) as Record<string, any>)
+    .sort((a, b) => (a.serial_no ?? 0) - (b.serial_no ?? 0))
+    .map((c) => ({
+      id: c.id,
+      title: c.competition_name || 'Untitled Competition',
+    }))
 
   let selectedCompTitle: string | undefined = undefined
   if (competitionId !== 'all') {
@@ -76,35 +75,27 @@ export async function GET(request: Request) {
     selectedCompTitle = matched?.title
   }
 
-  // 2. Fetch students belonging to the chosen academic year
-  // Support both canonical "3rd Year" / "2nd Year" and any stored variants
-  const studentQuery = db
-    .from('students')
-    .select('id, name, email, department, section, year')
-    .or(`year.ilike.%${yearNumber}%,year.eq.${targetYearLabel}`)
-
-  const studentsRes = await fetchAllRows(studentQuery)
-  if (studentsRes.error) {
-    return apiError('DB_ERROR', studentsRes.error, 500)
-  }
-
-  const students = studentsRes.rows || []
+  // 2. Fetch students belonging to the chosen academic year.
+  // Firestore has no `ilike` and no OR across fields, so the original
+  // `year.ilike.%N% OR year.eq.<label>` is applied in memory after one read.
+  // That keeps the same tolerance for stored variants ("3", "3rd Year", "III").
+  const studentSnap = await db.collection(COLLECTIONS.students).get()
+  const students = studentSnap.docs
+    .map((doc) => ({ id: doc.id, ...doc.data() }) as Record<string, any>)
+    .filter((row) => {
+      const year = String(row.year ?? '')
+      return year.includes(String(yearNumber)) || year === targetYearLabel
+    })
 
   // 3. Fetch registrations from student_competitions
-  let regQuery = db
-    .from('student_competitions')
-    .select('student_email, student_name, competition_id, competition_name, verification_status, created_at')
-  
-  if (competitionId !== 'all') {
-    regQuery = regQuery.eq('competition_id', competitionId)
-  }
+  const regCollection = db.collection(COLLECTIONS.studentCompetitions)
+  const regSnap = await (competitionId !== 'all'
+    ? regCollection.where('competition_id', '==', competitionId).get()
+    : regCollection.get())
 
-  const regRes = await fetchAllRows(regQuery)
-  if (regRes.error) {
-    return apiError('DB_ERROR', regRes.error, 500)
-  }
-
-  const registrations = regRes.rows || []
+  const registrations = regSnap.docs.map(
+    (doc) => ({ id: doc.id, ...doc.data() }) as Record<string, any>
+  )
 
   // Build a lookup map of registrations grouped by student email
   const regsByEmail = new Map<string, any[]>()

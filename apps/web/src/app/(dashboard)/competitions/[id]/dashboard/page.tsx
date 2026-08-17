@@ -3,7 +3,7 @@
 import { useParams } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import { Card, CardHeader, CardTitle, Badge, Button, StatCard } from '@comp-dash/design-system'
-import { useCompetitionDashboard, useCompetitionDashboardRealtime, useSendReminder, isSupabaseEnabled } from '@comp-dash/api'
+import { useCompetitionDashboard, useCompetitionDashboardRealtime, useSendReminder, isFirestoreEnabled } from '@comp-dash/api'
 import { Trophy, Users, UserCheck, UserX, Calendar, Building2, Send, Bell, Wifi, WifiOff } from 'lucide-react'
 
 const statusConfig: Record<string, { variant: 'warning' | 'success' | 'info' | 'danger'; label: string }> = {
@@ -18,7 +18,7 @@ export default function CompetitionDashboardPage() {
   const id = params.id as string
   const { data, isLoading } = useCompetitionDashboard(id)
   const sendReminder = useSendReminder()
-  const realtime = isSupabaseEnabled()
+  const realtime = isFirestoreEnabled()
   const [isConnected, setIsConnected] = useState(false)
 
   useCompetitionDashboardRealtime(id)
