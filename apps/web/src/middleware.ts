@@ -3,7 +3,19 @@ import type { NextRequest } from 'next/server'
 import { updateSession } from '@/lib/supabase/middleware'
 import type { UserRole } from '@/lib/auth'
 
-const PUBLIC_ROUTES = ['/', '/sign-in', '/sign-up', '/login', '/policy', '/terms']
+// `/auth/callback` must stay public: it is the route that *creates* the
+// session, so guarding it would bounce every OAuth return to /sign-in and the
+// PKCE code would never be redeemed.
+const PUBLIC_ROUTES = [
+  '/',
+  '/sign-in',
+  '/sign-up',
+  '/forgot-password',
+  '/login',
+  '/policy',
+  '/terms',
+  '/auth/callback',
+]
 
 function normalizeRole(role: unknown): UserRole {
   return role === 'advisor' || role === 'hod' || role === 'super_admin' ? role : 'student'

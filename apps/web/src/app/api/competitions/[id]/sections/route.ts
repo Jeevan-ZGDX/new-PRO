@@ -1,32 +1,27 @@
 import { apiOk, apiError } from '@/lib/api-response'
 import { createSupabaseAdminClient } from '@/lib/supabase/admin'
 import { supabase as anonClient } from '@/lib/supabase-client'
-import { activeEligibleYears, normalizeSection } from '@comp-dash/utils'
+import { activeEligibleYears, normalizeSection, yearNumberToLabel } from '@comp-dash/utils'
 import type { CompetitionSectionsResponse } from '@comp-dash/types'
 import { fetchAllRows } from '@/lib/fetch-all-rows'
 
 export const dynamic = 'force-dynamic'
-// `dynamic` only controls route rendering. supabase-js goes through `fetch`,
-// which Next caches separately, so without this a query's first result was
-// replayed forever and rows written later stayed invisible.
 export const fetchCache = 'force-no-store'
 
 /**
- * Section-wise registration breakdown for one competition.
- *
- * Registration status is joined through `student_competitions.student_email`
- * → `students.email`; `student_competitions` has no section column of its own.
+ * Section-wise registration breakdown for one competition, supporting Year filtering.
  */
 export async function GET(
-  _request: Request,
+  request: Request,
   { params }: { params: { id: string } }
 ) {
-  // Read the id from the route params. Deriving it from the pathname breaks here
-  // because the last segment is "sections", not the competition id.
   const competitionId = params.id
   if (!competitionId) {
     return apiError('BAD_REQUEST', 'Missing competition id', 400)
   }
+
+  const url = new URL(request.url)
+  const rawYear = url.searchParams.get('year') || 'all'
 
   const db = createSupabaseAdminClient() ?? anonClient
   if (!db) return apiError('NOT_CONFIGURED', 'Supabase not configured', 500)
@@ -44,29 +39,32 @@ export async function GET(
     return apiError('NOT_FOUND', 'Competition not found', 404)
   }
 
-  // eligible_year holds Roman numerals ("I, II, III, IV") plus free text
-  // ("StartUp", "Startups, MSME") — it is never a students.year label, so it has
-  // to be translated before it can filter students.
-  //
-  // Then intersect with the cohorts we actually report on. Without that, a
-  // competition open to "I, II, III, IV" pulled in both stored section
-  // conventions — bare 1st-year "A" and prefixed 3rd-year "3%A" both normalize
-  // to "A" — so every section double-counted (A showed 127 instead of 65).
-  const eligible = activeEligibleYears(compRes.data.eligible_year)
+  let targetYears: string[] = []
 
-  if (eligible.excludesAllActive) {
-    return apiOk<CompetitionSectionsResponse>({
-      competitionId,
-      eligibleYears: [],
-      sections: [],
-      notEligible: true,
-    })
+  if (rawYear === '2' || rawYear.includes('2nd') || rawYear.includes('Second')) {
+    targetYears = ['2nd Year']
+  } else if (rawYear === '3' || rawYear.includes('3rd') || rawYear.includes('Third')) {
+    targetYears = ['3rd Year']
+  } else {
+    const eligible = activeEligibleYears(compRes.data.eligible_year)
+    if (eligible.excludesAllActive) {
+      return apiOk<CompetitionSectionsResponse>({
+        competitionId,
+        eligibleYears: [],
+        sections: [],
+        notEligible: true,
+      })
+    }
+    targetYears = eligible.yearLabels.length > 0 ? eligible.yearLabels : ['2nd Year', '3rd Year']
   }
 
-  const studentQuery = db
+  let studentQuery = db
     .from('students')
     .select('id,name,email,department,section,year')
-    .in('year', eligible.yearLabels)
+
+  if (targetYears.length > 0) {
+    studentQuery = studentQuery.in('year', targetYears)
+  }
 
   // Paginated: PostgREST caps a plain select at 1000 rows and there are 2,200+ students.
   const students = await fetchAllRows(studentQuery)
@@ -119,7 +117,7 @@ export async function GET(
 
   const response: CompetitionSectionsResponse = {
     competitionId,
-    eligibleYears: eligible.yearLabels,
+    eligibleYears: targetYears,
     sections: Array.from(sectionMap.entries())
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([section, { total, registered, details }]) => ({

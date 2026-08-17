@@ -202,7 +202,7 @@ export default function VerifiedStudentsPage() {
       <div className="space-y-3">
         <div className="flex items-center gap-2">
           <button onClick={() => setShowFilterInput(!showFilterInput)}
-            className="flex items-center gap-1.5 px-3 py-2 bg-white border border-gray-200 rounded-xl text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors dark:bg-obsidian-surface dark:border-obsidian-border dark:text-ink-muted dark:hover:bg-obsidian-hover"
+            className="flex items-center gap-1.5 px-3 py-2 bg-white border border-gray-200 rounded-xl text-sm font-medium text-gray-600 hover:bg-white-50 transition-colors dark:bg-obsidian-surface dark:border-obsidian-border dark:text-ink-muted dark:hover:bg-obsidian-hover"
           >
             <Filter className="w-4 h-4" />
             Filters {filterTags.length > 0 && `(${filterTags.length})`}
@@ -263,7 +263,7 @@ export default function VerifiedStudentsPage() {
 
       {loading ? (
         <div className="space-y-3">
-          {[1, 2, 3, 4].map(i => <div key={i} className="h-28 bg-gray-100 rounded-xl animate-pulse dark:bg-obsidian-hover" />)}
+          {[1, 2, 3, 4].map(i => <div key={i} className="h-28 rounded-xl animate-pulse dark:bg-obsidian-hover" />)}
         </div>
       ) : filtered.length === 0 ? (
         <Card>
@@ -286,7 +286,7 @@ export default function VerifiedStudentsPage() {
           {filtered.map(v => (
             <div key={v.id} className="bg-white border border-gray-200 rounded-xl overflow-hidden dark:bg-obsidian-surface dark:border-obsidian-border">
               <div
-                className="p-4 cursor-pointer hover:bg-gray-50/50 transition-colors"
+                className="p-4 cursor-pointer hover:transition-colors"
                 onClick={() => setExpandedId(expandedId === v.id ? null : v.id)}
               >
                 <div className="flex items-center justify-between">
@@ -322,7 +322,7 @@ export default function VerifiedStudentsPage() {
               </div>
 
               {expandedId === v.id && v.emailProof && (
-                <div className="border-t border-gray-100 bg-gray-50/50 dark:border-obsidian-border">
+                <div className="border-t border-gray-100  dark:border-obsidian-border">
                   <div className="p-4 space-y-4">
                     <p className="text-xs font-medium text-gray-500 uppercase tracking-wider dark:text-obsidian-faint">Submitted Email Proof Metadata</p>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -356,7 +356,7 @@ export default function VerifiedStudentsPage() {
               )}
 
               {expandedId === v.id && !v.emailProof && (
-                <div className="border-t border-gray-100 bg-gray-50/50 p-4 text-center dark:border-obsidian-border">
+                <div className="border-t border-gray-100 p-4 text-center dark:border-obsidian-border">
                   <p className="text-sm text-gray-400 dark:text-obsidian-faint">No email proof metadata available</p>
                 </div>
               )}

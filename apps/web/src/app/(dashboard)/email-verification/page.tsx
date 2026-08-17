@@ -527,7 +527,7 @@ function EmailVerificationContent() {
                 </CardHeader>
                 <div className="px-4 pb-6">
                   <div className="space-y-3">
-                    {[1,2,3,4].map(i => <div key={i} className="h-14 bg-gray-100 rounded-xl animate-pulse dark:bg-obsidian-hover" />)}
+                    {[2,3].map(i => <div key={i} className="h-14 bg-gray-100 rounded-xl animate-pulse dark:bg-obsidian-hover" />)}
                   </div>
                 </div>
               </Card>

@@ -129,9 +129,17 @@ export default function SignInPage() {
           </div>
 
           <div>
-            <label htmlFor="password" className="block text-sm font-medium text-gray-700 dark:text-ink-muted mb-1.5">
-              Password
-            </label>
+            <div className="flex items-center justify-between mb-1.5">
+              <label htmlFor="password" className="block text-sm font-medium text-gray-700 dark:text-ink-muted">
+                Password
+              </label>
+              <Link
+                href="/forgot-password"
+                className="text-xs text-accent dark:text-uv font-medium hover:underline"
+              >
+                Forgot Password?
+              </Link>
+            </div>
             <div className="relative">
               <input
                 id="password"
@@ -171,9 +179,9 @@ export default function SignInPage() {
           </button>
 
           <p className="text-center text-sm text-gray-500 dark:text-obsidian-faint">
-            Don&apos;t have an account?{' '}
-            <Link href="/sign-up" className="text-accent dark:text-uv font-medium hover:underline">
-              Create one
+            Having trouble signing in?{' '}
+            <Link href="/forgot-password" className="text-accent dark:text-uv font-medium hover:underline">
+              Forgot Password
             </Link>
           </p>
         </form>

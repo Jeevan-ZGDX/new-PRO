@@ -129,7 +129,7 @@ function CreateCompetitionContent() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!form.title || !form.category || !form.scope || !form.mode || !form.organizer) return
+    if (!form.title || !form.category || !form.scope || !form.mode || !form.organizer || !form.registrationLink) return
 
     const payload = {
       ...form,
@@ -156,7 +156,7 @@ function CreateCompetitionContent() {
     } catch { /* ignore */ }
   }
 
-  const isValid = form.title && form.category && form.scope && form.mode && form.organizer
+  const isValid = form.title && form.category && form.scope && form.mode && form.organizer && form.registrationLink
   const isSaving = createMutation.isPending || updateMutation.isPending
 
   return (

@@ -2,6 +2,8 @@
 
 import { useState } from 'react'
 import { useSearchParams } from 'next/navigation'
+import { getSupabaseBrowserClient } from '@/lib/supabase/browser'
+import { OFFICIAL_COLLEGE_DOMAIN } from '@/lib/auth'
 
 export function GoogleIcon({ className = 'w-5 h-5' }: { className?: string }) {
   return (
@@ -27,34 +29,71 @@ export function GoogleIcon({ className = 'w-5 h-5' }: { className?: string }) {
 }
 
 /**
- * Redirects the browser through `/api/auth/google`, which performs the Google
- * OAuth dance, restricts sign-in to @citchennai.net and verifies the account
- * against the database before creating a session.
+ * Starts the Supabase-hosted Google OAuth flow. Supabase handles the exchange
+ * with Google and returns the browser to `/auth/callback`, which trades the
+ * PKCE code for a session, restricts sign-in to @citchennai.net and resolves
+ * the account's role from the database before forwarding to `next`.
  */
 export function GoogleSignInButton({ next }: { next?: string }) {
   const searchParams = useSearchParams()
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
 
-  const handleClick = () => {
+  const handleClick = async () => {
     const requested = next || searchParams.get('next') || '/dashboard'
+
     const target =
       requested.startsWith('/') && !requested.startsWith('//')
         ? requested
         : '/dashboard'
+
+    const supabase = getSupabaseBrowserClient()
+    if (!supabase) {
+      setError('Supabase is not configured, so Google sign in is unavailable.')
+      return
+    }
+
     setLoading(true)
-    // Hard navigation so the 302 → Google consent redirect is followed natively.
-    window.location.href = `/api/auth/google?next=${encodeURIComponent(target)}`
+    setError('')
+
+    // The origin is read from the live document rather than hardcoded, so the
+    // same build works on localhost and on the deployed host. Whatever it
+    // resolves to must be listed under Supabase → Auth → URL Configuration →
+    // Redirect URLs, otherwise Supabase silently falls back to the Site URL.
+    const { error: oauthError } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(target)}`,
+        queryParams: {
+          // Narrows Google's account picker to college accounts. This is a UX
+          // filter only — /auth/callback performs the real domain check.
+          hd: OFFICIAL_COLLEGE_DOMAIN,
+          prompt: 'select_account',
+        },
+      },
+    })
+
+    if (oauthError) {
+      console.error('Google OAuth error:', oauthError)
+      setError(oauthError.message || 'Could not start Google sign in.')
+      setLoading(false)
+    }
   }
 
   return (
-    <button
-      type="button"
-      onClick={handleClick}
-      disabled={loading}
-      className="w-full h-11 flex items-center justify-center gap-3 rounded-xl border border-gray-300 dark:border-obsidian-border bg-white dark:bg-obsidian-hover text-gray-800 dark:text-ink-primary font-medium text-sm hover:bg-gray-50 dark:hover:bg-obsidian-surface disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
-    >
-      <GoogleIcon className="w-5 h-5" />
-      {loading ? 'Redirecting to Google…' : 'Continue with Google'}
-    </button>
+    <div className="space-y-2">
+      <button
+        type="button"
+        onClick={handleClick}
+        disabled={loading}
+        className="w-full h-11 flex items-center justify-center gap-3 rounded-xl border border-gray-300 dark:border-obsidian-border bg-white dark:bg-obsidian-hover text-gray-800 dark:text-ink-primary font-medium text-sm hover:bg-gray-50 dark:hover:bg-obsidian-surface disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
+      >
+        <GoogleIcon className="w-5 h-5" />
+        {loading ? 'Redirecting to Google…' : 'Continue with Google'}
+      </button>
+      {error && (
+        <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
+      )}
+    </div>
   )
 }
