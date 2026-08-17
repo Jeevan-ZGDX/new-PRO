@@ -1,15 +1,18 @@
 import { apiOk, apiError } from '@/lib/api-response'
-import { createSupabaseAdminClient } from '@/lib/supabase/admin'
-import { supabase as anonClient } from '@/lib/supabase-client'
-import { activeEligibleYears, normalizeSection, yearNumberToLabel } from '@comp-dash/utils'
+import { getDocById, queryByField, isFirestoreConfigured } from '@/lib/firestore-data'
+import { getAdminDb } from '@/lib/firebase/admin'
+import { COLLECTIONS } from '@/lib/firebase/config'
+import { activeEligibleYears, normalizeSection } from '@comp-dash/utils'
 import type { CompetitionSectionsResponse } from '@comp-dash/types'
-import { fetchAllRows } from '@/lib/fetch-all-rows'
 
 export const dynamic = 'force-dynamic'
 export const fetchCache = 'force-no-store'
 
 /**
  * Section-wise registration breakdown for one competition, supporting Year filtering.
+ *
+ * Registration status is joined through `student_competitions.student_email`
+ * → `students.email`; `student_competitions` has no section column of its own.
  */
 export async function GET(
   request: Request,
@@ -23,22 +26,17 @@ export async function GET(
   const url = new URL(request.url)
   const rawYear = url.searchParams.get('year') || 'all'
 
-  const db = createSupabaseAdminClient() ?? anonClient
-  if (!db) return apiError('NOT_CONFIGURED', 'Supabase not configured', 500)
-
-  const compRes = await db
-    .from('competition_dashboard')
-    .select('id, competition_name, eligible_year')
-    .eq('id', competitionId)
-    .maybeSingle()
-
-  if (compRes.error) {
-    return apiError('DB_ERROR', compRes.error.message, 500)
+  if (!isFirestoreConfigured()) {
+    return apiError('NOT_CONFIGURED', 'Firestore not configured', 500)
   }
-  if (!compRes.data) {
+
+  const competition = await getDocById(COLLECTIONS.competitionDashboard, competitionId)
+  if (!competition) {
     return apiError('NOT_FOUND', 'Competition not found', 404)
   }
 
+  // An explicit ?year= overrides the competition's own eligibility; "all" falls
+  // back to whatever the competition declares.
   let targetYears: string[] = []
 
   if (rawYear === '2' || rawYear.includes('2nd') || rawYear.includes('Second')) {
@@ -46,7 +44,16 @@ export async function GET(
   } else if (rawYear === '3' || rawYear.includes('3rd') || rawYear.includes('Third')) {
     targetYears = ['3rd Year']
   } else {
-    const eligible = activeEligibleYears(compRes.data.eligible_year)
+    // eligible_year holds Roman numerals ("I, II, III, IV") plus free text
+    // ("StartUp", "Startups, MSME") — it is never a students.year label, so it
+    // has to be translated before it can filter students.
+    //
+    // Then intersect with the cohorts we actually report on. Without that, a
+    // competition open to "I, II, III, IV" pulled in both stored section
+    // conventions — bare 1st-year "A" and prefixed 3rd-year "3%A" both normalize
+    // to "A" — so every section double-counted (A showed 127 instead of 65).
+    const eligible = activeEligibleYears(competition.eligible_year)
+
     if (eligible.excludesAllActive) {
       return apiOk<CompetitionSectionsResponse>({
         competitionId,
@@ -55,35 +62,32 @@ export async function GET(
         notEligible: true,
       })
     }
-    targetYears = eligible.yearLabels.length > 0 ? eligible.yearLabels : ['2nd Year', '3rd Year']
+
+    targetYears =
+      eligible.yearLabels.length > 0 ? eligible.yearLabels : ['2nd Year', '3rd Year']
   }
 
-  let studentQuery = db
-    .from('students')
-    .select('id,name,email,department,section,year')
+  const db = getAdminDb()
+  if (!db) return apiError('NOT_CONFIGURED', 'Firestore not configured', 500)
 
-  if (targetYears.length > 0) {
-    studentQuery = studentQuery.in('year', targetYears)
-  }
+  // `in` caps at 30 values and would need an index; the year set is tiny, so
+  // filtering after a single read is both simpler and cheaper here. No paging
+  // is needed either — the Admin SDK streams the whole collection, unlike
+  // PostgREST's 1,000-row cap.
+  const yearSet = new Set(targetYears)
+  const studentSnap = await db.collection(COLLECTIONS.students).get()
+  const studentRows = studentSnap.docs
+    .map((doc) => ({ id: doc.id, ...doc.data() }) as Record<string, any>)
+    .filter((row) => yearSet.has(row.year))
 
-  // Paginated: PostgREST caps a plain select at 1000 rows and there are 2,200+ students.
-  const students = await fetchAllRows(studentQuery)
-  if (students.error) {
-    return apiError('DB_ERROR', students.error, 500)
-  }
-
-  const registrations = await fetchAllRows(
-    db
-      .from('student_competitions')
-      .select('student_email, verification_status')
-      .eq('competition_id', competitionId)
+  const registrationRows = await queryByField(
+    COLLECTIONS.studentCompetitions,
+    'competition_id',
+    competitionId
   )
-  if (registrations.error) {
-    return apiError('DB_ERROR', registrations.error, 500)
-  }
 
   const statusByEmail = new Map<string, string>()
-  for (const reg of registrations.rows) {
+  for (const reg of registrationRows) {
     const email = String(reg.student_email ?? '').trim().toLowerCase()
     if (email) statusByEmail.set(email, reg.verification_status ?? 'pending')
   }
@@ -93,7 +97,7 @@ export async function GET(
     { total: number; registered: number; details: CompetitionSectionsResponse['sections'][number]['registered'] }
   >()
 
-  for (const student of students.rows) {
+  for (const student of studentRows) {
     const section = normalizeSection(student.section) || 'Unassigned'
     let entry = sectionMap.get(section)
     if (!entry) {

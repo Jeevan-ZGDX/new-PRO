@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { useTranslation } from 'react-i18next'
 import { Card, Badge, Button } from '@comp-dash/design-system'
-import { useCompetitions, isSupabaseEnabled } from '@comp-dash/api'
+import { useCompetitions, isFirestoreEnabled } from '@comp-dash/api'
 import { getCurrentUser } from '@/lib/auth'
 import { HodYearSectionBreakdown } from '@/components/dashboard/HodYearSectionBreakdown'
 import {
@@ -59,7 +59,7 @@ export default function CompetitionsPage() {
     setUser(getCurrentUser())
   }, [])
 
-  const realtime = isSupabaseEnabled()
+  const realtime = isFirestoreEnabled()
 
   const { data, isLoading } = useCompetitions({
     category: selectedCategory === 'all' ? undefined : (selectedCategory as CompetitionCategory),

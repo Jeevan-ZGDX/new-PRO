@@ -1,5 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { supabase } from '@/lib/supabase-client'
+import {
+  queryByField,
+  createDoc,
+  updateDocById,
+  getDocById,
+  isFirestoreConfigured,
+} from '@/lib/firestore-data'
+import { COLLECTIONS } from '@/lib/firebase/config'
 
 export async function POST(request: NextRequest) {
   try {
@@ -9,24 +16,21 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: 'Missing required fields' }, { status: 400 })
     }
 
-    if (!supabase) {
+    if (!isFirestoreConfigured()) {
       return NextResponse.json({ success: false, error: 'Database connection failed' }, { status: 500 })
     }
 
-    const { data: existingRegistration } = await supabase
-      .from('student_competitions')
-      .select('*')
-      .eq('student_email', email)
-      .eq('competition_id', competitionId)
-      .single()
+    // Firestore has no compound uniqueness constraint, so the duplicate check
+    // filters the narrower email match down by competition in memory rather than
+    // needing a composite index for the two-field equality.
+    const byEmail = await queryByField(COLLECTIONS.studentCompetitions, 'student_email', email)
+    const existingRegistration = byEmail.find((row) => row.competition_id === competitionId)
 
     if (existingRegistration) {
       return NextResponse.json({ success: false, error: 'Already registered' }, { status: 409 })
     }
 
-    const { data: newRegistration, error: insertError } = await supabase
-      .from('student_competitions')
-      .insert({
+    const newRegistration = await createDoc(COLLECTIONS.studentCompetitions, {
         student_id: userId,
         student_email: email,
         student_name: email.split('@')[0],
@@ -38,12 +42,10 @@ export async function POST(request: NextRequest) {
         verified_at: verificationCode && verificationCode.trim() !== '' ? new Date().toISOString() : null,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
-      })
-      .select()
-      .single()
+    })
 
-    if (insertError) {
-      console.error('Registration insertion error:', insertError)
+    if (!newRegistration) {
+      console.error('Registration insertion failed for', email, competitionId)
       return NextResponse.json({ success: false, error: 'Failed to create registration' }, { status: 500 })
     }
 
@@ -62,7 +64,7 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ success: false, error: 'Registration ID required' }, { status: 400 })
     }
 
-    if (!supabase) {
+    if (!isFirestoreConfigured()) {
       return NextResponse.json({ success: false, error: 'Database connection failed' }, { status: 500 })
     }
 
@@ -86,16 +88,21 @@ export async function PATCH(request: NextRequest) {
       updateData.verification_status = 'rejected'
     }
 
-    const { data: updatedRegistration, error: updateError } = await supabase
-      .from('student_competitions')
-      .update(updateData)
-      .eq('id', registrationId)
-      .select()
-      .single()
+    const result = await updateDocById(
+      COLLECTIONS.studentCompetitions,
+      registrationId,
+      updateData
+    )
 
-    if (updateError) {
+    if (!result.success) {
       return NextResponse.json({ success: false, error: 'Failed to update registration' }, { status: 500 })
     }
+
+    // Firestore updates return nothing, but the client expects the saved row.
+    const updatedRegistration = await getDocById(
+      COLLECTIONS.studentCompetitions,
+      registrationId
+    )
 
     return NextResponse.json({ success: true, registration: updatedRegistration })
   } catch (error) {

@@ -4,7 +4,8 @@ import { useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { Eye, EyeOff, CheckCircle } from 'lucide-react'
-import { getSupabaseBrowserClient, isSupabaseAuthConfigured } from '@/lib/supabase/browser'
+import { getFirebaseAuth, isFirebaseConfigured } from '@/lib/firebase/client'
+import { establishSession, abandonSession } from '@/lib/firebase/establish-session'
 import { isAllowedEmail } from '@/lib/auth'
 import { GoogleSignInButton } from '@/components/common/GoogleSignInButton'
 import { ThemeToggle } from '@/components/common/ThemeToggle'
@@ -20,7 +21,7 @@ export default function SignUpPage() {
   const [loading, setLoading] = useState(false)
   const [checkEmail, setCheckEmail] = useState(false)
 
-  const configured = isSupabaseAuthConfigured()
+  const configured = isFirebaseConfigured()
 
   const oauthError = searchParams.get('error')
   const oauthMessage = searchParams.get('message')
@@ -41,31 +42,52 @@ export default function SignUpPage() {
     }
 
     if (isCollegeEmail) {
-      const supabase = getSupabaseBrowserClient()
-      if (!supabase) {
-        setError('Supabase is not configured. Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY, then restart the app.')
+      const auth = getFirebaseAuth()
+      if (!auth) {
+        setError('Firebase is not configured. Set the NEXT_PUBLIC_FIREBASE_* variables, then restart the app.')
         setLoading(false)
         return
       }
 
-      const { error: authError } = await supabase.auth.signUp({
-        email: email.trim().toLowerCase(),
-        password,
-        options: {
-          data: {
-            name: name.trim() || email.split('@')[0],
-            role: 'student',
-            department: '',
-          },
-        },
-      })
-      setLoading(false)
+      try {
+        const { createUserWithEmailAndPassword, updateProfile, sendEmailVerification } =
+          await import('firebase/auth')
+        const credential = await createUserWithEmailAndPassword(
+          auth,
+          email.trim().toLowerCase(),
+          password
+        )
 
-      if (authError) {
-        setError(authError.message || 'Failed to create account')
+        await updateProfile(credential.user, {
+          displayName: name.trim() || email.split('@')[0],
+        })
+
+        // Role and department are deliberately not set here — they are resolved
+        // server-side from role_access and written as custom claims, so a client
+        // cannot mint itself a privileged account at sign-up.
+        await sendEmailVerification(credential.user).catch(() => {})
+
+        const result = await establishSession(credential.user)
+        if (!result.ok) {
+          await abandonSession()
+          setError(result.error || 'Account created, but sign in was rejected.')
+          setLoading(false)
+          return
+        }
+      } catch (err) {
+        const code = (err as { code?: string }).code
+        setError(
+          code === 'auth/email-already-in-use'
+            ? 'An account with that email already exists.'
+            : code === 'auth/weak-password'
+              ? 'Password should be at least 6 characters.'
+              : (err as Error).message || 'Failed to create account'
+        )
+        setLoading(false)
         return
       }
 
+      setLoading(false)
       setCheckEmail(true)
       return
     }
@@ -144,7 +166,7 @@ export default function SignUpPage() {
 
           {!configured && (
             <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-700 text-sm">
-              Supabase Auth is not configured. Add NEXT_PUBLIC_SUPABASE_URL and
+              Firebase Auth is not configured. Add NEXT_PUBLIC_FIREBASE_API_KEY and
               NEXT_PUBLIC_SUPABASE_ANON_KEY to your environment to enable sign up.
             </div>
           )}

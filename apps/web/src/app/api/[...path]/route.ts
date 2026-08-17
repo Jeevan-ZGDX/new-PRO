@@ -9,12 +9,12 @@ import {
   pushCompetition, syncRegistration, syncVerificationRequests, syncNotifications,
 } from '@/lib/firebase-data'
 import { getAllRoleAccessData, setUserAccess, checkUserAccess } from '@/lib/firestore-service'
-import { supabase, isSupabaseConfigured } from '@/lib/supabase-client'
-import { createSupabaseServerClient } from '@/lib/supabase/server'
+import { isFirestoreConfigured, getDocById } from '@/lib/firestore-data'
+import { COLLECTIONS } from '@/lib/firebase/config'
 import { storeGmailTokens, getValidAccessToken as getValidGmailAccessToken, getGmailTokens, clearGmailTokens } from '@/lib/gmail-tokens'
 import type { UserRole } from '@/lib/auth'
 import { normalizeSection, sectionMatches } from '@comp-dash/utils'
-import { getSessionUser } from '@/lib/supabase/server'
+import { getSessionUser } from '@/lib/firebase/server-session'
 
 // ─── Types & Helper Functions ───────────────────────────────────────
 type RouteHandler = (req: NextRequest, segments: string[]) => Promise<NextResponse>
@@ -223,17 +223,10 @@ async function handle(request: NextRequest, pathSegments: string[]) {
 const profileMemory: Record<string, any> = {}
 
 async function getAuthenticatedEmail(req: NextRequest): Promise<string | null> {
-  if (process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
-    try {
-      const supabaseServer = createSupabaseServerClient()
-      const {
-        data: { user },
-      } = await supabaseServer.auth.getUser()
-      if (user?.email) return user.email
-    } catch {
-      // fall through to bearer-token fallback
-    }
-  }
+  // The verified session cookie is authoritative; the bearer path below is a
+  // legacy fallback for callers that never carried one.
+  const sessionUser = await getSessionUser()
+  if (sessionUser?.email) return sessionUser.email
 
   const auth = req.headers.get('authorization') || ''
   const token = auth.replace('Bearer ', '')
@@ -255,24 +248,17 @@ async function getProfileByEmail(email: string): Promise<any> {
   const cached = profileMemory[email]
   if (cached) return { ...base, ...cached }
 
-  if (isSupabaseConfigured() && supabase) {
-    try {
-      const { data } = await supabase
-        .from('role_access')
-        .select('role, department, name, granted')
-        .eq('email', email.toLowerCase())
-        .maybeSingle()
-      if (data?.role) {
-        return {
-          ...base,
-          name: data.name || base.name,
-          role: data.role,
-          department: data.department || '',
-          granted: data.granted !== false,
-        }
+  if (isFirestoreConfigured()) {
+    // role_access documents are keyed by lowercased email, so this is a point read.
+    const data = await getDocById(COLLECTIONS.roleAccess, email.toLowerCase())
+    if (data?.role) {
+      return {
+        ...base,
+        name: data.name || base.name,
+        role: data.role,
+        department: data.department || '',
+        granted: data.granted !== false,
       }
-    } catch {
-      // ignore lookup errors; fall back to the student default
     }
   }
 

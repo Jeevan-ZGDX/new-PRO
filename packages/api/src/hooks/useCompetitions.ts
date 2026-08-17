@@ -1,6 +1,18 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import {
+  collection,
+  doc,
+  getDoc,
+  getDocs,
+  limit,
+  orderBy,
+  query as fsQuery,
+  where,
+  type DocumentSnapshot,
+  type QueryConstraint,
+} from 'firebase/firestore'
 import { apiClient } from '../client'
-import { getSupabaseClient, isSupabaseEnabled } from '../supabase-manager'
+import { getFirestoreDb, isFirestoreEnabled } from '../firestore-manager'
 import type {
   Competition,
   CompetitionDetail,
@@ -8,58 +20,80 @@ import type {
   CompetitionFilters,
 } from '@comp-dash/types'
 
-const DASHBOARD_TABLE = 'competition_dashboard'
+const DASHBOARD_COLLECTION = 'competition_dashboard'
 
 function isCompetitionActive(comp: Competition): boolean {
   if (!comp.registrationDeadline) return true
   return new Date(comp.registrationDeadline) > new Date()
 }
 
-async function fetchFromSupabase<T>(table: string, filters?: Record<string, unknown>): Promise<T> {
-  const sb = getSupabaseClient()
-  if (!sb) throw new Error('Supabase client not configured')
+/** Documents keep the snake_case column names; the doc id is the row id. */
+function toRow(snapshot: DocumentSnapshot): any {
+  return { ...snapshot.data(), id: snapshot.id }
+}
 
-  let query = sb.from(DASHBOARD_TABLE).select('*', { count: 'exact' })
+function matchesSearch(row: any, needle: string): boolean {
+  return (
+    String(row.competition_name || '').toLowerCase().includes(needle) ||
+    String(row.organizer || '').toLowerCase().includes(needle)
+  )
+}
 
+/** ASC on a nullable column puts NULLs last in Postgres; mirror that. */
+function nullsLast(value: unknown): number {
+  return typeof value === 'number' ? value : Number.MAX_SAFE_INTEGER
+}
+
+async function fetchFromFirestore<T>(collectionName: string, filters?: Record<string, unknown>): Promise<T> {
+  const db = getFirestoreDb()
+  if (!db) throw new Error('Firestore not configured')
+
+  const constraints: QueryConstraint[] = []
   if (filters?.category && filters.category !== 'all') {
-    query = query.eq('category', filters.category)
+    constraints.push(where('category', '==', filters.category))
   }
+
+  // Only the category filter is pushed to Firestore. Search has no server-side
+  // equivalent (no ilike, no OR across fields), orderBy('serial_no') would drop
+  // any doc missing that field, and the total row count has to be taken after
+  // the in-memory search filter anyway — so the rest happens below.
+  const snap = await getDocs(fsQuery(collection(db, DASHBOARD_COLLECTION), ...constraints))
+  let rows = snap.docs.map(toRow)
+
   if (filters?.search) {
-    const s = String(filters.search)
-    query = query.or(`competition_name.ilike.%${s}%,organizer.ilike.%${s}%`)
+    const needle = String(filters.search).toLowerCase()
+    rows = rows.filter((r) => matchesSearch(r, needle))
   }
 
-  query = query.order('serial_no', { ascending: true })
+  rows.sort((a, b) => nullsLast(a.serial_no) - nullsLast(b.serial_no))
 
-  if (filters?.limit) {
-    query = query.limit(Number(filters.limit))
-  }
+  const total = rows.length
+  const pageSize = Number(filters?.limit) || 10
+
   if (filters?.page) {
-    const page = Number(filters.page)
-    const limit = Number(filters.limit) || 10
-    const from = (page - 1) * limit
-    const to = from + limit - 1
-    query = query.range(from, to)
+    const from = (Number(filters.page) - 1) * pageSize
+    rows = rows.slice(from, from + pageSize)
+  } else if (filters?.limit) {
+    rows = rows.slice(0, Number(filters.limit))
   }
 
-  const { data, error, count } = await query
-  if (error) throw new Error(error.message)
-
-  let mapped = (data || []).map(mapDashboardRow)
+  const mapped = rows.map(mapDashboardRow)
+  // Open registrations first. The serial_no order survives inside each group
+  // because Array#sort is stable.
   mapped.sort((a: Competition, b: Competition) => {
     const aOpen = isCompetitionActive(a)
     const bOpen = isCompetitionActive(b)
     if (aOpen && !bOpen) return -1
     if (!aOpen && bOpen) return 1
-    return (a as any).serial_no - (b as any).serial_no
+    return 0
   })
 
   return {
     data: mapped,
-    total: count || data?.length || 0,
+    total,
     page: Number(filters?.page) || 1,
     limit: Number(filters?.limit) || 10,
-    totalPages: Math.ceil((count || data?.length || 0) / (Number(filters?.limit) || 10)),
+    totalPages: Math.ceil(total / pageSize),
   } as T
 }
 
@@ -93,13 +127,13 @@ function mapDashboardRow(row: any): Competition {
 }
 
 export function useCompetitions(filters?: CompetitionFilters) {
-  const useSupabase = isSupabaseEnabled()
+  const useFirestore = isFirestoreEnabled()
 
   return useQuery({
-    queryKey: useSupabase ? ['supabase-competitions', filters] : ['competitions', filters],
+    queryKey: useFirestore ? ['supabase-competitions', filters] : ['competitions', filters],
     queryFn: () => {
-      if (useSupabase) {
-        return fetchFromSupabase<CompetitionListResponse>('competitions', filters as Record<string, unknown>)
+      if (useFirestore) {
+        return fetchFromFirestore<CompetitionListResponse>('competitions', filters as Record<string, unknown>)
       }
       return apiClient.get<CompetitionListResponse>('/competitions', filters as Record<string, unknown>)
     },
@@ -108,17 +142,17 @@ export function useCompetitions(filters?: CompetitionFilters) {
 }
 
 export function useCompetition(id: string) {
-  const useSupabase = isSupabaseEnabled()
+  const useFirestore = isFirestoreEnabled()
 
   return useQuery({
-    queryKey: useSupabase ? ['supabase-competitions', id] : ['competitions', id],
+    queryKey: useFirestore ? ['supabase-competitions', id] : ['competitions', id],
     queryFn: async () => {
-      if (useSupabase) {
-        const sb = getSupabaseClient()
-        if (!sb) throw new Error('Supabase client not configured')
-        const { data, error } = await sb.from(DASHBOARD_TABLE).select('*').eq('id', id).single()
-        if (error) throw new Error(error.message)
-        const base = mapDashboardRow(data)
+      if (useFirestore) {
+        const db = getFirestoreDb()
+        if (!db) throw new Error('Firestore not configured')
+        const snap = await getDoc(doc(db, DASHBOARD_COLLECTION, id))
+        if (!snap.exists()) throw new Error('Competition not found')
+        const base = mapDashboardRow(toRow(snap))
         return {
           ...base,
           instructions: '',
@@ -136,22 +170,28 @@ export function useCompetition(id: string) {
 }
 
 export function useUpcomingDeadlines() {
-  const useSupabase = isSupabaseEnabled()
+  const useFirestore = isFirestoreEnabled()
 
   return useQuery({
-    queryKey: useSupabase ? ['supabase-competitions', 'upcoming'] : ['competitions', 'upcoming'],
+    queryKey: useFirestore ? ['supabase-competitions', 'upcoming'] : ['competitions', 'upcoming'],
     queryFn: async () => {
-      if (useSupabase) {
-        const sb = getSupabaseClient()
-        if (!sb) return []
+      if (useFirestore) {
+        const db = getFirestoreDb()
+        if (!db) return []
         const now = new Date().toISOString().split('T')[0]
-        const { data } = await sb
-          .from(DASHBOARD_TABLE)
-          .select('*')
-          .gte('reg_deadline', now)
-          .order('reg_deadline', { ascending: true })
-          .limit(5)
-        return (data || []).map(mapDashboardRow)
+        // reg_deadline is stored as a 'YYYY-MM-DD' string, so the range filter
+        // compares lexicographically the way the SQL date did. Docs with a null
+        // or missing deadline are excluded by the inequality itself, which is
+        // also what gte() did — so the required orderBy drops nothing extra.
+        const snap = await getDocs(
+          fsQuery(
+            collection(db, DASHBOARD_COLLECTION),
+            where('reg_deadline', '>=', now),
+            orderBy('reg_deadline', 'asc'),
+            limit(5)
+          )
+        )
+        return snap.docs.map(toRow).map(mapDashboardRow)
       }
       return apiClient.get<Competition[]>('/competitions/upcoming')
     },
@@ -160,20 +200,20 @@ export function useUpcomingDeadlines() {
 }
 
 export function useTrendingCompetitions() {
-  const useSupabase = isSupabaseEnabled()
+  const useFirestore = isFirestoreEnabled()
 
   return useQuery({
-    queryKey: useSupabase ? ['supabase-competitions', 'trending'] : ['competitions', 'trending'],
+    queryKey: useFirestore ? ['supabase-competitions', 'trending'] : ['competitions', 'trending'],
     queryFn: async () => {
-      if (useSupabase) {
-        const sb = getSupabaseClient()
-        if (!sb) return []
-        const { data } = await sb
-          .from(DASHBOARD_TABLE)
-          .select('*')
-          .order('remaining_days_for_reg', { ascending: true })
-          .limit(4)
-        return (data || []).map(mapDashboardRow)
+      if (useFirestore) {
+        const db = getFirestoreDb()
+        if (!db) return []
+        // remaining_days_for_reg is nullable and Firestore's orderBy() silently
+        // excludes docs that lack the field, so rank in memory instead.
+        const snap = await getDocs(collection(db, DASHBOARD_COLLECTION))
+        const rows = snap.docs.map(toRow)
+        rows.sort((a, b) => nullsLast(a.remaining_days_for_reg) - nullsLast(b.remaining_days_for_reg))
+        return rows.slice(0, 4).map(mapDashboardRow)
       }
       return apiClient.get<Competition[]>('/competitions/trending')
     },
@@ -182,20 +222,23 @@ export function useTrendingCompetitions() {
 }
 
 export function useSearchCompetitions(query: string) {
-  const useSupabase = isSupabaseEnabled()
+  const useFirestore = isFirestoreEnabled()
 
   return useQuery({
-    queryKey: useSupabase ? ['supabase-competitions', 'search', query] : ['competitions', 'search', query],
+    queryKey: useFirestore ? ['supabase-competitions', 'search', query] : ['competitions', 'search', query],
     queryFn: async () => {
-      if (useSupabase) {
-        const sb = getSupabaseClient()
-        if (!sb || query.length < 2) return []
-        const { data } = await sb
-          .from(DASHBOARD_TABLE)
-          .select('*')
-          .or(`competition_name.ilike.%${query}%,organizer.ilike.%${query}%`)
-          .limit(20)
-        return (data || []).map(mapDashboardRow)
+      if (useFirestore) {
+        const db = getFirestoreDb()
+        if (!db || query.length < 2) return []
+        // Firestore has no case-insensitive substring match and no OR across
+        // two fields, so the ilike pair is done client-side.
+        const needle = query.toLowerCase()
+        const snap = await getDocs(collection(db, DASHBOARD_COLLECTION))
+        return snap.docs
+          .map(toRow)
+          .filter((r) => matchesSearch(r, needle))
+          .slice(0, 20)
+          .map(mapDashboardRow)
       }
       return apiClient.get<Competition[]>('/competitions/search', { q: query })
     },

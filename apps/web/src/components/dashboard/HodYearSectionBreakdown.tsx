@@ -318,7 +318,7 @@ export function HodYearSectionBreakdown() {
                       <h3 className="text-base font-bold text-gray-900 dark:text-ink-primary">
                         Section {activeSection.section} Roster
                       </h3>
-                      <Badge variant="secondary" size="sm">
+                      <Badge variant="default" size="sm">
                         {data.yearLabel}
                       </Badge>
                     </div>

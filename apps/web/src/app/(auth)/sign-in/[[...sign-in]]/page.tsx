@@ -4,7 +4,8 @@ import { useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { Eye, EyeOff } from 'lucide-react'
-import { getSupabaseBrowserClient, isSupabaseAuthConfigured } from '@/lib/supabase/browser'
+import { getFirebaseAuth, isFirebaseConfigured } from '@/lib/firebase/client'
+import { establishSession, abandonSession } from '@/lib/firebase/establish-session'
 import { GoogleSignInButton } from '@/components/common/GoogleSignInButton'
 import { ThemeToggle } from '@/components/common/ThemeToggle'
 
@@ -17,7 +18,7 @@ export default function SignInPage() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
-  const configured = isSupabaseAuthConfigured()
+  const configured = isFirebaseConfigured()
 
   const oauthError = searchParams.get('error')
   const oauthMessage = searchParams.get('message')
@@ -35,24 +36,40 @@ export default function SignInPage() {
       return
     }
 
-    const supabase = getSupabaseBrowserClient()
-    if (!supabase) {
-      setError('Supabase is not configured. Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY, then restart the app.')
+    const auth = getFirebaseAuth()
+    if (!auth) {
+      setError('Firebase is not configured. Set the NEXT_PUBLIC_FIREBASE_* variables, then restart the app.')
       setLoading(false)
       return
     }
 
-    const { error: authError } = await supabase.auth.signInWithPassword({
-      email: cleanEmail,
-      password,
-    })
-    setLoading(false)
+    try {
+      const { signInWithEmailAndPassword } = await import('firebase/auth')
+      const credential = await signInWithEmailAndPassword(auth, cleanEmail, password)
 
-    if (authError) {
-      setError(authError.message || 'Invalid email or password')
+      // Firebase authenticated the account; the server still has to approve it
+      // (college domain + role_access) before any session cookie is issued.
+      const result = await establishSession(credential.user)
+      if (!result.ok) {
+        await abandonSession()
+        setError(result.error || 'Sign in was rejected.')
+        setLoading(false)
+        return
+      }
+    } catch (err) {
+      const code = (err as { code?: string }).code
+      setError(
+        code === 'auth/invalid-credential' ||
+          code === 'auth/wrong-password' ||
+          code === 'auth/user-not-found'
+          ? 'Invalid email or password'
+          : (err as Error).message || 'Could not sign in'
+      )
+      setLoading(false)
       return
     }
 
+    setLoading(false)
     const next = searchParams.get('next') || '/dashboard'
     router.push(next)
     router.refresh()
@@ -109,7 +126,7 @@ export default function SignInPage() {
 
           {!configured && (
             <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-700 text-sm">
-              Supabase Auth is not configured. Add NEXT_PUBLIC_SUPABASE_URL and
+              Firebase Auth is not configured. Add NEXT_PUBLIC_FIREBASE_API_KEY and
               NEXT_PUBLIC_SUPABASE_ANON_KEY to your environment to enable sign in.
             </div>
           )}

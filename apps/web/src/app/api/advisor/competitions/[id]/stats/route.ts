@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { supabase } from '@/lib/supabase-client'
+import { isFirestoreConfigured, getDocById, queryByField } from '@/lib/firestore-data'
+import { COLLECTIONS } from '@/lib/firebase/config'
 
 export async function GET(
   _request: NextRequest,
@@ -9,23 +10,19 @@ export async function GET(
   if (!competitionId) {
     return NextResponse.json({ error: 'Missing competition id' }, { status: 400 })
   }
-  if (!supabase) {
-    return NextResponse.json({ error: 'Supabase not configured' }, { status: 500 })
+  if (!isFirestoreConfigured()) {
+    return NextResponse.json({ error: 'Firestore not configured' }, { status: 500 })
   }
 
   // Fetch competition to get eligible_year
-  const { data: competition, error: compError } = await supabase
-    .from('competition_dashboard')
-    .select('eligible_year')
-    .eq('id', competitionId)
-    .single()
+  const competition = await getDocById(COLLECTIONS.competitionDashboard, competitionId)
 
-  if (compError || !competition) {
+  if (!competition) {
     return NextResponse.json({ error: 'Competition not found' }, { status: 404 })
   }
 
-  const eligibleYears = competition.eligible_year
-    ? competition.eligible_year.split(',').map(y => y.trim()).filter(Boolean)
+  const eligibleYears: string[] = competition.eligible_year
+    ? String(competition.eligible_year).split(',').map((y) => y.trim()).filter(Boolean)
     : []
 
   if (eligibleYears.length === 0) {
@@ -38,37 +35,32 @@ export async function GET(
     })
   }
 
-  // Total eligible students
-  const { data: students, error: studentsError } = await supabase
-    .from('students')
-    .select('id, name, email, department, section, year')
-    .in('year', eligibleYears)
-
-  if (studentsError) {
-    console.error('Supabase fetch students error:', studentsError)
-    return NextResponse.json({ error: 'Failed to fetch students' }, { status: 500 })
+  // Total eligible students. Firestore has no `in` on an unbounded list, so the
+  // year filter runs as one query per eligible year, de-duplicated by id.
+  const byId = new Map<string, Record<string, any>>()
+  for (const year of eligibleYears) {
+    for (const student of await queryByField(COLLECTIONS.students, 'year', year)) {
+      byId.set(student.id, student)
+    }
   }
+  const students = [...byId.values()]
 
-  const totalStudents = students?.length || 0
+  const totalStudents = students.length
 
   // Registrations for this competition
-  const { data: registrations, error: regError } = await supabase
-    .from('student_competitions')
-    .select('student_email, section')
-    .eq('competition_id', competitionId)
+  const registrations = await queryByField(
+    COLLECTIONS.studentCompetitions,
+    'competition_id',
+    competitionId
+  )
 
-  if (regError) {
-    console.error('Supabase fetch registrations error:', regError)
-    return NextResponse.json({ error: 'Failed to fetch registrations' }, { status: 500 })
-  }
-
-  const registeredEmails = new Set((registrations || []).map(r => r.student_email))
+  const registeredEmails = new Set(registrations.map((r) => r.student_email))
   const appliedStudents = registeredEmails.size
   const unregisteredStudents = totalStudents - appliedStudents
 
   // Registrations by department
   const deptMap = new Map<string, number>()
-  students?.forEach(s => {
+  students.forEach((s) => {
     if (registeredEmails.has(s.email)) {
       deptMap.set(s.department, (deptMap.get(s.department) || 0) + 1)
     }
@@ -79,9 +71,9 @@ export async function GET(
   }))
 
   // Students with details (only registered)
-  const studentsWithDetails = (students || [])
-    .filter(s => registeredEmails.has(s.email))
-    .map(s => ({
+  const studentsWithDetails = students
+    .filter((s) => registeredEmails.has(s.email))
+    .map((s) => ({
       id: s.id,
       name: s.name,
       email: s.email,

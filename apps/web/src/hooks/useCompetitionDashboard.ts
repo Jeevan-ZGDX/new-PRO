@@ -2,8 +2,9 @@
 
 import { useEffect, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { supabase } from '@/lib/supabase-client'
-import type { RealtimePostgresChangesPayload } from '@supabase/supabase-js'
+import { collection, doc, getDoc, getDocs, onSnapshot } from 'firebase/firestore'
+import { getFirebaseDb } from '@/lib/firebase/client'
+import { COLLECTIONS } from '@/lib/firebase/config'
 
 export interface CompetitionDashboardItem {
   id: string
@@ -31,31 +32,9 @@ export interface CompetitionDashboardFilters {
   status?: string
 }
 
-async function fetchDashboardFromSupabase(filters?: CompetitionDashboardFilters) {
-  if (!supabase) return []
-
-  let query = supabase
-    .from('competition_dashboard')
-    .select('*')
-    .order('serial_no', { ascending: true })
-
-  if (filters?.category && filters.category !== 'all') {
-    query = query.eq('category', filters.category)
-  }
-  if (filters?.status && filters.status !== 'all') {
-    query = query.eq('competition_status', filters.status)
-  }
-  if (filters?.search) {
-    query = query.or(
-      `competition_name.ilike.%${filters.search}%,organizer.ilike.%${filters.search}%`
-    )
-  }
-
-  const { data, error } = await query
-  if (error) throw new Error(error.message)
-
-  return (data || []).map((row: any) => ({
-    id: row.id,
+function mapRow(id: string, row: Record<string, any>): CompetitionDashboardItem {
+  return {
+    id,
     serialNo: row.serial_no,
     competitionName: row.competition_name,
     competitionStatus: row.competition_status,
@@ -72,7 +51,44 @@ async function fetchDashboardFromSupabase(filters?: CompetitionDashboardFilters)
     organizer: row.organizer,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
-  })) as CompetitionDashboardItem[]
+  }
+}
+
+/**
+ * Reads the dashboard collection and applies filters in memory.
+ *
+ * Filtering is deliberately not pushed into the query. Firestore has no
+ * case-insensitive substring operator, so the old `ilike '%term%'` search cannot
+ * be expressed server-side at all; and `orderBy('serial_no')` would silently
+ * drop any document missing that field. Both are avoided by fetching the
+ * collection — it is a single dashboard list, not an unbounded table — and
+ * sorting and filtering here.
+ */
+async function fetchDashboard(filters?: CompetitionDashboardFilters) {
+  const db = getFirebaseDb()
+  if (!db) return []
+
+  const snapshot = await getDocs(collection(db, COLLECTIONS.competitionDashboard))
+  let items = snapshot.docs.map((d) => mapRow(d.id, d.data()))
+
+  items.sort((a, b) => (a.serialNo ?? 0) - (b.serialNo ?? 0))
+
+  if (filters?.category && filters.category !== 'all') {
+    items = items.filter((item) => item.category === filters.category)
+  }
+  if (filters?.status && filters.status !== 'all') {
+    items = items.filter((item) => item.competitionStatus === filters.status)
+  }
+  if (filters?.search) {
+    const term = filters.search.toLowerCase()
+    items = items.filter(
+      (item) =>
+        (item.competitionName || '').toLowerCase().includes(term) ||
+        (item.organizer || '').toLowerCase().includes(term)
+    )
+  }
+
+  return items
 }
 
 export function useCompetitionDashboard(filters?: CompetitionDashboardFilters) {
@@ -81,35 +97,33 @@ export function useCompetitionDashboard(filters?: CompetitionDashboardFilters) {
 
   const query = useQuery({
     queryKey: ['competition-dashboard', filters],
-    queryFn: () => fetchDashboardFromSupabase(filters),
+    queryFn: () => fetchDashboard(filters),
     staleTime: 30 * 1000,
     refetchOnWindowFocus: true,
   })
 
   useEffect(() => {
-    if (!supabase) return
+    const db = getFirebaseDb()
+    if (!db) return
 
-    const channel = supabase
-      .channel('competition-dashboard-changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'competition_dashboard',
-        },
-        (payload: RealtimePostgresChangesPayload<Record<string, unknown>>) => {
-          queryClient.invalidateQueries({ queryKey: ['competition-dashboard'] })
-        }
-      )
-      .subscribe((status) => {
-        setIsRealtimeConnected(status === 'SUBSCRIBED')
-      })
+    // Firestore's own listener replaces the Supabase realtime channel. It fires
+    // once immediately with the current contents, which is what flips the
+    // connected flag — there is no separate subscribe callback.
+    const unsubscribe = onSnapshot(
+      collection(db, COLLECTIONS.competitionDashboard),
+      () => {
+        setIsRealtimeConnected(true)
+        queryClient.invalidateQueries({ queryKey: ['competition-dashboard'] })
+      },
+      (error) => {
+        console.error('Competition dashboard subscription error:', error.message)
+        setIsRealtimeConnected(false)
+      }
+    )
 
     return () => {
-      if (supabase) {
-        supabase.removeChannel(channel)
-      }
+      setIsRealtimeConnected(false)
+      unsubscribe()
     }
   }, [queryClient])
 
@@ -123,33 +137,11 @@ export function useCompetitionDashboardItem(id: string) {
   return useQuery({
     queryKey: ['competition-dashboard', id],
     queryFn: async () => {
-      if (!supabase) return null
-      const { data, error } = await supabase
-        .from('competition_dashboard')
-        .select('*')
-        .eq('id', id)
-        .single()
-      if (error) throw new Error(error.message)
-      if (!data) return null
-      return {
-        id: data.id,
-        serialNo: data.serial_no,
-        competitionName: data.competition_name,
-        competitionStatus: data.competition_status,
-        eligibleYear: data.eligible_year,
-        regDeadline: data.reg_deadline,
-        r1Date: data.r1_date,
-        r2Date: data.r2_date,
-        remainingDaysForReg: data.remaining_days_for_reg,
-        rDaysForR1: data.r_days_for_r1,
-        rDaysForR2: data.r_days_for_r2,
-        regTeam: data.reg_team,
-        totalPrizeAmount: data.total_prize_amount,
-        category: data.category,
-        organizer: data.organizer,
-        createdAt: data.created_at,
-        updatedAt: data.updated_at,
-      } as CompetitionDashboardItem
+      const db = getFirebaseDb()
+      if (!db) return null
+      const snap = await getDoc(doc(db, COLLECTIONS.competitionDashboard, id))
+      if (!snap.exists()) return null
+      return mapRow(snap.id, snap.data())
     },
     enabled: !!id,
   })

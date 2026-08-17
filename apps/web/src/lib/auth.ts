@@ -1,13 +1,14 @@
-import { getSupabaseBrowserClient } from '@/lib/supabase/browser'
+import { getFirebaseAuth } from '@/lib/firebase/client'
+import {
+  normalizeRole,
+  isAllowedEmail,
+  OFFICIAL_COLLEGE_DOMAIN,
+  USER_COOKIE,
+  type UserRole,
+} from '@/lib/firebase/session'
 
-export const OFFICIAL_COLLEGE_DOMAIN = 'citchennai.net'
-
-export function isAllowedEmail(email: string): boolean {
-  const clean = email.trim().toLowerCase()
-  return clean.endsWith(`@${OFFICIAL_COLLEGE_DOMAIN.toLowerCase()}`)
-}
-
-export type UserRole = 'student' | 'advisor' | 'hod' | 'super_admin'
+export { normalizeRole, isAllowedEmail, OFFICIAL_COLLEGE_DOMAIN }
+export type { UserRole }
 
 export interface CurrentUser {
   email: string
@@ -15,12 +16,6 @@ export interface CurrentUser {
   name: string
   department: string
 }
-
-export function normalizeRole(role: unknown): UserRole {
-  return role === 'advisor' || role === 'hod' || role === 'super_admin' ? role : 'student'
-}
-
-const USER_COOKIE = 'comp_dash_user'
 
 function readCookie(name: string): string | null {
   if (typeof document === 'undefined') return null
@@ -35,90 +30,68 @@ function readCookie(name: string): string | null {
   }
 }
 
-function decodeJwtPayload(token: string): Record<string, unknown> | null {
-  try {
-    const payload = token.split('.')[1]
-    if (!payload) return null
-    const normalized = payload.replace(/-/g, '+').replace(/_/g, '/')
-    const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, '=')
-    return JSON.parse(Buffer.from(padded, 'base64').toString('utf-8'))
-  } catch {
-    return null
-  }
-}
-
 /**
- * Synchronously reads the current user from the `comp_dash_user` cookie that the
- * middleware sets for every authenticated request. Falls back to decoding the
- * Supabase access-token cookie so callers work even before the first middleware pass.
+ * Synchronously reads the current user from the `comp_dash_user` cookie the
+ * middleware refreshes on every authenticated request.
+ *
+ * This is a rendering convenience, not an access check — the cookie is readable
+ * and writable by client code. Authorisation always comes from the signed
+ * session token the middleware and route handlers verify.
  */
 export function getCurrentUser(): CurrentUser | null {
   if (typeof window === 'undefined') return null
 
-  const fromCookie = readCookie(USER_COOKIE)
-  if (fromCookie) {
-    try {
-      const parsed = JSON.parse(fromCookie)
-      if (parsed?.email) {
-        return {
-          email: parsed.email,
-          role: normalizeRole(parsed.role),
-          name: parsed.name || parsed.email.split('@')[0],
-          department: parsed.department || '',
-        }
-      }
-    } catch {
-      // fall through to JWT decoding
-    }
-  }
+  const raw = readCookie(USER_COOKIE)
+  if (!raw) return null
 
-  // Fallback: decode the Supabase session cookie (sb-<ref>-auth-token).
-  const sessionCookie = document.cookie
-    .split('; ')
-    .map((entry) => entry.trim())
-    .find((entry) => entry.startsWith('sb-') && entry.includes('-auth-token='))
-  if (sessionCookie) {
-    try {
-      const raw = sessionCookie.slice(sessionCookie.indexOf('=') + 1)
-      const decoded = decodeURIComponent(raw)
-      const [accessToken] = JSON.parse(decoded)
-      const claims = accessToken ? decodeJwtPayload(accessToken) : null
-      const metadata = (claims?.user_metadata || {}) as Record<string, unknown>
-      if (claims?.email) {
-        const claimEmail = String(claims.email)
-        return {
-          email: claimEmail,
-          role: normalizeRole(metadata.role),
-          name: String(metadata.name || claimEmail.split('@')[0]),
-          department: String(metadata.department || ''),
-        }
-      }
-    } catch {
-      return null
+  try {
+    const parsed = JSON.parse(raw)
+    if (!parsed?.email) return null
+    return {
+      email: parsed.email,
+      role: normalizeRole(parsed.role),
+      name: parsed.name || parsed.email.split('@')[0],
+      department: parsed.department || '',
     }
+  } catch {
+    return null
   }
-
-  return null
 }
 
 export function isAuthenticated(): boolean {
   return !!getCurrentUser()
 }
 
+/** The live Firebase user, or null. Async because Firebase restores state lazily. */
 export async function getSessionUser() {
-  const supabase = getSupabaseBrowserClient()
-  if (!supabase) return null
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  return user
+  const auth = getFirebaseAuth()
+  if (!auth) return null
+  if (auth.currentUser) return auth.currentUser
+
+  return new Promise<import('firebase/auth').User | null>((resolve) => {
+    const unsubscribe = auth.onAuthStateChanged((user) => {
+      unsubscribe()
+      resolve(user)
+    })
+  })
 }
 
 export async function logoutUser(): Promise<void> {
-  const supabase = getSupabaseBrowserClient()
-  if (supabase) {
-    await supabase.auth.signOut()
+  const auth = getFirebaseAuth()
+
+  // Clear the server cookies first: if the Firebase sign-out succeeded but this
+  // failed, the middleware would keep waving through a valid session cookie.
+  try {
+    await fetch('/api/auth/session', { method: 'DELETE' })
+  } catch {
+    // Fall through — the client-side clear below still applies.
   }
+
+  if (auth) {
+    const { signOut } = await import('firebase/auth')
+    await signOut(auth)
+  }
+
   if (typeof window !== 'undefined') {
     document.cookie = `${USER_COOKIE}=; Path=/; Max-Age=0; SameSite=Lax`
     localStorage.removeItem('auth_token')

@@ -1,8 +1,34 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { supabase } from '@/lib/supabase-client'
+import {
+  isFirestoreConfigured,
+  getDocById,
+  findOneByField,
+  queryByField,
+  createDoc,
+  writeDocById,
+} from '@/lib/firestore-data'
+import { COLLECTIONS } from '@/lib/firebase/config'
 import { getValidAccessToken } from '@/lib/gmail-tokens'
 
 const GMAIL_API_BASE = 'https://www.googleapis.com/gmail/v1/users/me'
+
+/**
+ * Postgres enforced `unique(student_email, competition_id)`, which is what made
+ * the old upsert idempotent. Firestore has no unique constraint, so the pair is
+ * looked up first and that document rewritten.
+ *
+ * Only `student_email` goes to Firestore — one student holds a handful of
+ * registrations, so filtering the competition in memory avoids a second
+ * indexed field for no gain.
+ */
+async function findRegistration(studentEmail: string, competitionId: string) {
+  const rows = await queryByField(
+    COLLECTIONS.studentCompetitions,
+    'student_email',
+    studentEmail
+  )
+  return rows.find((row) => row.competition_id === competitionId) ?? null
+}
 
 async function searchEmails(accessToken: string, query: string, maxResults = 20) {
   const response = await fetch(
@@ -77,15 +103,11 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    if (!supabase) {
-      return NextResponse.json({ error: 'Supabase not configured' }, { status: 500 })
+    if (!isFirestoreConfigured()) {
+      return NextResponse.json({ error: 'Firestore not configured' }, { status: 500 })
     }
 
-    const { data: competition } = await supabase
-      .from('competition_dashboard')
-      .select('organizer_email, competition_name')
-      .eq('id', competitionId)
-      .single()
+    const competition = await getDocById(COLLECTIONS.competitionDashboard, competitionId)
 
     if (!competition) {
       return NextResponse.json({ error: 'Competition not found' }, { status: 404 })
@@ -119,14 +141,11 @@ export async function POST(request: NextRequest) {
     }
 
     if (verified) {
-      const { data: studentData } = await supabase
-        .from('user_profiles')
-        .select('user_id, full_name, email')
-        .eq('email', userEmail)
-        .single()
+      const studentData = await findOneByField(COLLECTIONS.userProfiles, 'email', userEmail)
 
       if (studentData) {
-        await supabase.from('student_competitions').upsert({
+        const now = new Date().toISOString()
+        const doc = {
           student_id: studentData.user_id,
           student_email: userEmail,
           student_name: studentData.full_name || userEmail.split('@')[0],
@@ -136,12 +155,15 @@ export async function POST(request: NextRequest) {
           verification_method: 'gmail_auto',
           gmail_message_id: matchedMessageId,
           gmail_thread_id: matchedThreadId,
-          verified_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        }, {
-          onConflict: 'student_email,competition_id',
-          ignoreDuplicates: false,
-        })
+          verified_at: now,
+          updated_at: now,
+        }
+        const existing = await findRegistration(userEmail, competitionId)
+        if (existing) {
+          await writeDocById(COLLECTIONS.studentCompetitions, existing.id, doc)
+        } else {
+          await createDoc(COLLECTIONS.studentCompetitions, doc)
+        }
       }
     }
 
@@ -171,16 +193,11 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    if (!supabase) {
+    if (!isFirestoreConfigured()) {
       return NextResponse.json({ verified: false, status: 'pending' })
     }
 
-    const { data: verification } = await supabase
-      .from('student_competitions')
-      .select('verification_status, verified_at, verification_method')
-      .eq('competition_id', competitionId)
-      .eq('student_email', userEmail)
-      .single()
+    const verification = await findRegistration(userEmail, competitionId)
 
     return NextResponse.json({
       verified: verification?.verification_status === 'verified',

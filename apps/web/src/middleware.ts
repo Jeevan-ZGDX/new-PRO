@@ -1,11 +1,8 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
-import { updateSession } from '@/lib/supabase/middleware'
-import type { UserRole } from '@/lib/auth'
+import { verifyIdToken, SESSION_COOKIE, USER_COOKIE } from '@/lib/firebase/session'
+import { FIREBASE_PROJECT_ID } from '@/lib/firebase/config'
 
-// `/auth/callback` must stay public: it is the route that *creates* the
-// session, so guarding it would bounce every OAuth return to /sign-in and the
-// PKCE code would never be redeemed.
 const PUBLIC_ROUTES = [
   '/',
   '/sign-in',
@@ -14,56 +11,60 @@ const PUBLIC_ROUTES = [
   '/login',
   '/policy',
   '/terms',
-  '/auth/callback',
 ]
-
-function normalizeRole(role: unknown): UserRole {
-  return role === 'advisor' || role === 'hod' || role === 'super_admin' ? role : 'student'
-}
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
-  const isPublic = PUBLIC_ROUTES.some(
-    (route) => pathname === route || pathname.startsWith(`${route}/`)
-  )
 
   if (pathname.startsWith('/_next')) return NextResponse.next()
   if (pathname.startsWith('/api')) return NextResponse.next()
 
-  // Supabase not configured — let the app render and surface setup guidance in the UI.
-  if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
-    return NextResponse.next()
-  }
+  const isPublic = PUBLIC_ROUTES.some(
+    (route) => pathname === route || pathname.startsWith(`${route}/`)
+  )
 
-  const { supabaseResponse, user } = await updateSession(request)
+  // Firebase not configured — let the app render and surface setup guidance in the UI.
+  if (!FIREBASE_PROJECT_ID) return NextResponse.next()
 
-  if (isPublic) {
-    return supabaseResponse
-  }
+  if (isPublic) return NextResponse.next()
 
-  if (!user?.email) {
+  // Verified entirely in-process against Google's public keys; no Admin SDK and
+  // no network call to Firebase on the hot path.
+  const token = request.cookies.get(SESSION_COOKIE)?.value
+  const user = token ? await verifyIdToken(token) : null
+
+  if (!user) {
     const url = request.nextUrl.clone()
     url.pathname = '/sign-in'
     url.searchParams.set('next', pathname)
-    return NextResponse.redirect(url)
+    const response = NextResponse.redirect(url)
+    // An expired or tampered cookie is cleared so the client stops resending it.
+    if (token) {
+      response.cookies.set(SESSION_COOKIE, '', { path: '/', maxAge: 0 })
+      response.cookies.set(USER_COOKIE, '', { path: '/', maxAge: 0 })
+    }
+    return response
   }
 
-  const metadata = (user.user_metadata || {}) as Record<string, unknown>
-  const profile = {
-    email: user.email,
-    name: metadata.name || user.email.split('@')[0] || '',
-    role: normalizeRole(metadata.role),
-    department: metadata.department || '',
-  }
+  const response = NextResponse.next()
 
-  supabaseResponse.cookies.set('comp_dash_user', JSON.stringify(profile), {
-    path: '/',
-    sameSite: 'lax',
-    secure: process.env.NODE_ENV === 'production',
-    maxAge: 60 * 60 * 24 * 30,
-  })
+  response.cookies.set(
+    USER_COOKIE,
+    JSON.stringify({
+      email: user.email,
+      name: user.name,
+      role: user.role,
+      department: user.department,
+    }),
+    {
+      path: '/',
+      sameSite: 'lax',
+      secure: process.env.NODE_ENV === 'production',
+      maxAge: 60 * 60 * 24 * 30,
+    }
+  )
 
-  return supabaseResponse
+  return response
 }
 
 export const config = {

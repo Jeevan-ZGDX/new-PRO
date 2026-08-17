@@ -1,7 +1,18 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useEffect } from 'react'
+import {
+  collection,
+  deleteDoc,
+  doc,
+  getDocs,
+  onSnapshot,
+  query as fsQuery,
+  setDoc,
+  updateDoc,
+  where,
+} from 'firebase/firestore'
 import { apiClient } from '../client'
-import { getSupabaseClient, isSupabaseEnabled } from '../supabase-manager'
+import { getFirestoreDb, isFirestoreEnabled } from '../firestore-manager'
 import type {
   Registration,
   RegistrationListResponse,
@@ -18,7 +29,7 @@ import type {
   AdvisorDashboardStats,
 } from '@comp-dash/types'
 
-const DASHBOARD_TABLE = 'competition_dashboard'
+const DASHBOARD_COLLECTION = 'competition_dashboard'
 
 export function useRegistrations(params?: {
   status?: RegistrationStatus
@@ -55,21 +66,43 @@ export function useRegisterForCompetition() {
     mutationFn: async (data: RegistrationCreate) => {
       const result = await apiClient.post<Registration, RegistrationCreate>('/registrations', data)
 
-      if (isSupabaseEnabled()) {
-        const sb = getSupabaseClient()
-        if (sb) {
-          const { error } = await sb.from('student_competitions').upsert({
-            student_id: data.userId || '',
-            student_email: data.userEmail || '',
-            student_name: data.userName || '',
-            competition_id: data.competitionId || '',
-            competition_name: data.competitionTitle || '',
-            verification_status: 'pending',
-            verification_method: 'manual',
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          })
-          if (error) console.error('Supabase student_competitions insert error:', error.message)
+      if (isFirestoreEnabled()) {
+        const db = getFirestoreDb()
+        if (db) {
+          try {
+            const studentEmail = data.userEmail || ''
+            const competitionId = data.competitionId || ''
+            // Postgres enforced unique(student_email, competition_id), which is
+            // what made the upsert idempotent. Firestore has no unique
+            // constraint, so look the pair up first and rewrite that doc.
+            const existing = await getDocs(
+              fsQuery(
+                collection(db, 'student_competitions'),
+                where('student_email', '==', studentEmail),
+                where('competition_id', '==', competitionId)
+              )
+            )
+            const ref = existing.empty ? doc(collection(db, 'student_competitions')) : existing.docs[0].ref
+            const now = new Date().toISOString()
+            await setDoc(
+              ref,
+              {
+                id: ref.id,
+                student_id: data.userId || '',
+                student_email: studentEmail,
+                student_name: data.userName || '',
+                competition_id: competitionId,
+                competition_name: data.competitionTitle || '',
+                verification_status: 'pending',
+                verification_method: 'manual',
+                created_at: now,
+                updated_at: now,
+              },
+              { merge: true }
+            )
+          } catch (err) {
+            console.error('Firestore student_competitions upsert error:', (err as Error).message)
+          }
         }
       }
 
@@ -229,11 +262,14 @@ export function useCreateCompetition() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: async (data: Record<string, unknown>) => {
-      if (isSupabaseEnabled()) {
-        const sb = getSupabaseClient()
-        if (sb) {
-          const { error } = await sb.from(DASHBOARD_TABLE).insert({
-            id: crypto.randomUUID(),
+      if (isFirestoreEnabled()) {
+        const db = getFirestoreDb()
+        if (db) {
+          // The doc id is the row id, matching how the migration keyed every
+          // collection, so updates and deletes can address it directly.
+          const id = crypto.randomUUID()
+          await setDoc(doc(db, DASHBOARD_COLLECTION, id), {
+            id,
             competition_name: (data.title as string) || '',
             category: (data.category as string) || 'competition',
             organizer: (data.organizer as string) || '',
@@ -255,7 +291,6 @@ export function useCreateCompetition() {
             competition_status: 'On Going',
             serial_no: Math.floor(Date.now() / 1000),
           })
-          if (error) throw new Error(error.message)
         }
       }
 
@@ -273,9 +308,9 @@ export function useUpdateCompetition() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: async ({ id, data }: { id: string; data: Record<string, unknown> }) => {
-      if (isSupabaseEnabled()) {
-        const sb = getSupabaseClient()
-        if (!sb) throw new Error('Supabase client not configured')
+      if (isFirestoreEnabled()) {
+        const db = getFirestoreDb()
+        if (!db) throw new Error('Firestore not configured')
         const updates: Record<string, unknown> = {}
         if (data.title !== undefined) updates.competition_name = data.title as string
         if (data.description !== undefined) updates.description = data.description as string
@@ -299,8 +334,7 @@ export function useUpdateCompetition() {
           updates.eligible_year = ((data.eligibility as Record<string, unknown>)?.yearOfStudy as string[])?.[0] || ''
         }
         updates.updated_at = new Date().toISOString()
-        const { error } = await sb.from(DASHBOARD_TABLE).update(updates).eq('id', id)
-        if (error) throw new Error(error.message)
+        await updateDoc(doc(db, DASHBOARD_COLLECTION, id), updates)
         return { id, ...data } as Record<string, unknown>
       }
 
@@ -318,11 +352,10 @@ export function useDeleteCompetition() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: async (id: string) => {
-      if (isSupabaseEnabled()) {
-        const sb = getSupabaseClient()
-        if (!sb) throw new Error('Supabase client not configured')
-        const { error } = await sb.from(DASHBOARD_TABLE).delete().eq('id', id)
-        if (error) throw new Error(error.message)
+      if (isFirestoreEnabled()) {
+        const db = getFirestoreDb()
+        if (!db) throw new Error('Firestore not configured')
+        await deleteDoc(doc(db, DASHBOARD_COLLECTION, id))
         return id
       }
 
@@ -337,45 +370,42 @@ export function useDeleteCompetition() {
 
 export function useCompetitionDashboardRealtime(id: string) {
   const queryClient = useQueryClient()
-  const useSupabase = isSupabaseEnabled()
+  const useFirestore = isFirestoreEnabled()
 
   useEffect(() => {
-    if (!useSupabase || !id) return
+    if (!useFirestore || !id) return
 
-    const sb = getSupabaseClient()
-    if (!sb) return
+    const db = getFirestoreDb()
+    if (!db) return
 
-    const channel = sb
-      .channel(`competition-dashboard-${id}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: DASHBOARD_TABLE,
-          filter: `id=eq.${id}`,
-        },
-        (payload: any) => {
-          queryClient.invalidateQueries({ queryKey: ['competition', id, 'dashboard'] })
-          queryClient.invalidateQueries({ queryKey: ['supabase-competitions'] })
+    // onSnapshot delivers the current state immediately, where postgres_changes
+    // only fired on an actual change. Skip that first delivery so mounting the
+    // dashboard does not invalidate the query it just fetched.
+    let dashboardPrimed = false
+    const unsubscribeDashboard = onSnapshot(doc(db, DASHBOARD_COLLECTION, id), () => {
+      if (!dashboardPrimed) {
+        dashboardPrimed = true
+        return
+      }
+      queryClient.invalidateQueries({ queryKey: ['competition', id, 'dashboard'] })
+      queryClient.invalidateQueries({ queryKey: ['supabase-competitions'] })
+    })
+
+    let entriesPrimed = false
+    const unsubscribeEntries = onSnapshot(
+      fsQuery(collection(db, 'student_competitions'), where('competition_id', '==', id)),
+      () => {
+        if (!entriesPrimed) {
+          entriesPrimed = true
+          return
         }
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'student_competitions',
-          filter: `competition_id=eq.${id}`,
-        },
-        (payload: any) => {
-          queryClient.invalidateQueries({ queryKey: ['competition', id, 'dashboard'] })
-        }
-      )
-      .subscribe()
+        queryClient.invalidateQueries({ queryKey: ['competition', id, 'dashboard'] })
+      }
+    )
 
     return () => {
-      sb.removeChannel(channel)
+      unsubscribeDashboard()
+      unsubscribeEntries()
     }
-  }, [id, useSupabase, queryClient])
+  }, [id, useFirestore, queryClient])
 }

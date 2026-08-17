@@ -1,18 +1,15 @@
 export const dynamic = 'force-dynamic'
 
 import { NextResponse } from 'next/server'
-import { supabase } from '@/lib/supabase-client'
+import { pingFirestore } from '@/lib/firestore-data'
+import { isFirestoreConfigured } from '@/lib/firestore-data'
 
 export async function GET() {
   let dbStatus = 'not_configured'
 
-  if (supabase) {
-    try {
-      const { error } = await supabase.from('competition_dashboard').select('id').limit(1)
-      dbStatus = error ? 'error' : 'connected'
-    } catch {
-      dbStatus = 'error'
-    }
+  if (isFirestoreConfigured()) {
+    const { ok } = await pingFirestore()
+    dbStatus = ok ? 'connected' : 'error'
   }
 
   return NextResponse.json({
