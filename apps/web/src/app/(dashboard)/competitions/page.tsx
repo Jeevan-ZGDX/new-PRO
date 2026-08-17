@@ -27,9 +27,6 @@ import type { CompetitionCategory } from '@comp-dash/types'
 const categoryOptions = [
   { label: 'All', value: 'all' },
   { label: 'Competition', value: 'competition' },
-  { label: 'C + P', value: 'c + p' },
-  { label: 'C + I', value: 'c + i' },
-  { label: 'Start-up', value: 'start-up' },
   { label: 'Hackathons', value: 'hackathon' },
 ]
 
@@ -139,11 +136,10 @@ export default function CompetitionsPage() {
                 <button
                   key={cat.value}
                   onClick={() => setSelectedCategory(cat.value)}
-                  className={`px-3.5 py-2 rounded-xl text-xs font-semibold transition-all duration-200 ${
-                    isSelected
+                  className={`px-3.5 py-2 rounded-xl text-xs font-semibold transition-all duration-200 ${isSelected
                       ? 'bg-accent dark:bg-striver text-white shadow-sm scale-105'
                       : 'bg-white dark:bg-obsidian-surface border border-gray-200 dark:border-obsidian-border text-gray-600 dark:text-ink-muted hover:bg-gray-50 dark:hover:bg-obsidian-hover hover:text-gray-900 dark:hover:text-ink-primary'
-                  }`}
+                    }`}
                 >
                   {cat.label}
                 </button>
@@ -205,11 +201,10 @@ export default function CompetitionsPage() {
                         </span>
                         {daysLeft !== null && (
                           <span
-                            className={`text-xs font-semibold px-2.5 py-0.5 rounded-full border ${
-                              isOpen
+                            className={`text-xs font-semibold px-2.5 py-0.5 rounded-full border ${isOpen
                                 ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800/60'
                                 : 'bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 border-rose-200 dark:border-rose-800/60'
-                            }`}
+                              }`}
                           >
                             {isOpen ? (daysLeft > 0 ? `${daysLeft}d left` : 'Closing soon') : 'Closed'}
                           </span>
