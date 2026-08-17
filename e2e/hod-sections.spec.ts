@@ -137,7 +137,7 @@ test.describe('HOD competition detail', () => {
     }
   })
 
-  test('drilling into a section lists its registered students', async ({ page }) => {
+  test('clicking a section card does NOT show the student roster (admin-only)', async ({ page }) => {
     await clearFixtureRegistrations()
     const competition = await findCompetitionForYear('III')
     const students = await getStudentsInSection('B', YEAR_LABEL)
@@ -151,26 +151,23 @@ test.describe('HOD competition detail', () => {
 
     await page.getByTestId('hod-section-card-B').click()
 
-    await expect(page.getByRole('heading', { name: /Section B/i })).toBeVisible()
-    await expect(page.getByTestId('hod-section-student-row')).toHaveCount(2)
-    // The fixture marker must never reach the UI.
-    await expect(page.getByTestId('hod-sections-panel')).not.toContainText(FIXTURE_TAG)
-
-    await page.getByRole('button', { name: /back to all sections/i }).click()
+    // HOD should NOT see the student roster drill-down
+    await expect(page.getByRole('heading', { name: /Section B Student Roster/i })).toHaveCount(0)
+    await expect(page.getByTestId('hod-section-student-row')).toHaveCount(0)
+    // Should still see the section grid
     await expect(page.locator('[data-testid^="hod-section-card-"]').first()).toBeVisible()
   })
 
-  test('a section with no registrations says so explicitly', async ({ page }) => {
+  test('section cards are visible but not clickable for HOD', async ({ page }) => {
     await clearFixtureRegistrations()
     const competition = await findCompetitionForYear('III')
     await page.goto(`/competitions/${competition!.id}`)
     await page.getByTestId('hod-sections-panel').waitFor()
 
-    // Section A has no seeded rows in this spec.
-    await page.getByTestId('hod-section-card-A').click()
-    await expect(page.getByTestId('hod-sections-panel')).toContainText(
-      /has registered for this competition yet/i
-    )
+    const sectionA = page.getByTestId('hod-section-card-A')
+    await expect(sectionA).toBeVisible()
+    // Cards should be rendered as non-interactive for HOD
+    await expect(sectionA).toHaveCSS('cursor', 'default')
   })
 })
 

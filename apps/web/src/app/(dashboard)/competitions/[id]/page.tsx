@@ -332,7 +332,7 @@ function CompetitionDetailContent() {
     {/* HOD Section Breakdown - Full Width */}
     {(user?.role === 'hod' || user?.role === 'super_admin') && (
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-8">
-        <HodSectionsPanel competitionId={comp.id} competitionTitle={comp.title} />
+        <HodSectionsPanel competitionId={comp.id} competitionTitle={comp.title} userRole={user?.role} />
       </div>
     )}
     </>

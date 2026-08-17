@@ -18,9 +18,11 @@ const YEAR_OPTIONS = [
 export function HodSectionsPanel({
   competitionId,
   competitionTitle,
+  userRole,
 }: {
   competitionId: string
   competitionTitle?: string
+  userRole?: string
 }) {
   const [selectedYear, setSelectedYear] = useState<string>('3')
   const { data, isLoading, error } = useCompetitionSections(competitionId, selectedYear)
@@ -48,6 +50,7 @@ export function HodSectionsPanel({
     exportToCSV(`sections-${competitionId}-year-${selectedYear}`, headers, rows)
   }
 
+  const isAdmin = userRole === 'super_admin'
   const active = selected ? data?.sections.find((s) => s.section === selected) : null
 
   return (
@@ -133,7 +136,7 @@ export function HodSectionsPanel({
             This competition does not have enrolled students for the selected academic cohort.
           </p>
         </div>
-      ) : active ? (
+      ) : active && isAdmin ? (
         <div className="space-y-4 pt-1">
           <button
             onClick={() => setSelected(null)}
@@ -188,16 +191,18 @@ export function HodSectionsPanel({
         </div>
       ) : (
         <div className="space-y-4 pt-1">
-          <p className="text-sm text-gray-500 dark:text-zinc-400">Click a section to view registered students</p>
+          {isAdmin && <p className="text-sm text-gray-500 dark:text-zinc-400">Click a section to view registered students</p>}
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4" data-testid="hod-sections-grid">
             {data.sections.map((s) => {
               const pct = s.totalCount ? Math.round((s.registeredCount / s.totalCount) * 100) : 0
               return (
                 <button
                   key={s.section}
-                  onClick={() => setSelected(s.section)}
+                  onClick={isAdmin ? () => setSelected(s.section) : undefined}
                   data-testid={`hod-section-card-${s.section}`}
-                  className="text-left p-4 bg-gray-50 dark:bg-zinc-800/40 border border-gray-200 dark:border-zinc-700/50 rounded-xl transition-transform duration-200 hover:scale-[1.03] cursor-pointer"
+                  className={`text-left p-4 bg-gray-50 dark:bg-zinc-800/40 border border-gray-200 dark:border-zinc-700/50 rounded-xl transition-transform duration-200 ${
+                    isAdmin ? 'hover:scale-[1.03] cursor-pointer' : 'cursor-default'
+                  }`}
                 >
                   <p className="text-base font-bold text-gray-900 dark:text-white">{s.section}</p>
                   <p className="text-xs text-gray-500 dark:text-zinc-400 mt-1">{s.totalCount} students</p>
