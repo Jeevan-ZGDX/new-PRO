@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Card, Button, SearchBar, Avatar, Badge } from '@comp-dash/design-system'
 import { useAdminAdvisors } from '@comp-dash/api'
-import { Plus, Download, ExternalLink } from 'lucide-react'
+import { Plus, Download } from 'lucide-react'
 import { exportToCSV } from '@/lib/export-csv'
 import { useRouter } from 'next/navigation'
 
@@ -73,14 +73,13 @@ export default function AdvisorsPage() {
                 <th className="text-left text-xs font-medium uppercase tracking-wider px-6 py-3.5">Department</th>
                 <th className="text-left text-xs font-medium uppercase tracking-wider px-6 py-3.5">Assigned Sections</th>
                 <th className="text-left text-xs font-medium uppercase tracking-wider px-6 py-3.5">Pending Verifications</th>
-                <th className="text-right text-xs font-medium uppercase tracking-wider px-6 py-3.5">Actions</th>
               </tr>
             </thead>
             <tbody>
               {isLoading ? (
                 Array.from({ length: 3 }).map((_, i) => (
                   <tr key={i} className="border-b border-gray-100 dark:border-zinc-800/60">
-                    <td colSpan={5} className="px-6 py-4">
+                    <td colSpan={4} className="px-6 py-4">
                       <div className="h-10 bg-gray-100 dark:bg-zinc-800/50 rounded-xl animate-pulse" />
                     </td>
                   </tr>
@@ -91,7 +90,7 @@ export default function AdvisorsPage() {
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
                         <Avatar name={advisor.name} size="sm" />
-                        <div className="transition-transform duration-200 hover:scale-[1.02] origin-left cursor-pointer">
+                        <div>
                           <p className="text-sm font-medium text-gray-900 dark:text-white">{advisor.name}</p>
                           <p className="text-xs text-gray-500 dark:text-zinc-400">{advisor.email}</p>
                         </div>
@@ -108,22 +107,11 @@ export default function AdvisorsPage() {
                       </div>
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-600 dark:text-zinc-300 font-medium">{advisor.pendingVerifications}</td>
-                    <td className="px-6 py-4 text-right">
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
-                        onClick={() => router.push(`/advisors/${advisor.id}`)}
-                        className="transition-transform duration-200 hover:scale-105 active:scale-95"
-                      >
-                        <ExternalLink className="w-4 h-4 mr-1 text-accent" />
-                        View
-                      </Button>
-                    </td>
                   </tr>
                 ))
               ) : (
                 <tr>
-                  <td colSpan={5} className="text-center py-12 text-gray-500 dark:text-zinc-400">
+                  <td colSpan={4} className="text-center py-12 text-gray-500 dark:text-zinc-400">
                     No advisors found
                   </td>
                 </tr>
