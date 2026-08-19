@@ -293,3 +293,81 @@ export async function readTopLeaderboard(limit = LEADERBOARD_LIMIT): Promise<Lea
 
   return rows.map((row, i) => ({ ...row, rank: i + 1 }))
 }
+
+/**
+ * Reads the top 25 students by cumulative prize amount from the prize_amount collection.
+ * This is a simpler, faster query since the data is pre-aggregated per student.
+ */
+export async function readTopPrizeLeaderboard(limit = 25): Promise<PrizeLeaderboardRow[]> {
+  const db = getAdminDb()
+  if (!db) return []
+
+  const capped = Math.min(Math.max(1, limit), 100)
+
+  const snap = await db
+    .collection(COLLECTIONS.prizeAmount)
+    .orderBy('total_prize_amount', 'desc')
+    .limit(capped)
+    .get()
+
+  const rows = snap.docs.map((d) => d.data() as Omit<PrizeLeaderboardRow, 'rank'>)
+
+  rows.sort(
+    (a, b) =>
+      (b.totalPrizeAmount || 0) - (a.totalPrizeAmount || 0) ||
+      (b.competitionsWon || 0) - (a.competitionsWon || 0) ||
+      String(a.studentName).localeCompare(String(b.studentName))
+  )
+
+  return rows.map((row, i) => ({ ...row, rank: i + 1 }))
+}
+
+export interface PrizeLeaderboardRow {
+  rank: number
+  email: string
+  studentName: string
+  section: string
+  totalPrizeAmount: number
+  competitionsWon: number
+  wins: number
+}
+
+export interface RecentWinnerRow {
+  rank: number
+  email: string
+  studentName: string
+  section: string
+  competition: string
+  prize: string
+  date: string
+}
+
+/**
+ * Reads the most recent 25 winners from the winners collection.
+ */
+export async function readRecentWinners(limit = 25): Promise<RecentWinnerRow[]> {
+  const db = getAdminDb()
+  if (!db) return []
+
+  const capped = Math.min(Math.max(1, limit), 100)
+
+  const snap = await db
+    .collection(COLLECTIONS.winners)
+    .orderBy('date', 'desc')
+    .limit(capped)
+    .get()
+
+  const rows = snap.docs.map((d) => {
+    const data = d.data() as Record<string, any>
+    return {
+      email: keyOf(data.email),
+      studentName: String(data.student_name || ''),
+      section: '', // Will need to be fetched from students collection if needed
+      competition: String(data.competition || ''),
+      prize: String(data.prize || ''),
+      date: String(data.date || ''),
+    } as Omit<RecentWinnerRow, 'rank'>
+  })
+
+  return rows.map((row, i) => ({ ...row, rank: i + 1 }))
+}

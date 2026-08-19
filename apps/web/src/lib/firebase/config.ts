@@ -40,6 +40,8 @@ export const COLLECTIONS = {
   gmailTokens: 'gmail_tokens',
   /** Precomputed ranking rows, one per student with at least one win. */
   leaderboard: 'leaderboard',
+  /** Cumulative prize amounts per student (keyed by email). */
+  prizeAmount: 'prize_amount',
 } as const
 
 export type CollectionName = (typeof COLLECTIONS)[keyof typeof COLLECTIONS]

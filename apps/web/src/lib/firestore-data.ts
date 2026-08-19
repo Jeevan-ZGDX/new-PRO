@@ -323,6 +323,66 @@ export async function upsertWinner(winner: Record<string, unknown>) {
   })
 }
 
+// ─── Prize Amount (Cumulative per Student) ───────────────────────────
+function extractNumericPrize(prizeStr: string): number {
+  if (!prizeStr) return 0
+  const upper = prizeStr.toUpperCase()
+  const croreMatch = upper.match(/([\d,.]+)\s*CRORE/)
+  if (croreMatch) return parseFloat(croreMatch[1].replace(/,/g, '')) * 10000000
+  const lakhMatch = upper.match(/([\d,.]+)\s*LAKH/)
+  if (lakhMatch) return parseFloat(lakhMatch[1].replace(/,/g, '')) * 100000
+  const rupeeMatch = upper.match(/₹\s*([\d,]+)/)
+  if (rupeeMatch) return parseFloat(rupeeMatch[1].replace(/,/g, ''))
+  const dollarMatch = prizeStr.match(/\$\s*([\d,]+)/)
+  if (dollarMatch) return parseFloat(dollarMatch[1].replace(/,/g, ''))
+  const numMatch = prizeStr.match(/([\d,]+)/)
+  if (numMatch) return parseFloat(numMatch[1].replace(/,/g, ''))
+  return 0
+}
+
+export async function updatePrizeAmountForWinner(winner: Record<string, unknown>) {
+  const email = (winner.email || '').toLowerCase().trim()
+  const prizeStr = (winner.prize || '') as string
+  const studentName = (winner.studentName || '') as string
+  const section = (winner.section || '') as string
+  const competition = (winner.competition || '') as string
+
+  if (!email) return
+
+  const db = getAdminDb()
+  if (!db) return
+
+  const prizeValue = extractNumericPrize(prizeStr)
+  if (prizeValue <= 0) return
+
+  const docRef = db.collection(COLLECTIONS.prizeAmount).doc(email)
+
+  try {
+    await db.runTransaction(async (transaction) => {
+      const docSnap = await transaction.get(docRef)
+      const existing = docSnap.exists ? docSnap.data() : null
+      const currentTotal = existing?.total_prize_amount || 0
+      const currentWins = existing?.wins || 0
+      const competitions = existing?.competitions || []
+      if (!competitions.includes(competition)) {
+        competitions.push(competition)
+      }
+
+      transaction.set(docRef, {
+        email,
+        student_name: studentName,
+        section,
+        total_prize_amount: currentTotal + prizeValue,
+        wins: currentWins + 1,
+        competitions,
+        last_updated: new Date().toISOString(),
+      }, { merge: true })
+    })
+  } catch (err) {
+    console.error('Failed to update prize amount:', (err as Error).message)
+  }
+}
+
 // ─── Notifications ─────────────────────────────────────────────────
 function mapNotification(row: Row) {
   return {

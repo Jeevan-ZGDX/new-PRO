@@ -16,6 +16,7 @@ import {
   upsertNotifications,
   upsertVerificationRequest,
   insertAuditLog,
+  updatePrizeAmountForWinner,
 } from './firestore-data'
 
 // ─── In-memory caches ───────────────────────────────────────────────
@@ -146,15 +147,14 @@ export async function ensureLoaded() {
     fetchVerificationRequests(),
   ])
 
-  if (sStudents.length > 0) {
-    students.splice(0, students.length, ...sStudents)
-    if (departments[0]) departments[0].studentCount = students.length
-  }
-  if (sAdvisors.length > 0) advisors.splice(0, advisors.length, ...sAdvisors)
-  if (sComps.length > 0) competitions.splice(0, competitions.length, ...sComps)
-  if (sRegs.length > 0) registrations.splice(0, registrations.length, ...sRegs)
-  if (sWinners.length > 0) winners.splice(0, winners.length, ...sWinners)
-  if (sVRs.length > 0) verificationRequests.splice(0, verificationRequests.length, ...sVRs)
+  // Always replace with Firestore data (even if empty) to reflect actual DB state
+  students.splice(0, students.length, ...sStudents)
+  if (departments[0]) departments[0].studentCount = students.length
+  advisors.splice(0, advisors.length, ...sAdvisors)
+  competitions.splice(0, competitions.length, ...sComps)
+  registrations.splice(0, registrations.length, ...sRegs)
+  winners.splice(0, winners.length, ...sWinners)
+  verificationRequests.splice(0, verificationRequests.length, ...sVRs)
 
   persistToStorage()
   console.log(`[Comp-Dash] Loaded: ${students.length} students, ${advisors.length} advisors, ${competitions.length} competitions`)
@@ -228,6 +228,7 @@ export async function pushVerificationRequest(item: any) {
 export async function pushWinner(item: any) {
   winners.push(item)
   await upsertWinner(item)
+  await updatePrizeAmountForWinner(item)
   persistToStorage()
 }
 

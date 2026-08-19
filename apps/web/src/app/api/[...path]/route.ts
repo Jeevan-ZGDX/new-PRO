@@ -7,6 +7,7 @@ import {
   ensureLoaded, pushRegistration, pushNotification, pushNotifications,
   pushVerificationRequest, pushWinner, pushStudent, pushAdvisor,
   pushCompetition, syncRegistration, syncVerificationRequests, syncNotifications,
+  persistToStorage,
 } from '@/lib/firebase-data'
 import { getAllRoleAccessData, setUserAccess, checkUserAccess } from '@/lib/firestore-service'
 import {
@@ -16,6 +17,7 @@ import {
   countUnreadNotifications,
   markNotificationRead,
   fetchAuditLogs,
+  updatePrizeAmountForWinner,
 } from '@/lib/firestore-data'
 import { COLLECTIONS } from '@/lib/firebase/config'
 import { storeGmailTokens, getValidAccessToken as getValidGmailAccessToken, getGmailTokens, clearGmailTokens } from '@/lib/gmail-tokens'
@@ -1011,7 +1013,19 @@ register('GET', '/admin/departments', async () => ok(departments))
 
 register('GET', '/admin/winners', async (req) => {
   const qs = new URL(req.url).searchParams
-  let filtered = [...winners]
+  const forceRefresh = qs.get('refresh') === 'true'
+  
+  let winnersData = winners
+  if (forceRefresh && isFirestoreConfigured()) {
+    const { fetchWinners } = await import('@/lib/firestore-data')
+    const fresh = await fetchWinners()
+    winnersData = fresh
+    // Also update in-memory cache
+    winners.splice(0, winners.length, ...fresh)
+    persistToStorage()
+  }
+  
+  let filtered = [...winnersData]
   const s = qs.get('search')?.toLowerCase()
   if (s) filtered = filtered.filter(w => w.studentName.toLowerCase().includes(s) || w.competition.toLowerCase().includes(s))
   const page = parseInt(qs.get('page') || '1')
@@ -1043,6 +1057,8 @@ register('POST', '/admin/winners', async (req) => {
   // derive it. Failure here is logged, not thrown — a lagging ranking must not
   // cost us the recorded win.
   await refreshStudentLeaderboard(email)
+  // Also update cumulative prize amount per student
+  await updatePrizeAmountForWinner(newWinner)
   revalidateTag(LEADERBOARD_TAG)
   await pushNotification({
     id: 'notif-' + (notifications.length + 1),

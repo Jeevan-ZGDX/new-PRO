@@ -16,6 +16,8 @@ import {
   LEADERBOARD_MAX,
   LEADERBOARD_TAG,
   readTopLeaderboard,
+  readTopPrizeLeaderboard,
+  readRecentWinners,
   recomputeLeaderboard,
 } from '@/lib/leaderboard'
 
@@ -37,6 +39,20 @@ function cachedTop(limit: number) {
   })
 }
 
+function cachedPrizeTop(limit: number) {
+  return unstable_cache(() => readTopPrizeLeaderboard(limit), ['leaderboard-prize-top', String(limit)], {
+    revalidate: 60,
+    tags: [LEADERBOARD_TAG],
+  })
+}
+
+function cachedRecentWinners(limit: number) {
+  return unstable_cache(() => readRecentWinners(limit), ['leaderboard-recent-winners', String(limit)], {
+    revalidate: 60,
+    tags: [LEADERBOARD_TAG],
+  })
+}
+
 function parseLimit(raw: string | null): number {
   const parsed = Number.parseInt(raw || '', 10)
   if (!Number.isFinite(parsed) || parsed <= 0) return LEADERBOARD_LIMIT
@@ -50,11 +66,20 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ success: false, error: 'Not signed in' }, { status: 401 })
   }
 
-  const limit = parseLimit(new URL(request.url).searchParams.get('limit'))
+  const { searchParams } = new URL(request.url)
+  const limit = parseLimit(searchParams.get('limit'))
+  const type = searchParams.get('type') || 'points' // 'points' or 'prize' or 'recent'
 
   try {
-    const data = await cachedTop(limit)()
-    return NextResponse.json({ success: true, data, limit })
+    let data
+    if (type === 'prize') {
+      data = await cachedPrizeTop(limit)()
+    } else if (type === 'recent') {
+      data = await cachedRecentWinners(limit)()
+    } else {
+      data = await cachedTop(limit)()
+    }
+    return NextResponse.json({ success: true, data, limit, type })
   } catch (err) {
     console.error('Leaderboard read failed:', (err as Error).message)
     return NextResponse.json(
