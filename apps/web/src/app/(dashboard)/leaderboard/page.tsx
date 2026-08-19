@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { Card } from '@comp-dash/design-system'
 import { usePrizeLeaderboard, useRecentWinners } from '@comp-dash/api'
-import { Trophy, Award, Clock, DollarSign } from 'lucide-react'
+import { Trophy, Award, Clock } from 'lucide-react'
 
 function RankBadge({ rank }: { rank: number }) {
   if (rank === 1) return <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-amber-400 text-white font-bold text-xs shadow-sm">1</span>
@@ -14,12 +14,12 @@ function RankBadge({ rank }: { rank: number }) {
 
 function formatCurrency(amount: number): string {
   if (amount >= 10000000) {
-    return `₹${(amount / 10000000).toFixed(2)} Cr`
+    return `${(amount / 10000000).toFixed(2)} Cr`
   }
   if (amount >= 100000) {
-    return `₹${(amount / 100000).toFixed(2)} L`
+    return `${(amount / 100000).toFixed(2)} L`
   }
-  return `₹${amount.toLocaleString()}`
+  return `${amount.toLocaleString()}`
 }
 
 export default function LeaderboardPage() {
@@ -45,7 +45,7 @@ export default function LeaderboardPage() {
             }`}
           >
             <Trophy className="w-4 h-4" />
-            Top 25 by Prize Pool
+            Top Achievers
           </button>
           <button
             onClick={() => setActiveTab('recent')}
@@ -56,7 +56,7 @@ export default function LeaderboardPage() {
             }`}
           >
             <Clock className="w-4 h-4" />
-            Recent 25 Winners
+            Winners
           </button>
         </div>
 
@@ -64,7 +64,7 @@ export default function LeaderboardPage() {
           {activeTab === 'prize' && (
             <div className="space-y-4">
               <p className="text-sm text-gray-500 dark:text-zinc-400">
-                Top 25 students by total prize amount won across all competitions
+                Top achievers by total prize amount won across all competitions
               </p>
               <div className="overflow-x-auto">
                 <table className="w-full">
@@ -114,7 +114,6 @@ export default function LeaderboardPage() {
                           </td>
                           <td className="px-4 py-4 text-right">
                             <span className="text-sm font-semibold text-amber-600 dark:text-amber-400 inline-flex items-center gap-1">
-                              <DollarSign className="w-4 h-4" />
                               {formatCurrency(entry.totalPrizeAmount)}
                             </span>
                           </td>

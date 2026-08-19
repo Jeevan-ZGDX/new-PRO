@@ -185,7 +185,7 @@ export default function WinnersPage() {
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-gray-700 dark:text-ink-muted mb-1">Prize</label>
-                    <input type="text" placeholder="$500 / Trophy" value={form.prize} onChange={e => setForm({ ...form, prize: e.target.value })} className="w-full px-3 py-2 bg-white dark:bg-obsidian-hover border border-gray-200 dark:border-obsidian-border rounded-xl text-sm text-gray-900 dark:text-ink-primary" />
+                    <input type="text" placeholder="₹50,000 / Trophy" value={form.prize} onChange={e => setForm({ ...form, prize: e.target.value })} className="w-full px-3 py-2 bg-white dark:bg-obsidian-hover border border-gray-200 dark:border-obsidian-border rounded-xl text-sm text-gray-900 dark:text-ink-primary" />
                   </div>
                 </div>
                 <div className="flex justify-end gap-3 pt-4 border-t border-gray-100 dark:border-obsidian-border">
