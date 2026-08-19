@@ -276,6 +276,10 @@ export async function readTopLeaderboard(limit = LEADERBOARD_LIMIT): Promise<Lea
 
   const capped = Math.min(Math.max(1, limit), LEADERBOARD_MAX)
 
+  // Verify winners exist in DB
+  const winnersSnap = await db.collection(COLLECTIONS.winners).get()
+  if (winnersSnap.empty) return []
+
   const snap = await db
     .collection(COLLECTIONS.leaderboard)
     .orderBy('points', 'desc')
@@ -295,8 +299,8 @@ export async function readTopLeaderboard(limit = LEADERBOARD_LIMIT): Promise<Lea
 }
 
 /**
- * Reads the top 25 students by cumulative prize amount from the prize_amount collection.
- * This is a simpler, faster query since the data is pre-aggregated per student.
+ * Reads the top students by cumulative prize amount computed live from the winners collection.
+ * This guarantees 100% real-time reflection of the database (returns [] when winners is empty).
  */
 export async function readTopPrizeLeaderboard(limit = 25): Promise<PrizeLeaderboardRow[]> {
   const db = getAdminDb()
@@ -304,13 +308,57 @@ export async function readTopPrizeLeaderboard(limit = 25): Promise<PrizeLeaderbo
 
   const capped = Math.min(Math.max(1, limit), 100)
 
-  const snap = await db
-    .collection(COLLECTIONS.prizeAmount)
-    .orderBy('total_prize_amount', 'desc')
-    .limit(capped)
-    .get()
+  // Query live winners collection
+  const winnersSnap = await db.collection(COLLECTIONS.winners).get()
+  if (winnersSnap.empty) {
+    return []
+  }
 
-  const rows = snap.docs.map((d) => d.data() as Omit<PrizeLeaderboardRow, 'rank'>)
+  const winnerDocs = winnersSnap.docs.map((d) => d.data() as Record<string, any>)
+  const tallies = tallyWinners(winnerDocs)
+  if (tallies.size === 0) {
+    return []
+  }
+
+  // Fetch student sections and details for these emails
+  const emails = Array.from(tallies.keys())
+  const studentsByEmail = new Map<string, Record<string, any>>()
+
+  if (emails.length > 0) {
+    try {
+      // Chunk emails in batches of 30 for Firestore 'in' query limit
+      for (let i = 0; i < emails.length; i += 30) {
+        const chunk = emails.slice(i, i + 30)
+        const snap = await db.collection(COLLECTIONS.students).where('email', 'in', chunk).get()
+        for (const doc of snap.docs) {
+          const data = doc.data()
+          const email = keyOf(data.email)
+          if (email) studentsByEmail.set(email, data)
+        }
+      }
+    } catch {
+      // Ignore student lookup error, fallback to winner doc fields
+    }
+  }
+
+  const rows: Omit<PrizeLeaderboardRow, 'rank'>[] = []
+  for (const [email, tally] of tallies) {
+    const student = studentsByEmail.get(email)
+    const winnerDoc = winnerDocs.find((w) => keyOf(w.email) === email)
+    const studentName =
+      student?.name || winnerDoc?.student_name || winnerDoc?.studentName || email.split('@')[0]
+    const rawSection = student?.section || winnerDoc?.section || ''
+    const section = normalizeSection(rawSection) || rawSection || ''
+
+    rows.push({
+      email,
+      studentName: String(studentName),
+      section,
+      totalPrizeAmount: tally.totalPrize,
+      competitionsWon: tally.wins,
+      wins: tally.wins,
+    })
+  }
 
   rows.sort(
     (a, b) =>
@@ -319,7 +367,7 @@ export async function readTopPrizeLeaderboard(limit = 25): Promise<PrizeLeaderbo
       String(a.studentName).localeCompare(String(b.studentName))
   )
 
-  return rows.map((row, i) => ({ ...row, rank: i + 1 }))
+  return rows.slice(0, capped).map((row, i) => ({ ...row, rank: i + 1 }))
 }
 
 export interface PrizeLeaderboardRow {
@@ -343,7 +391,7 @@ export interface RecentWinnerRow {
 }
 
 /**
- * Reads the most recent 25 winners from the winners collection.
+ * Reads the most recent winners directly from the winners collection.
  */
 export async function readRecentWinners(limit = 25): Promise<RecentWinnerRow[]> {
   const db = getAdminDb()
@@ -351,23 +399,45 @@ export async function readRecentWinners(limit = 25): Promise<RecentWinnerRow[]> 
 
   const capped = Math.min(Math.max(1, limit), 100)
 
-  const snap = await db
-    .collection(COLLECTIONS.winners)
-    .orderBy('date', 'desc')
-    .limit(capped)
-    .get()
+  const snap = await db.collection(COLLECTIONS.winners).get()
+  if (snap.empty) return []
 
-  const rows = snap.docs.map((d) => {
-    const data = d.data() as Record<string, any>
+  const rawDocs = snap.docs.map((d) => ({ id: d.id, ...(d.data() as Record<string, any>) }))
+
+  // Fetch sections for emails
+  const emails = Array.from(new Set(rawDocs.map((d) => keyOf(d.email)).filter(Boolean)))
+  const sectionsByEmail = new Map<string, string>()
+
+  if (emails.length > 0) {
+    try {
+      for (let i = 0; i < emails.length; i += 30) {
+        const chunk = emails.slice(i, i + 30)
+        const studentSnap = await db.collection(COLLECTIONS.students).where('email', 'in', chunk).get()
+        for (const doc of studentSnap.docs) {
+          const data = doc.data()
+          const email = keyOf(data.email)
+          if (email) sectionsByEmail.set(email, normalizeSection(data.section) || data.section || '')
+        }
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  const rows = rawDocs.map((data) => {
+    const email = keyOf(data.email)
     return {
-      email: keyOf(data.email),
-      studentName: String(data.student_name || ''),
-      section: '', // Will need to be fetched from students collection if needed
+      email,
+      studentName: String(data.student_name || data.studentName || ''),
+      section: sectionsByEmail.get(email) || data.section || '',
       competition: String(data.competition || ''),
       prize: String(data.prize || ''),
       date: String(data.date || ''),
     } as Omit<RecentWinnerRow, 'rank'>
   })
 
-  return rows.map((row, i) => ({ ...row, rank: i + 1 }))
+  // Sort descending by date
+  rows.sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')))
+
+  return rows.slice(0, capped).map((row, i) => ({ ...row, rank: i + 1 }))
 }

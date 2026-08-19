@@ -56,7 +56,8 @@ export function useAdminWinners(params?: {
     queryKey: ['admin', 'winners', params],
     queryFn: () =>
       apiClient.get<WinnerListResponse>('/admin/winners', params as Record<string, unknown>),
-    staleTime: 2 * 60 * 1000,
+    staleTime: 0,
+    refetchOnMount: 'always',
   })
 }
 

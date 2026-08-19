@@ -1013,24 +1013,44 @@ register('GET', '/admin/departments', async () => ok(departments))
 
 register('GET', '/admin/winners', async (req) => {
   const qs = new URL(req.url).searchParams
-  const forceRefresh = qs.get('refresh') === 'true'
-  
-  let winnersData = winners
-  if (forceRefresh && isFirestoreConfigured()) {
+
+  let winnersData: any[] = []
+  if (isFirestoreConfigured()) {
     const { fetchWinners } = await import('@/lib/firestore-data')
-    const fresh = await fetchWinners()
-    winnersData = fresh
-    // Also update in-memory cache
-    winners.splice(0, winners.length, ...fresh)
+    winnersData = await fetchWinners()
+    // Sync in-memory cache with real DB
+    winners.splice(0, winners.length, ...winnersData)
     persistToStorage()
+  } else {
+    winnersData = winners
   }
-  
+
   let filtered = [...winnersData]
   const s = qs.get('search')?.toLowerCase()
-  if (s) filtered = filtered.filter(w => w.studentName.toLowerCase().includes(s) || w.competition.toLowerCase().includes(s))
+  if (s) {
+    filtered = filtered.filter(
+      (w) =>
+        (w.studentName || '').toLowerCase().includes(s) ||
+        (w.competition || '').toLowerCase().includes(s)
+    )
+  }
   const page = parseInt(qs.get('page') || '1')
   const limit = parseInt(qs.get('limit') || '10')
   return ok(paginated(filtered, page, limit))
+})
+
+register('DELETE', '/admin/winners/:id', async (req, seg) => {
+  const id = seg[1]
+  if (isFirestoreConfigured()) {
+    const { deleteDocById } = await import('@/lib/firestore-data')
+    const { COLLECTIONS } = await import('@/lib/firebase/config')
+    await deleteDocById(COLLECTIONS.winners, id)
+  }
+  const idx = winners.findIndex((w) => w.id === id)
+  if (idx !== -1) winners.splice(idx, 1)
+  persistToStorage()
+  revalidateTag(LEADERBOARD_TAG)
+  return ok({ success: true, id })
 })
 
 register('POST', '/admin/winners', async (req) => {

@@ -106,7 +106,7 @@ function hydrateFromStorage() {
   }
 }
 
-function persistToStorage() {
+export function persistToStorage() {
   if (typeof window === 'undefined') return
   localStorage.setItem('comp_dash_students', JSON.stringify(students))
   localStorage.setItem('comp_dash_advisors', JSON.stringify(advisors))

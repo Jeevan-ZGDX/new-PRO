@@ -1,10 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
-import { isSupabaseEnabled } from '../supabase-manager'
-import { apiClient } from '../client'
 import type { PrizeLeaderboardEntry, RecentWinnerEntry } from '@comp-dash/types'
 
-// Use the new Firestore-based leaderboard endpoint
-async function fetchPrizeLeaderboardFromFirestore(): Promise<PrizeLeaderboardEntry[]> {
+async function fetchPrizeLeaderboard(): Promise<PrizeLeaderboardEntry[]> {
   try {
     const response = await fetch('/api/leaderboard?type=prize&limit=25', {
       credentials: 'same-origin',
@@ -17,7 +14,7 @@ async function fetchPrizeLeaderboardFromFirestore(): Promise<PrizeLeaderboardEnt
   }
 }
 
-async function fetchRecentWinnersFromFirestore(): Promise<RecentWinnerEntry[]> {
+async function fetchRecentWinners(): Promise<RecentWinnerEntry[]> {
   try {
     const response = await fetch('/api/leaderboard?type=recent&limit=25', {
       credentials: 'same-origin',
@@ -33,26 +30,17 @@ async function fetchRecentWinnersFromFirestore(): Promise<RecentWinnerEntry[]> {
 export function usePrizeLeaderboard() {
   return useQuery({
     queryKey: ['leaderboard', 'prize'],
-    queryFn: () => {
-      if (isSupabaseEnabled()) {
-        // Fallback to Supabase if enabled (legacy)
-        return fetch('/api/leaderboard?type=prize&limit=25').then(r => r.json()).then(b => b.data || [])
-      }
-      return fetchPrizeLeaderboardFromFirestore()
-    },
-    staleTime: 2 * 60 * 1000,
+    queryFn: () => fetchPrizeLeaderboard(),
+    staleTime: 0,
+    refetchOnMount: 'always',
   })
 }
 
 export function useRecentWinners() {
   return useQuery({
     queryKey: ['leaderboard', 'recent-winners'],
-    queryFn: () => {
-      if (isSupabaseEnabled()) {
-        return fetch('/api/leaderboard?type=recent&limit=25').then(r => r.json()).then(b => b.data || [])
-      }
-      return fetchRecentWinnersFromFirestore()
-    },
-    staleTime: 2 * 60 * 1000,
+    queryFn: () => fetchRecentWinners(),
+    staleTime: 0,
+    refetchOnMount: 'always',
   })
 }

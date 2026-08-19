@@ -73,13 +73,20 @@ export async function GET(request: NextRequest) {
   try {
     let data
     if (type === 'prize') {
-      data = await cachedPrizeTop(limit)()
+      data = await readTopPrizeLeaderboard(limit)
     } else if (type === 'recent') {
-      data = await cachedRecentWinners(limit)()
+      data = await readRecentWinners(limit)
     } else {
-      data = await cachedTop(limit)()
+      data = await readTopLeaderboard(limit)
     }
-    return NextResponse.json({ success: true, data, limit, type })
+    return NextResponse.json(
+      { success: true, data, limit, type },
+      {
+        headers: {
+          'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+        },
+      }
+    )
   } catch (err) {
     console.error('Leaderboard read failed:', (err as Error).message)
     return NextResponse.json(
