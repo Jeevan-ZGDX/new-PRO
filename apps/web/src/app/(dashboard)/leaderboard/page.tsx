@@ -63,9 +63,6 @@ export default function LeaderboardPage() {
         <div className="p-6">
           {activeTab === 'prize' && (
             <div className="space-y-4">
-              <p className="text-sm text-gray-500 dark:text-zinc-400">
-                Top achievers by total prize amount won across all competitions
-              </p>
               <div className="overflow-x-auto">
                 <table className="w-full">
                   <thead>
@@ -114,7 +111,7 @@ export default function LeaderboardPage() {
                           </td>
                           <td className="px-4 py-4 text-right">
                             <span className="text-sm font-semibold text-amber-600 dark:text-amber-400 inline-flex items-center gap-1">
-                              {formatCurrency(entry.totalPrizeAmount)}
+                              Rs.{entry.totalPrizeAmount}
                             </span>
                           </td>
                         </tr>
@@ -133,7 +130,7 @@ export default function LeaderboardPage() {
           {activeTab === 'recent' && (
             <div className="space-y-4">
               <p className="text-sm text-gray-500 dark:text-zinc-400">
-                Most recent 25 winners from all competitions
+                Recent winners
               </p>
               <div className="overflow-x-auto">
                 <table className="w-full">
@@ -183,7 +180,7 @@ export default function LeaderboardPage() {
                             {entry.competition}
                           </td>
                           <td className="px-4 py-4 text-right text-sm font-medium text-amber-600 dark:text-amber-400">
-                            {entry.prize || '-'}
+                            Rs.{entry.prize || '-'}
                           </td>
                           <td className="px-4 py-4 text-sm text-gray-500 dark:text-zinc-500">
                             {entry.date ? new Date(entry.date).toLocaleDateString() : '-'}
