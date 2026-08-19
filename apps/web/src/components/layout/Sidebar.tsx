@@ -11,7 +11,6 @@ import {
   Users,
   GraduationCap,
   Building2,
-  Medal,
   BarChart3,
   FileText,
   LogOut,
@@ -39,8 +38,7 @@ const navItems: NavItem[] = [
   { label: 'Students', icon: Users, href: '/students', roles: ['super_admin'] },
   { label: 'Advisors', icon: GraduationCap, href: '/advisors', roles: ['hod', 'super_admin'] },
   { label: 'Analytics', icon: BarChart3, href: '/analytics', roles: ['hod'] },
-  { label: 'Winners', icon: Medal, href: '/winners', roles: ['hod', 'advisor', 'student', 'super_admin'] },
-]
+  ]
 
 interface SidebarProps {
   open: boolean

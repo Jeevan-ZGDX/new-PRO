@@ -26,3 +26,22 @@ export interface CompetitionLeaderboardEntry {
   score: number
   position: string
 }
+
+export interface PrizeLeaderboardEntry {
+  rank: number
+  studentName: string
+  email: string
+  section: string
+  competitionsWon: number
+  totalPrizeAmount: number
+}
+
+export interface RecentWinnerEntry {
+  rank: number
+  studentName: string
+  email: string
+  section: string
+  competition: string
+  prize: string
+  date: string
+}

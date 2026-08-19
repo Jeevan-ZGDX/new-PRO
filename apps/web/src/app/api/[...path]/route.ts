@@ -1057,6 +1057,123 @@ register('POST', '/admin/winners', async (req) => {
   return ok(newWinner)
 })
 
+function extractNumericPrize(prizeStr: string): number {
+  if (!prizeStr) return 0
+  const upper = prizeStr.toUpperCase()
+  const croreMatch = upper.match(/([\d,.]+)\s*CRORE/)
+  if (croreMatch) return parseFloat(croreMatch[1].replace(/,/g, '')) * 10000000
+  const lakhMatch = upper.match(/([\d,.]+)\s*LAKH/)
+  if (lakhMatch) return parseFloat(lakhMatch[1].replace(/,/g, '')) * 100000
+  const rupeeMatch = upper.match(/₹\s*([\d,]+)/)
+  if (rupeeMatch) return parseFloat(rupeeMatch[1].replace(/,/g, ''))
+  const dollarMatch = prizeStr.match(/\$\s*([\d,]+)/)
+  if (dollarMatch) return parseFloat(dollarMatch[1].replace(/,/g, ''))
+  const numMatch = prizeStr.match(/([\d,]+)/)
+  if (numMatch) return parseFloat(numMatch[1].replace(/,/g, ''))
+  return 0
+}
+
+async function fetchPrizeLeaderboardFromSupabase(): Promise<any[]> {
+  if (!isSupabaseConfigured() || !supabase) return []
+  
+  const { data: winnersData, error: winnersError } = await supabase
+    .from('winners')
+    .select('student_name, email, competition, prize, date')
+    .order('date', { ascending: false })
+
+  if (winnersError || !winnersData?.length) return []
+
+  // Fetch student sections for these emails
+  const emails = [...new Set(winnersData.map(w => w.email?.toLowerCase().trim()).filter(Boolean))]
+  const { data: studentsData } = await supabase
+    .from('students')
+    .select('email, section')
+    .in('email', emails)
+
+  const sectionByEmail = new Map<string, string>()
+  for (const s of studentsData || []) {
+    sectionByEmail.set(s.email?.toLowerCase().trim() || '', s.section || '')
+  }
+
+  const prizeByEmail = new Map<string, { totalPrize: number; studentName: string; competitions: string[]; section: string }>()
+
+  for (const w of winnersData) {
+    const email = (w.email || '').toLowerCase().trim()
+    if (!email) continue
+    const section = sectionByEmail.get(email) || ''
+    const existing = prizeByEmail.get(email) || { totalPrize: 0, studentName: w.student_name || '', competitions: [], section }
+    existing.totalPrize += extractNumericPrize(w.prize || '')
+    if (w.competition && !existing.competitions.includes(w.competition)) {
+      existing.competitions.push(w.competition)
+    }
+    prizeByEmail.set(email, existing)
+  }
+
+  const entries = Array.from(prizeByEmail.entries())
+    .map(([email, data]) => ({
+      studentName: data.studentName,
+      email,
+      section: data.section,
+      competitionsWon: data.competitions.length,
+      totalPrizeAmount: data.totalPrize,
+    }))
+    .sort((a, b) => b.totalPrizeAmount - a.totalPrizeAmount)
+    .slice(0, 25)
+    .map((e, i) => ({ rank: i + 1, ...e }))
+
+  return entries
+}
+
+register('GET', '/leaderboard', async (req) => {
+  if (isSupabaseConfigured() && supabase) {
+    const entries = await fetchPrizeLeaderboardFromSupabase()
+    return ok(entries)
+  }
+  return ok([])
+})
+
+async function fetchRecentWinnersFromSupabase(): Promise<any[]> {
+  if (!isSupabaseConfigured() || !supabase) return []
+  
+  const { data: winnersData, error: winnersError } = await supabase
+    .from('winners')
+    .select('student_name, email, competition, position, prize, date')
+    .order('date', { ascending: false })
+    .limit(25)
+
+  if (winnersError || !winnersData?.length) return []
+
+  // Fetch student sections for these emails
+  const emails = [...new Set(winnersData.map(w => w.email?.toLowerCase().trim()).filter(Boolean))]
+  const { data: studentsData } = await supabase
+    .from('students')
+    .select('email, section')
+    .in('email', emails)
+
+  const sectionByEmail = new Map<string, string>()
+  for (const s of studentsData || []) {
+    sectionByEmail.set(s.email?.toLowerCase().trim() || '', s.section || '')
+  }
+
+  return winnersData.map((w, i) => ({
+    rank: i + 1,
+    studentName: w.student_name || '',
+    email: w.email || '',
+    section: sectionByEmail.get(w.email?.toLowerCase().trim() || '') || '',
+    competition: w.competition || '',
+    prize: w.prize || '',
+    date: w.date || '',
+  }))
+}
+
+register('GET', '/leaderboard/recent-winners', async (req) => {
+  if (isSupabaseConfigured() && supabase) {
+    const entries = await fetchRecentWinnersFromSupabase()
+    return ok(entries)
+  }
+  return ok([])
+})
+
 register('GET', '/admin/analytics/stats', async () => {
   const totalCompetitions = competitions.length
   const totalParticipants = registrations.length
