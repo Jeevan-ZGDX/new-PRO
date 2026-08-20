@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { Card, CardHeader, CardTitle, Button } from '@comp-dash/design-system'
 import { useCreateCompetition, useUpdateCompetition, useCompetition } from '@comp-dash/api'
 import { useQueryClient } from '@tanstack/react-query'
-import { Plus, X, Save } from 'lucide-react'
+import { Plus, X, Save, AlertCircle } from 'lucide-react'
 import type { CompetitionCategory, CompetitionScope, CompetitionMode } from '@comp-dash/types'
 
 const categoryOptions: { value: CompetitionCategory; label: string }[] = [
@@ -53,6 +53,7 @@ function CreateCompetitionContent() {
   const { data: existingComp } = useCompetition(editId || '')
 
   const [tagsInput, setTagsInput] = useState('')
+  const [submitError, setSubmitError] = useState<string | null>(null)
 
   const defaultForm = {
     title: '',
@@ -129,10 +130,17 @@ function CreateCompetitionContent() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!form.title || !form.category || !form.scope || !form.mode || !form.organizer || !form.registrationLink) return
+    setSubmitError(null)
+
+    if (!form.title.trim() || !form.category || !form.scope || !form.mode || !form.organizer.trim()) {
+      setSubmitError('Please fill in all required fields: Title, Category, Scope, Mode, and Organizer.')
+      return
+    }
 
     const payload = {
       ...form,
+      title: form.title.trim(),
+      organizer: form.organizer.trim(),
       category: form.category as CompetitionCategory,
       scope: form.scope as CompetitionScope,
       mode: form.mode as CompetitionMode,
@@ -153,10 +161,17 @@ function CreateCompetitionContent() {
       await queryClient.invalidateQueries({ queryKey: ['supabase-competitions'] })
       router.push('/competitions')
       router.refresh()
-    } catch { /* ignore */ }
+    } catch (err: any) {
+      console.error('Failed to save competition:', err)
+      const errorMsg =
+        err?.response?.data?.error?.message ||
+        err?.message ||
+        'Failed to save competition to database. Please check your connection and try again.'
+      setSubmitError(errorMsg)
+    }
   }
 
-  const isValid = form.title && form.category && form.scope && form.mode && form.organizer && form.registrationLink
+  const isValid = Boolean(form.title.trim() && form.category && form.scope && form.mode && form.organizer.trim())
   const isSaving = createMutation.isPending || updateMutation.isPending
 
   return (
@@ -169,6 +184,16 @@ function CreateCompetitionContent() {
           </span>
         )}
       </div>
+
+      {submitError && (
+        <div className="p-4 rounded-xl bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800/60 text-red-700 dark:text-red-300 text-sm flex items-start gap-3 shadow-sm">
+          <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
+          <div className="flex-1">
+            <p className="font-semibold">Unable to save competition</p>
+            <p className="mt-0.5 text-xs opacity-90">{submitError}</p>
+          </div>
+        </div>
+      )}
 
       <form onSubmit={handleSubmit} className="space-y-6">
         <Card className="bg-white dark:bg-[#18181b] border border-gray-200 dark:border-zinc-800 shadow-sm transition-all duration-200">

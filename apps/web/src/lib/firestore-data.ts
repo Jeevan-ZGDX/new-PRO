@@ -341,7 +341,7 @@ function extractNumericPrize(prizeStr: string): number {
 }
 
 export async function updatePrizeAmountForWinner(winner: Record<string, unknown>) {
-  const email = (winner.email || '').toLowerCase().trim()
+  const email = String(winner.email || '').toLowerCase().trim()
   const prizeStr = (winner.prize || '') as string
   const studentName = (winner.studentName || '') as string
   const section = (winner.section || '') as string
@@ -598,6 +598,16 @@ export function mapCompetitionDashboardRow(row: Row) {
     totalPrizeAmount: row.total_prize_amount,
     category: row.category,
     organizer: row.organizer,
+    organizerEmail: row.organizer_email,
+    websiteUrl: row.website_url,
+    registrationLink: row.registration_link,
+    description: row.description,
+    shortDescription: row.short_description,
+    scope: row.scope,
+    mode: row.mode,
+    teamSizeMin: row.team_size_min,
+    teamSizeMax: row.team_size_max,
+    tags: row.tags,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   }
@@ -605,20 +615,31 @@ export function mapCompetitionDashboardRow(row: Row) {
 
 export async function upsertCompetitionDashboardItem(item: Record<string, unknown>) {
   return writeDoc(COLLECTIONS.competitionDashboard, String(item.id), {
-    serial_no: item.serialNo || item.serial_no,
-    competition_name: item.competitionName || item.competition_name,
+    serial_no: item.serialNo || item.serial_no || Math.floor(Date.now() / 1000),
+    competition_name: item.competitionName || item.competition_name || item.title || '',
     competition_status: item.competitionStatus || item.competition_status || 'On Going',
-    eligible_year: item.eligibleYear || item.eligible_year || '',
-    reg_deadline: item.regDeadline || item.reg_deadline || null,
-    r1_date: item.r1Date || item.r1_date || null,
-    r2_date: item.r2Date || item.r2_date || null,
+    eligible_year: item.eligibleYear || item.eligible_year || ((item.eligibility as any)?.yearOfStudy?.[0]) || '',
+    reg_deadline: item.regDeadline || item.reg_deadline || item.registrationDeadline || null,
+    r1_date: item.r1Date || item.r1_date || item.startDate || null,
+    r2_date: item.r2Date || item.r2_date || item.endDate || null,
     remaining_days_for_reg: item.remainingDaysForReg ?? item.remaining_days_for_reg ?? 0,
     r_days_for_r1: item.rDaysForR1 ?? item.r_days_for_r1 ?? 0,
     r_days_for_r2: item.rDaysForR2 ?? item.r_days_for_r2 ?? 0,
     reg_team: item.regTeam ?? item.reg_team ?? 0,
-    total_prize_amount: item.totalPrizeAmount || item.total_prize_amount || '',
-    category: item.category || 'Competition',
+    total_prize_amount: item.totalPrizeAmount || item.total_prize_amount || item.prizePool || '',
+    category: (item.category as string)?.toLowerCase() || 'competition',
     organizer: item.organizer || '',
+    organizer_email: item.organizerEmail || item.organizer_email || '',
+    website_url: item.registrationUrl || item.websiteUrl || item.website_url || '',
+    registration_link: item.registrationLink || item.registration_link || '',
+    description: item.description || '',
+    short_description: item.shortDescription || item.short_description || '',
+    scope: item.scope || 'national',
+    mode: item.mode || 'online',
+    team_size_min: item.teamSizeMin || item.team_size_min || 1,
+    team_size_max: item.teamSizeMax || item.team_size_max || 1,
+    tags: typeof item.tags === 'string' ? item.tags : JSON.stringify(item.tags || []),
+    created_at: item.createdAt || item.created_at || nowIso(),
     updated_at: nowIso(),
   })
 }

@@ -265,32 +265,38 @@ export function useCreateCompetition() {
       if (isFirestoreEnabled()) {
         const db = getFirestoreDb()
         if (db) {
-          // The doc id is the row id, matching how the migration keyed every
-          // collection, so updates and deletes can address it directly.
-          const id = crypto.randomUUID()
-          await setDoc(doc(db, DASHBOARD_COLLECTION, id), {
-            id,
-            competition_name: (data.title as string) || '',
-            category: (data.category as string) || 'competition',
-            organizer: (data.organizer as string) || '',
-            total_prize_amount: (data.prizePool as string) || '',
-            website_url: (data.registrationUrl as string) || (data.websiteUrl as string) || '',
-            registration_link: (data.registrationLink as string) || '',
-            description: (data.description as string) || '',
-            short_description: (data.shortDescription as string) || '',
-            scope: (data.scope as string) || 'national',
-            mode: (data.mode as string) || 'online',
-            organizer_email: (data.organizerEmail as string) || '',
-            team_size_min: (data.teamSizeMin as number) ?? 1,
-            team_size_max: (data.teamSizeMax as number) ?? 1,
-            tags: data.tags ? JSON.stringify(data.tags) : '[]',
-            reg_deadline: (data.registrationDeadline as string) || null,
-            r1_date: (data.startDate as string) || null,
-            r2_date: (data.endDate as string) || null,
-            eligible_year: ((data.eligibility as Record<string, unknown>)?.yearOfStudy as string[])?.[0] || '',
-            competition_status: 'On Going',
-            serial_no: Math.floor(Date.now() / 1000),
-          })
+          try {
+            // The doc id is the row id, matching how the migration keyed every
+            // collection, so updates and deletes can address it directly.
+            const id = crypto.randomUUID()
+            await setDoc(doc(db, DASHBOARD_COLLECTION, id), {
+              id,
+              competition_name: (data.title as string) || '',
+              category: (data.category as string) || 'competition',
+              organizer: (data.organizer as string) || '',
+              total_prize_amount: (data.prizePool as string) || '',
+              website_url: (data.registrationUrl as string) || (data.websiteUrl as string) || '',
+              registration_link: (data.registrationLink as string) || '',
+              description: (data.description as string) || '',
+              short_description: (data.shortDescription as string) || '',
+              scope: (data.scope as string) || 'national',
+              mode: (data.mode as string) || 'online',
+              organizer_email: (data.organizerEmail as string) || '',
+              team_size_min: (data.teamSizeMin as number) ?? 1,
+              team_size_max: (data.teamSizeMax as number) ?? 1,
+              tags: data.tags ? (typeof data.tags === 'string' ? data.tags : JSON.stringify(data.tags)) : '[]',
+              reg_deadline: (data.registrationDeadline as string) || null,
+              r1_date: (data.startDate as string) || null,
+              r2_date: (data.endDate as string) || null,
+              eligible_year: ((data.eligibility as Record<string, unknown>)?.yearOfStudy as string[])?.[0] || '',
+              competition_status: 'On Going',
+              serial_no: Math.floor(Date.now() / 1000),
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+            })
+          } catch (err) {
+            console.warn('Direct Firestore client setDoc skipped/failed, relying on API endpoint:', err)
+          }
         }
       }
 

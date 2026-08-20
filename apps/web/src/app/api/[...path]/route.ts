@@ -1109,38 +1109,23 @@ function extractNumericPrize(prizeStr: string): number {
   return 0
 }
 
-async function fetchPrizeLeaderboardFromSupabase(): Promise<any[]> {
-  if (!isSupabaseConfigured() || !supabase) return []
-  
-  const { data: winnersData, error: winnersError } = await supabase
-    .from('winners')
-    .select('student_name, email, competition, prize, date')
-    .order('date', { ascending: false })
-
-  if (winnersError || !winnersData?.length) return []
-
-  // Fetch student sections for these emails
-  const emails = [...new Set(winnersData.map(w => w.email?.toLowerCase().trim()).filter(Boolean))]
-  const { data: studentsData } = await supabase
-    .from('students')
-    .select('email, section')
-    .in('email', emails)
-
+async function fetchPrizeLeaderboard(): Promise<any[]> {
   const sectionByEmail = new Map<string, string>()
-  for (const s of studentsData || []) {
-    sectionByEmail.set(s.email?.toLowerCase().trim() || '', s.section || '')
+  for (const s of students || []) {
+    sectionByEmail.set((s.email || '').toLowerCase().trim(), s.section || '')
   }
 
   const prizeByEmail = new Map<string, { totalPrize: number; studentName: string; competitions: string[]; section: string }>()
 
-  for (const w of winnersData) {
+  for (const w of winners || []) {
     const email = (w.email || '').toLowerCase().trim()
     if (!email) continue
-    const section = sectionByEmail.get(email) || ''
-    const existing = prizeByEmail.get(email) || { totalPrize: 0, studentName: w.student_name || '', competitions: [], section }
+    const section = sectionByEmail.get(email) || w.section || ''
+    const existing = prizeByEmail.get(email) || { totalPrize: 0, studentName: String(w.student_name || w.studentName || ''), competitions: [] as string[], section }
     existing.totalPrize += extractNumericPrize(w.prize || '')
-    if (w.competition && !existing.competitions.includes(w.competition)) {
-      existing.competitions.push(w.competition)
+    const compName = String(w.competition || '')
+    if (compName && !existing.competitions.includes(compName)) {
+      existing.competitions.push(compName)
     }
     prizeByEmail.set(email, existing)
   }
@@ -1160,54 +1145,33 @@ async function fetchPrizeLeaderboardFromSupabase(): Promise<any[]> {
   return entries
 }
 
-register('GET', '/leaderboard', async (req) => {
-  if (isSupabaseConfigured() && supabase) {
-    const entries = await fetchPrizeLeaderboardFromSupabase()
-    return ok(entries)
-  }
-  return ok([])
+register('GET', '/leaderboard', async () => {
+  const entries = await fetchPrizeLeaderboard()
+  return ok(entries)
 })
 
-async function fetchRecentWinnersFromSupabase(): Promise<any[]> {
-  if (!isSupabaseConfigured() || !supabase) return []
-  
-  const { data: winnersData, error: winnersError } = await supabase
-    .from('winners')
-    .select('student_name, email, competition, position, prize, date')
-    .order('date', { ascending: false })
-    .limit(25)
-
-  if (winnersError || !winnersData?.length) return []
-
-  // Fetch student sections for these emails
-  const emails = [...new Set(winnersData.map(w => w.email?.toLowerCase().trim()).filter(Boolean))]
-  const { data: studentsData } = await supabase
-    .from('students')
-    .select('email, section')
-    .in('email', emails)
-
+async function fetchRecentWinners(): Promise<any[]> {
   const sectionByEmail = new Map<string, string>()
-  for (const s of studentsData || []) {
-    sectionByEmail.set(s.email?.toLowerCase().trim() || '', s.section || '')
+  for (const s of students || []) {
+    sectionByEmail.set((s.email || '').toLowerCase().trim(), s.section || '')
   }
 
-  return winnersData.map((w, i) => ({
+  const sortedWinners = [...(winners || [])].sort((a: any, b: any) => String(b.date || '').localeCompare(String(a.date || ''))).slice(0, 25)
+
+  return sortedWinners.map((w: any, i: number) => ({
     rank: i + 1,
-    studentName: w.student_name || '',
+    studentName: w.student_name || w.studentName || '',
     email: w.email || '',
-    section: sectionByEmail.get(w.email?.toLowerCase().trim() || '') || '',
+    section: sectionByEmail.get((w.email || '').toLowerCase().trim()) || w.section || '',
     competition: w.competition || '',
     prize: w.prize || '',
     date: w.date || '',
   }))
 }
 
-register('GET', '/leaderboard/recent-winners', async (req) => {
-  if (isSupabaseConfigured() && supabase) {
-    const entries = await fetchRecentWinnersFromSupabase()
-    return ok(entries)
-  }
-  return ok([])
+register('GET', '/leaderboard/recent-winners', async () => {
+  const entries = await fetchRecentWinners()
+  return ok(entries)
 })
 
 register('GET', '/admin/analytics/stats', async () => {

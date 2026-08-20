@@ -402,7 +402,7 @@ export async function readRecentWinners(limit = 25): Promise<RecentWinnerRow[]> 
   const snap = await db.collection(COLLECTIONS.winners).get()
   if (snap.empty) return []
 
-  const rawDocs = snap.docs.map((d) => ({ id: d.id, ...(d.data() as Record<string, any>) }))
+  const rawDocs: Record<string, any>[] = snap.docs.map((d) => ({ id: d.id, ...d.data() }))
 
   // Fetch sections for emails
   const emails = Array.from(new Set(rawDocs.map((d) => keyOf(d.email)).filter(Boolean)))

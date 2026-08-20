@@ -10,6 +10,7 @@ import {
   upsertStudents,
   upsertAdvisor,
   upsertCompetition,
+  upsertCompetitionDashboardItem,
   upsertRegistration,
   upsertWinner,
   upsertNotification,
@@ -246,14 +247,20 @@ export async function pushAdvisor(item: any) {
 
 export async function pushCompetition(item: any) {
   competitions.push(item)
-  await upsertCompetition(item)
+  await Promise.all([
+    upsertCompetition(item),
+    upsertCompetitionDashboardItem(item),
+  ])
   persistToStorage()
 }
 
 export async function syncCompetition(id: string) {
   const item = competitions.find(c => c.id === id)
   if (item) {
-    await upsertCompetition(item)
+    await Promise.all([
+      upsertCompetition(item),
+      upsertCompetitionDashboardItem(item),
+    ])
     persistToStorage()
   }
 }
